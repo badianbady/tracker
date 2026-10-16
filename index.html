@@ -69,6 +69,21 @@
   .air-nums { font-size: 14px; margin-top: 2px; font-variant-numeric: tabular-nums; }
   .empty { padding: 22px 18px; color: var(--muted); }
   .plane-ic { background: none; border: 0; }
+  .recent { border-top: 1px solid var(--line); flex: none; max-height: 45%; overflow-y: auto; }
+  .recent h3 { font-size: 17px; padding: 12px 18px 4px; }
+  .recent-item { display: flex; align-items: center; gap: 10px; padding: 8px 18px; color: var(--text); text-decoration: none; font-size: 14px; }
+  .recent-item:hover { background: var(--green-soft); }
+  .recent-item .score { font-size: 15px; min-width: 40px; }
+  .recent-item div { min-width: 0; flex: 1; }
+  .recent-item b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ap-label { background: rgba(255,255,255,.92); border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.25); color: #102217;
+              font: 700 12px var(--display); padding: 0 5px; border-radius: 4px; }
+  .ap-label::before { display: none; }
+  .leaflet-control-layers { border-radius: 10px !important; font-family: var(--body); }
+  .flight-map { height: 340px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 18px; display: none; }
+  .flight-map.on { display: block; }
+  tr.clickable { cursor: pointer; } tr.clickable:hover td { background: var(--green-soft); } tr.sel td { background: var(--green-soft); }
+  .stream-btn { display: inline-flex; align-items: center; gap: 6px; background: #E11D48; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 3px 10px; border-radius: 999px; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -158,6 +173,7 @@
         <div class="legend"><span><i class="dot" style="background:var(--green)"></i>Jáchym Air</span><span><i class="dot" style="background:var(--other)"></i>Ostatní piloti</span></div>
       </div>
       <div class="air-list" id="airList"><div class="empty">Načítám…</div></div>
+      <div class="recent"><h3>Poslední přistání</h3><div id="recentList"><div class="empty">Načítám…</div></div></div>
     </aside>
   </section>
   <section class="view" id="view-zebricek"><div class="page" id="zebricek"></div></section>
@@ -243,7 +259,8 @@ function showNotConfigured(view) {
 }
 
 /* ---------- živá mapa ---------- */
-let map = null, markers = new Map(), liveTimer = null, liveRows = [];
+let map = null, markers = new Map(), trails = new Map(), liveTimer = null, liveRows = [], liveTick = 0;
+let airports = [], airportLayer = null, apRenderer = null;
 const PLANE = "M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z";
 
 function planeIcon(hdg, isJai) {
@@ -260,17 +277,64 @@ function initMap() {
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
   map = L.map("map", { zoomControl: false, worldCopyJump: true }).setView([49.8, 15.5], 5);
   L.control.zoom({ position: "topright" }).addTo(map);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, className: dark ? "tiles-dark" : "",
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, className: dark ? "tiles-dark" : "",
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
+  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+    maxZoom: 19, attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics"
+  });
+  apRenderer = L.canvas({ padding: 0.3 });
+  airportLayer = L.layerGroup().addTo(map);
+  L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer }, { position: "topright" }).addTo(map);
+  map.on("moveend", drawAirports);
+  fetch("letiste.json").then(r => r.json()).then(d => { airports = d; drawAirports(); }).catch(() => {});
   refreshLive();
   liveTimer = setInterval(refreshLive, 8000);
 }
 
+function drawAirports() {
+  if (!map || !airportLayer || !map.hasLayer(airportLayer)) return;
+  airportLayer.clearLayers();
+  const z = map.getZoom(), b = map.getBounds().pad(0.1);
+  const minSize = z >= 7 ? 2 : z >= 4 ? 3 : 9;
+  let n = 0;
+  for (const [icao, name, lat, lon, size, city] of airports) {
+    if (size < minSize || !b.contains([lat, lon])) continue;
+    if (++n > 800) break;
+    const big = size === 3;
+    const c = L.circleMarker([lat, lon], {
+      renderer: apRenderer, radius: big ? 6 : 4.5, weight: 2.5,
+      color: big ? "#116B26" : "#5C6E63", fillColor: "#fff", fillOpacity: 1
+    }).addTo(airportLayer);
+    const here = liveRows.filter(r => r.lat != null && Math.abs(r.lat - lat) < 0.06 && Math.abs(r.lon - lon) < 0.09);
+    c.bindPopup(`<div class="pop-cs">${esc(icao)}</div><div><b>${esc(name)}</b></div>${city ? `<div class="muted">${esc(city)}</div>` : ""}
+      ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
+      <div class="muted" style="margin-top:6px">METAR a linky Jáchym Air brzy</div>`);
+    if (z >= 8 || (big && z >= 6)) c.bindTooltip(esc(icao), { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
+    else c.bindTooltip(`${esc(icao)} – ${esc(name)}`, { direction: "top" });
+  }
+}
+
+async function refreshRecent() {
+  const { data } = await sb.from("flights").select("id, user_id, callsign, arr_icao, score, fpm, landed_at, profiles(username)")
+    .order("landed_at", { ascending: false }).limit(6);
+  $("recentList").innerHTML = !data?.length ? '<div class="empty">Zatím žádná přistání.</div>' : data.map(f => `
+    <a class="recent-item" href="#/pilot/${encodeURIComponent(f.profiles?.username || "")}">${scoreHtml(f.score)}
+      <div><b>${esc(f.callsign || f.profiles?.username)}${jaiSet.has(f.user_id) ? ' <span class="badge">JAI</span>' : ""}</b>
+      <span class="muted">${esc(f.arr_icao || "?")} · ${nf.format(f.fpm)} fpm · ${timeAgo(f.landed_at)}</span></div></a>`).join("");
+}
+function timeAgo(d) {
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (m < 1) return "právě teď"; if (m < 60) return `před ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `před ${h} h`;
+  return fmtDate(d);
+}
+
 async function refreshLive() {
+  if (liveTick++ % 4 === 0) refreshRecent();
   const since = new Date(Date.now() - 120000).toISOString();
-  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url)").gte("updated_at", since);
+  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url)").gte("updated_at", since);
   if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
   liveRows = data || [];
   const seen = new Set();
@@ -282,7 +346,16 @@ async function refreshLive() {
       <div><a href="#/pilot/${encodeURIComponent(r.profiles?.username || "")}">${esc(r.profiles?.username)}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}</div>
       <div>${esc(r.aircraft || "")}</div>
       <div>${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}</div>
-      ${r.dep_icao ? `<div>Odlet: ${esc(r.dep_icao)}</div>` : ""}`;
+      ${r.dep_icao ? `<div>Odlet: ${esc(r.dep_icao)}</div>` : ""}
+      ${r.profiles?.stream_url ? `<div style="margin-top:6px"><a class="stream-btn" href="${esc(r.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}`;
+    const pts = Array.isArray(r.trail) ? r.trail.map(p => [p[0], p[1]]) : [];
+    if (pts.length) pts.push([r.lat, r.lon]);
+    let tr = trails.get(r.user_id);
+    if (pts.length > 1) {
+      const style = { color: isJai ? "#1E9B36" : "#66788A", weight: isJai ? 3.5 : 2.5, opacity: .85 };
+      if (!tr) { tr = L.polyline(pts, style).addTo(map); trails.set(r.user_id, tr); }
+      else { tr.setLatLngs(pts); tr.setStyle(style); }
+    } else if (tr) { map.removeLayer(tr); trails.delete(r.user_id); }
     let m = markers.get(r.user_id);
     if (!m) {
       m = L.marker([r.lat, r.lon], { icon: planeIcon(r.hdg, isJai), zIndexOffset: isJai ? 1000 : 0 }).addTo(map);
@@ -293,6 +366,7 @@ async function refreshLive() {
     m.bindPopup(popup);
   }
   for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); }
+  for (const [id, t] of trails) if (!seen.has(id)) { map.removeLayer(t); trails.delete(id); }
 
   const sorted = [...liveRows].sort((a, b) => (jaiSet.has(b.user_id) - jaiSet.has(a.user_id)) || (b.alt - a.alt));
   $("airCount").textContent = `Ve vzduchu (${sorted.filter(r => r.phase !== "Na zemi").length})`;
@@ -320,7 +394,7 @@ async function renderLeaderboard() {
     <div id="lbHours"><p class="muted">Načítám…</p></div>`;
   el.querySelectorAll(".tab").forEach(b => b.onclick = () => { lbTab = b.dataset.t; renderLeaderboard(); });
 
-  let q = sb.from("flights").select("*, profiles(username, avatar_url)").not("score", "is", null)
+  let q = sb.from("flights").select("id, user_id, aircraft, dep_icao, arr_icao, landed_at, fpm, g, score, profiles(username, avatar_url)").not("score", "is", null)
     .order("score", { ascending: false }).order("fpm", { ascending: false }).limit(25);
   if (lbTab === "week") q = q.gte("landed_at", new Date(Date.now() - 7 * 864e5).toISOString());
   const { data, error } = await q;
@@ -357,11 +431,12 @@ async function renderPilot(username) {
   const { data: p } = await sb.from("pilot_stats").select("*").eq("username", username).maybeSingle();
   if (!p) { el.innerHTML = '<div class="card">Pilot nenalezen.</div>'; return; }
   const hours = p.minutes / 60, rk = rankOf(hours);
-  const { data: fl } = await sb.from("flights").select("*").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
+  const { data: prof } = await sb.from("profiles").select("stream_url").eq("id", p.id).maybeSingle();
+  const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
   el.innerHTML = `
     <div class="profile-head">${avatar(p, p.is_jai)}
       <div><h1 class="profile-name">${esc(p.username)}</h1>
-        <div class="rank-line">${p.callsign ? `<span>${esc(p.callsign)}</span>` : ""}<span>${rk.name}</span>${p.is_jai ? '<span class="badge">Pilot Jáchym Air</span>' : ""}</div>
+        <div class="rank-line">${p.callsign ? `<span>${esc(p.callsign)}</span>` : ""}<span>${rk.name}</span>${p.is_jai ? '<span class="badge">Pilot Jáchym Air</span>' : ""}${prof?.stream_url ? `<a class="stream-btn" href="${esc(prof.stream_url)}" target="_blank" rel="noopener">▶ Stream</a>` : ""}</div>
         ${rk.next ? `<div class="rank-bar" title="Do hodnosti ${rk.next.name}"><i style="width:${rk.pct}%"></i></div><small class="muted">Do hodnosti ${rk.next.name} zbývá ${fmt1(Math.max(0, rk.next.h - hours))} h</small>` : ""}
       </div></div>
     <div class="stats">
@@ -372,11 +447,40 @@ async function renderPilot(username) {
       <div class="stat"><b>${p.best_score != null ? fmt1(p.best_score) : "–"}</b><span>Nejlepší přistání</span></div>
     </div>
     <h2 class="section-title">Historie letů</h2>
+    ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a uvidíš jeho trasu.</p>' : ""}
+    <div class="flight-map" id="flightMap"></div>
     ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' :
     `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
-    ${fl.map(f => `<tr><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
+    ${fl.map(f => `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
       <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${nf.format(f.fpm)}</td><td>${fmt1(f.g)}</td><td>${scoreHtml(f.score)}</td></tr>`).join("")}
     </tbody></table></div>`}`;
+  el.querySelectorAll("tr.clickable").forEach(tr => {
+    const open = () => { el.querySelectorAll("tr.sel").forEach(x => x.classList.remove("sel")); tr.classList.add("sel"); showFlightPath(tr.dataset.fid); };
+    tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); };
+  });
+}
+
+let flightMap = null;
+async function showFlightPath(id) {
+  const box = $("flightMap");
+  const { data: f } = await sb.from("flights").select("path, dep_icao, arr_icao").eq("id", id).maybeSingle();
+  box.classList.add("on");
+  if (flightMap) { flightMap.remove(); flightMap = null; }
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  flightMap = L.map(box, { worldCopyJump: true });
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, className: dark ? "tiles-dark" : "",
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(flightMap);
+  const pts = Array.isArray(f?.path) ? f.path.map(p => [p[0], p[1]]) : [];
+  if (pts.length < 2) {
+    flightMap.setView([49.8, 15.5], 4);
+    L.popup().setLatLng([49.8, 15.5]).setContent("Tento let nemá uloženou trasu (ukládá se od trackeru 0.3).").openOn(flightMap);
+    return;
+  }
+  const line = L.polyline(pts, { color: "#1E9B36", weight: 4 }).addTo(flightMap);
+  L.circleMarker(pts[0], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(flightMap);
+  L.circleMarker(pts[pts.length - 1], { radius: 6, color: "#fff", fillColor: "#1E9B36", fillOpacity: 1, weight: 3 }).bindTooltip("Přistání " + (f.arr_icao || "")).addTo(flightMap);
+  flightMap.fitBounds(line.getBounds().pad(0.2));
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* ---------- účet ---------- */
@@ -423,6 +527,7 @@ function renderAccount(msg) {
           <div class="field" style="margin:0"><label for="fAv">Profilový obrázek</label><input id="fAv" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small>Max. 2 MB</small></div></div>
         <div class="field"><label for="pUser">Uživatelské jméno</label><input id="pUser" value="${esc(p.username)}" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}"></div>
         <div class="field"><label for="pCs">Volací znak</label><input id="pCs" value="${esc(p.callsign || "")}" maxlength="12"></div>
+        <div class="field"><label for="pStream">Odkaz na tvůj stream (nepovinné)</label><input id="pStream" type="url" value="${esc(p.stream_url || "")}" placeholder="https://www.twitch.tv/… nebo https://www.youtube.com/@…"><small>Twitch, YouTube nebo Kick. Na mapě se u tebe objeví tlačítko „Sledovat stream“.</small></div>
         <button class="btn">Uložit profil</button>
         <a class="btn ghost" href="#/pilot/${encodeURIComponent(p.username || "")}" style="margin-left:8px">Zobrazit profil</a>
       </form>
@@ -463,7 +568,9 @@ async function onProfileSubmit(e) {
   e.preventDefault();
   const btn = e.target.querySelector("button"); btn.disabled = true;
   try {
-    const upd = { username: $("pUser").value.trim(), callsign: $("pCs").value.trim().toUpperCase() || null };
+    const stream = $("pStream").value.trim();
+    if (stream && !/^https:\/\/(www\.|m\.)?(twitch\.tv|youtube\.com|youtu\.be|kick\.com)\//.test(stream)) throw new Error("Odkaz na stream musí vést na Twitch, YouTube nebo Kick (začínat https://).");
+    const upd = { username: $("pUser").value.trim(), callsign: $("pCs").value.trim().toUpperCase() || null, stream_url: stream || null };
     const file = $("fAv").files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) throw new Error("Obrázek je větší než 2 MB.");
