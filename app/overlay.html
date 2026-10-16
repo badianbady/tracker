@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jáchym Air – OBS overlay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #1E9B36;
+    --green-deep: #116B26;
+    --mint: #C9F5D3;
+    --white: #FFFFFF;
+    --ink: #0D2414;
+    --scale: 1;
+  }
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  body {
+    font-family: "Saira Semi Condensed", "Arial Narrow", "Roboto Condensed", Arial, sans-serif;
+    color: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    position: fixed; left: 40px; bottom: 40px;
+    transform: scale(var(--scale)); transform-origin: left bottom;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+  }
+
+  /* ---------- spodní pruh ---------- */
+  .bar {
+    display: flex; align-items: stretch; height: 88px;
+    background: var(--green);
+    border-radius: 44px 16px 16px 44px;
+    box-shadow: 0 8px 28px rgba(5, 40, 15, .38);
+    overflow: hidden;
+  }
+  .roundel { width: 88px; flex: none; display: grid; place-items: center; background: var(--green-deep); }
+  .ident { padding: 0 24px 0 18px; display: flex; flex-direction: column; justify-content: center; min-width: 160px; }
+  .callsign { font-weight: 800; font-size: 31px; line-height: 1; letter-spacing: .01em; }
+  .aircraft { font-size: 15px; font-weight: 500; opacity: .85; margin-top: 7px; max-width: 240px;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cells { display: flex; }
+  .cell { padding: 0 18px; display: flex; flex-direction: column; justify-content: center;
+          border-left: 1px solid rgba(255, 255, 255, .22); }
+  .val { font-size: 31px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .unit { font-size: 15px; font-weight: 600; opacity: .75; margin-left: 3px; }
+  .lbl { font-size: 14px; font-weight: 500; opacity: .78; margin-top: 7px; }
+  .phase-cell { padding: 0 22px 0 18px; display: flex; align-items: center; border-left: 1px solid rgba(255,255,255,.22); }
+  .phase { background: var(--white); color: var(--green-deep); font-weight: 700; font-size: 17px;
+           padding: 6px 14px 7px; border-radius: 999px; white-space: nowrap; }
+  .waves { display: flex; align-items: center; padding-right: 20px; opacity: .9; }
+  .offline .cells, .offline .phase-cell { display: none; }
+  .offline .aircraft { opacity: 1; font-weight: 600; }
+
+  /* ---------- karta přistání ---------- */
+  .landing {
+    display: flex; align-items: stretch;
+    background: var(--white); color: var(--ink);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 8px 28px rgba(5, 40, 15, .38);
+    opacity: 0; transform: translateY(24px);
+    transition: opacity .45s ease, transform .55s cubic-bezier(.2, .9, .25, 1.2);
+  }
+  .landing.show { opacity: 1; transform: none; }
+  .score-block { background: var(--green); color: var(--white); padding: 16px 24px 18px; min-width: 150px;
+                 display: flex; flex-direction: column; justify-content: center; }
+  .score { font-size: 72px; font-weight: 800; line-height: .9; font-variant-numeric: tabular-nums; }
+  .score small { font-size: 26px; font-weight: 700; opacity: .8; margin-left: 2px; }
+  .verdict { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .detail { padding: 16px 26px 18px; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .detail-row { display: flex; gap: 30px; }
+  .big { font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+  .big .unit { color: var(--green-deep); opacity: 1; }
+  .dlbl { font-size: 14px; font-weight: 600; color: var(--green-deep); margin-top: 5px; }
+  .segments { display: flex; gap: 4px; }
+  .seg { width: 22px; height: 8px; border-radius: 2px; background: #E2EDE4; }
+  .seg.on { background: var(--green); }
+  .landing.show .seg.on { animation: fill .3s both; }
+  @keyframes fill { from { background: #E2EDE4; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing { transition: opacity .2s; transform: none; }
+    .landing.show .seg.on { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="landing" id="landing" aria-live="polite">
+    <div class="score-block">
+      <div class="score" id="lScore">0<small>/10</small></div>
+      <div class="verdict" id="lVerdict">–</div>
+    </div>
+    <div class="detail">
+      <div class="detail-row">
+        <div><div class="big" id="lFpm">0<span class="unit">fpm</span></div><div class="dlbl">Rychlost dosednutí</div></div>
+        <div><div class="big" id="lG">1,00<span class="unit">G</span></div><div class="dlbl">Přetížení</div></div>
+      </div>
+      <div class="segments" id="segs"></div>
+    </div>
+  </div>
+
+  <div class="bar offline" id="bar">
+    <div class="roundel">
+      <svg width="58" height="58" viewBox="0 0 58 58" aria-label="Jáchym Air">
+        <circle cx="29" cy="29" r="25.5" fill="none" stroke="#fff" stroke-width="4"/>
+        <text x="29.5" y="40" text-anchor="middle" fill="#fff"
+              font-family="Saira Semi Condensed, Arial, sans-serif" font-weight="800" font-size="32">J</text>
+      </svg>
+    </div>
+    <div class="ident">
+      <div class="callsign" id="callsign">JAI</div>
+      <div class="aircraft" id="aircraft">Spouštím tracker…</div>
+    </div>
+    <div class="cells">
+      <div class="cell"><div class="val" id="alt">0<span class="unit">ft</span></div><div class="lbl">Výška</div></div>
+      <div class="cell"><div class="val" id="ias">0<span class="unit">kt</span></div><div class="lbl">IAS</div></div>
+      <div class="cell"><div class="val" id="gs">0<span class="unit">kt</span></div><div class="lbl">GS</div></div>
+      <div class="cell"><div class="val" id="vs">0<span class="unit">fpm</span></div><div class="lbl">V/S</div></div>
+      <div class="cell"><div class="val" id="hdg">000<span class="unit">°</span></div><div class="lbl">Kurz</div></div>
+    </div>
+    <div class="phase-cell"><div class="phase" id="phase">Na zemi</div></div>
+    <div class="waves">
+      <svg width="54" height="30" viewBox="0 0 54 30" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M3 9c8-7 14 5 24 0s16-7 24-1"/>
+        <path d="M3 16c8-7 14 5 24 0s16-7 24-1" opacity=".75"/>
+        <path d="M3 23c8-7 14 5 24 0s16-7 24-1" opacity=".5"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<script>
+  const qs = new URLSearchParams(location.search);
+  if (qs.get("scale")) document.documentElement.style.setProperty("--scale", qs.get("scale"));
+  const SHOW_MS = (Number(qs.get("cas")) || 20) * 1000;   // jak dlouho je karta přistání vidět (s)
+
+  const $ = id => document.getElementById(id);
+  const nf = new Intl.NumberFormat("cs-CZ");
+  const unit = u => `<span class="unit">${u}</span>`;
+  const segs = $("segs");
+  for (let i = 0; i < 10; i++) { const s = document.createElement("div"); s.className = "seg"; segs.appendChild(s); }
+
+  const pageStart = Date.now();
+  let shownId = null, hideTimer = null;
+
+  function render(d) {
+    $("callsign").textContent = d.callsign || "JAI";
+    const bar = $("bar");
+    if (!d.connected) {
+      bar.classList.add("offline");
+      $("aircraft").textContent = d.status || "Čekám na MSFS…";
+    } else {
+      bar.classList.remove("offline");
+      $("aircraft").textContent = d.aircraft || "";
+      $("alt").innerHTML = nf.format(d.alt) + unit("ft");
+      $("ias").innerHTML = d.ias + unit("kt");
+      $("gs").innerHTML = d.gs + unit("kt");
+      $("vs").innerHTML = (d.vs > 0 ? "+" : "") + nf.format(d.vs) + unit("fpm");
+      $("hdg").innerHTML = String(d.hdg).padStart(3, "0") + unit("°");
+      $("phase").textContent = d.phase;
+    }
+    if (d.landing && d.landing.id !== shownId) {
+      shownId = d.landing.id;
+      if (d.landing.id > pageStart - 5000) showLanding(d.landing);
+    }
+  }
+
+  function showLanding(l) {
+    $("lScore").innerHTML = Number(l.skore).toLocaleString("cs-CZ", { maximumFractionDigits: 1 }) + "<small>/10</small>";
+    $("lVerdict").textContent = l.hodnoceni;
+    $("lFpm").innerHTML = nf.format(l.fpm) + unit("fpm");
+    $("lG").innerHTML = l.g.toFixed(2).replace(".", ",") + unit("G");
+    const on = Math.round(l.skore);
+    [...segs.children].forEach((s, i) => {
+      s.classList.toggle("on", i < on);
+      s.style.animationDelay = (0.35 + i * 0.07) + "s";
+    });
+    const card = $("landing");
+    card.classList.remove("show");
+    void card.offsetWidth;
+    card.classList.add("show");
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => card.classList.remove("show"), SHOW_MS);
+  }
+
+  async function tick() {
+    try {
+      const r = await fetch("/data", { cache: "no-store" });
+      render(await r.json());
+    } catch (e) {
+      render({ connected: false, status: "Tracker neběží – spusť jai_tracker" });
+    }
+  }
+  tick();
+  setInterval(tick, 250);
+</script>
+</body>
+</html>
