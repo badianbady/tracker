@@ -1,0 +1,44 @@
+name: Sestavit aplikaci
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Číslo nové verze (např. 0.4.0)"
+        required: true
+        default: "0.4.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalace nástrojů
+        run: python -m pip install pyinstaller==6.22.3 SimConnect==0.4.26
+
+      - name: Zápis verze
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: printf 'VERSION = "%s"\nREPO = "%s"\n' "$VERSION" "$REPO" > app/build_info.py
+
+      - name: Sestavení .exe
+        working-directory: app
+        run: pyinstaller --noconfirm --onefile --windowed --name JachymAirTracker --icon icon.ico --add-data "overlay.html;." --add-data "icon.ico;." --collect-all SimConnect --hidden-import build_info jai_app.py
+
+      - name: Vydání na GitHubu
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Jáchym Air Tracker ${{ inputs.version }}
+          files: app/dist/JachymAirTracker.exe
+          make_latest: true
