@@ -589,15 +589,19 @@ def sim_loop():
         return
 
     rec = None
+    waiting_logged = False
     while True:
         try:
             with lock:
                 state["connected"] = False
                 state["status"] = "Čekám na MSFS…"
-            log("Čekám na MSFS…")
+            if not waiting_logged:
+                log("Čekám na MSFS…")
+                waiting_logged = True
             sm = SimConnect()
             aq = AircraftRequests(sm, _time=0)
             log("Připojeno k MSFS ✔")
+            was_connected = True
 
             td_req = None
             try:
@@ -649,7 +653,9 @@ def sim_loop():
                 rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "alt": alt, "hdg": hdg})
                 time.sleep(0.05)
         except Exception as e:
-            log("Spojení s MSFS přerušeno:", e)
+            if "Did not find" not in str(e):
+                log("Spojení s MSFS přerušeno:", e)
+                waiting_logged = False
             time.sleep(5)
 
 
@@ -752,3 +758,89 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
+
+
+# ---------------- Aktualizace aplikace ----------------
+def parse_ver(v):
+    nums = [int(x) for x in re.findall(r"\d+", v or "")[:3]]
+    return tuple(nums + [0] * (3 - len(nums)))
+
+
+def check_update():
+    if not REPO:
+        return
+    try:
+        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+                                     headers={"User-Agent": "JachymAirTracker", "Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            rel = json.loads(r.read())
+        tag = rel.get("tag_name", "")
+        if parse_ver(tag) <= parse_ver(VERSION):
+            return
+        asset = next((a for a in rel.get("assets", []) if a.get("name", "").lower().endswith(".exe")), None)
+        with lock:
+            state["update"] = {"version": tag.lstrip("v"), "url": asset and asset["browser_download_url"],
+                               "page": rel.get("html_url")}
+        log(f"Je k dispozici nová verze {tag.lstrip('v')}")
+    except Exception:
+        pass
+
+
+def apply_update(info, on_progress=None):
+    """Stáhne novou verzi, vymění ji za běžící .exe a spustí ji."""
+    if not FROZEN or not info.get("url"):
+        webbrowser.open(info.get("page") or f"https://github.com/{REPO}/releases/latest")
+        return
+    exe = sys.executable
+    new, old = exe + ".new", exe + ".old"
+    req = urllib.request.Request(info["url"], headers={"User-Agent": "JachymAirTracker"})
+    with urllib.request.urlopen(req, timeout=60) as r, open(new, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        done = 0
+        while True:
+            chunk = r.read(65536)
+            if not chunk:
+                break
+            f.write(chunk)
+            done += len(chunk)
+            if total and on_progress:
+                on_progress(done / total)
+    if os.path.exists(old):
+        os.remove(old)
+    os.rename(exe, old)
+    os.rename(new, exe)
+    subprocess.Popen([exe], close_fds=True)
+    os._exit(0)
+
+
+def cleanup_old_exe():
+    if FROZEN:
+        try:
+            os.remove(sys.executable + ".old")
+        except OSError:
+            pass
+
+
+def start_background(demo=False):
+    def web_login():
+        if not cloud.has_saved():
+            return
+        with lock:
+            state["web_status"] = "Přihlašuji…"
+        while True:
+            res = cloud.try_saved()
+            if res is True:
+                return
+            if res is False:
+                with lock:
+                    state["web_status"] = "Přihlášení vypršelo, přihlas se znovu"
+                return
+            with lock:
+                state["web_status"] = "Web nedostupný, zkouším znovu…"
+            time.sleep(15)
+
+    threading.Thread(target=load_airports, daemon=True).start()
+    threading.Thread(target=web_login, daemon=True).start()
+    threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
+    threading.Thread(target=upload_loop, daemon=True).start()
+    threading.Thread(target=check_update, daemon=True).start()
