@@ -104,7 +104,7 @@
   .tr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
   .tr-row { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
   .tr-row:last-child { border-bottom: 0; }
-  .tr-row span:first-child { width: 90px; color: var(--muted); flex: none; }
+  .tr-row span:first-child { width: 112px; color: var(--muted); flex: none; }
   .tr-row b.ok { color: var(--green); } .tr-row b.warn { color: var(--warn); }
   .tr-wide { grid-column: 1 / -1; }
   .tr-nums { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; gap: 8px; }
@@ -118,6 +118,29 @@
   .tr-landing .info { padding: 16px 22px; align-self: center; }
   .tr-log { font-size: 13px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; color: var(--muted); }
   .upd-banner { background: #FEF3C7; color: #78350F; border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; font-weight: 600; }
+  .td-pin { width: 30px; height: 30px; border-radius: 9px 9px 9px 2px; display: grid; place-items: center; color: #fff;
+            font: 800 13px var(--display); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transform: rotate(-45deg); }
+  .td-pin span { transform: rotate(45deg); }
+  .td-ic { background: none; border: 0; }
+  .zoom-low .td-ic { display: none; }
+  .lcard { min-width: 260px; font-family: var(--body); }
+  .lcard-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .lcard-head b { font-family: var(--display); font-size: 18px; display: block; line-height: 1.1; }
+  .lcard dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 14px; }
+  .lcard dt { color: var(--muted); } .lcard dd { margin: 0; font-weight: 600; }
+  .ap-label .cat { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+  .ap-label .wx { font-weight: 600; margin-left: 4px; }
+  .cat-VFR { background: #16A34A; } .cat-MVFR { background: #2563EB; } .cat-IFR { background: #DC2626; } .cat-LIFR { background: #C026D3; }
+  .metar-box { font-size: 14px; margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .metar-box dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 6px 0; }
+  .metar-box dt { color: var(--muted); } .metar-box dd { margin: 0; font-weight: 600; }
+  .metar-raw { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--bg); padding: 6px 8px; border-radius: 6px; white-space: normal; word-break: break-word; }
+  .cat-chip { color: #fff; font-weight: 700; font-size: 12px; padding: 1px 8px; border-radius: 999px; }
+  .flight-card { margin: -6px 0 18px; }
+  .flight-card .lcard { max-width: 560px; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
+  .switch input { width: 18px; height: 18px; accent-color: var(--green); }
+  .plan-route { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--muted); word-break: break-word; margin-top: 6px; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -236,6 +259,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const nf = new Intl.NumberFormat("cs-CZ");
 const fmt1 = n => Number(n).toLocaleString("cs-CZ", { maximumFractionDigits: 1 });
+const fmtG = n => Number(n).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = d => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
 const fmtDur = min => { min = Math.round(min || 0); return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`; };
 const scoreCls = s => s >= 8 ? "s-hi" : s >= 6 ? "s-mid" : s >= 3 ? "s-lo" : "s-bad";
@@ -308,7 +332,9 @@ async function pollApp() {
 function renderTracker(full) {
   const el = $("tracker"), s = appState;
   if (!appApi || !s) { el.innerHTML = '<div class="card">Tato stránka funguje jen v aplikaci Jáchym Air Tracker.</div>'; return; }
-  if (full || !$("trNums") || (!!$("trLogin") === !!s.online)) {
+  const sig = `${s.online}|${s.crew?.linked}|${!!s.plan}`;
+  if (full || !$("trNums") || sig !== renderTracker.sig) {
+    renderTracker.sig = sig;
     el.innerHTML = `<h1 class="page-title">Tracker</h1><p class="lead">Aplikace verze ${esc(s.version)} · běží na tvém PC vedle MSFS</p>
       <div id="trUpd"></div>
       <div class="tr-grid">
@@ -332,6 +358,28 @@ function renderTracker(full) {
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
           <div><b id="trAlt">–</b><span>Výška ft</span></div><div><b id="trIas">–</b><span>IAS kt</span></div>
           <div><b id="trGs">–</b><span>GS kt</span></div><div><b id="trVs">–</b><span>V/S fpm</span></div></div></div>
+        <div class="card"><h2 class="section-title">Letový plán (SimBrief)</h2>
+          ${s.plan ? `<div style="font-family:var(--display);font-size:30px;font-weight:800">${esc(s.plan.dep)} → ${esc(s.plan.arr)}</div>
+            <div class="tr-row"><span>Alternativa</span><b>${esc(s.plan.altn || "–")}</b></div>
+            <div class="tr-row"><span>Callsign</span><b>${esc(s.plan.callsign || "–")}</b></div>
+            <div class="tr-row"><span>Letadlo</span><b>${esc([s.plan.aircraft, s.plan.reg].filter(Boolean).join(" · ") || "–")}</b></div>
+            <div class="tr-row"><span>Hladina</span><b>${s.plan.cruise ? "FL" + Math.round(s.plan.cruise / 100) : "–"}${s.plan.ete_min ? ` · ${fmtDur(s.plan.ete_min)} h` : ""}</b></div>
+            ${s.plan.route ? `<div class="plan-route">${esc(s.plan.route)}</div>` : ""}
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn ghost" id="sbReload">Načíst znovu</button><button class="btn ghost" id="sbClear">Zrušit plán</button></div>`
+          : `<p class="muted">Načti poslední OFP ze SimBriefu. Na mapě se ukáže plánovaná trasa a ostatní uvidí, kam letíš.</p>
+            <form id="sbForm"><div class="field"><label for="sbUser">Uživatelské jméno v SimBriefu</label><input id="sbUser" required value="${esc(s.simbrief_user || "")}" placeholder="např. jachym12"></div>
+            <button class="btn">Načíst letový plán</button></form>`}
+          <div id="sbMsg"></div></div>
+        <div class="card"><h2 class="section-title">Crew center Jáchym Air</h2>
+          ${s.crew?.linked ? `<div class="tr-row"><span>Pilot</span><b class="ok">✔ ${esc(s.crew.ident || "")} ${esc(s.crew.name || "")}</b></div>
+            <label class="switch" style="margin:12px 0"><input type="checkbox" id="crewAuto" ${s.crew.auto ? "checked" : ""}> Po přistání let automaticky odeslat</label>
+            <p class="muted" style="margin:0 0 6px">Let se odešle, když máš v crew centru rezervaci (bid) se stejným odletem a cílem.</p>
+            <div class="tr-row"><span>Poslední stav</span><b id="crewStatus"></b></div>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn ghost" id="crewFile">Odeslat poslední let</button><button class="btn ghost" id="crewUnlink">Odpojit</button></div>`
+          : `<p class="muted">Vlož API klíč ze svého profilu v crew centru. Klíč zůstane jen v tomto počítači a lety se pak budou samy odesílat do crew centra.</p>
+            <form id="crewLinkForm"><div class="field"><label for="crewKeyApp">API klíč</label><input id="crewKeyApp" type="password" required autocomplete="off"></div>
+            <button class="btn">Propojit crew center</button></form>`}
+          <div id="crewMsg"></div></div>
       </div>
       <h2 class="section-title" style="margin-top:24px">Události</h2>
       <div class="card tr-log" id="trLog"></div>`;
@@ -343,7 +391,36 @@ function renderTracker(full) {
       if (r.ok) { appState = await appApi.get_state(); renderTracker(true); }
       else $("trLoginMsg").innerHTML = `<div class="msg err">${esc(r.msg)}</div>`;
     };
+    const say = (id, ok, text) => { const b = $(id); if (b) b.innerHTML = `<div class="msg ${ok ? "ok" : "err"}" style="margin:12px 0 0">${esc(text)}</div>`; };
+    const busy = (btn, t) => { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = t; };
+    if ($("sbForm")) $("sbForm").onsubmit = async e => {
+      e.preventDefault(); busy(e.target.querySelector("button"), "Načítám…");
+      const r = await appApi.load_simbrief($("sbUser").value.trim());
+      appState = await appApi.get_state(); renderTracker(true);
+      if (!r.ok) say("sbMsg", false, r.msg);
+    };
+    if ($("sbReload")) $("sbReload").onclick = async e => {
+      busy(e.target, "Načítám…"); const r = await appApi.load_simbrief(null);
+      appState = await appApi.get_state(); renderTracker(true); say("sbMsg", r.ok, r.ok ? "Plán aktualizován." : r.msg);
+    };
+    if ($("sbClear")) $("sbClear").onclick = async () => { await appApi.clear_plan(); appState = await appApi.get_state(); renderTracker(true); };
+    if ($("crewLinkForm")) $("crewLinkForm").onsubmit = async e => {
+      e.preventDefault(); busy(e.target.querySelector("button"), "Ověřuji…");
+      const r = await appApi.crew_link($("crewKeyApp").value.trim());
+      appState = await appApi.get_state(); renderTracker(true); say("crewMsg", r.ok, r.msg);
+      if (r.ok) { await loadJai(); updateNav(); }
+    };
+    if ($("crewAuto")) $("crewAuto").onchange = e => appApi.crew_set_auto(e.target.checked);
+    if ($("crewFile")) $("crewFile").onclick = async e => {
+      busy(e.target, "Odesílám…"); const r = await appApi.crew_file_last();
+      e.target.disabled = false; e.target.textContent = e.target.dataset.t; say("crewMsg", r.ok, r.msg);
+    };
+    if ($("crewUnlink")) $("crewUnlink").onclick = async () => {
+      if (!confirm("Odpojit crew center z této aplikace?")) return;
+      await appApi.crew_unlink(); appState = await appApi.get_state(); renderTracker(true);
+    };
   }
+  if ($("crewStatus")) $("crewStatus").textContent = s.crew?.status || "–";
   $("trWeb").textContent = s.online ? `✔ ${s.username || "Přihlášen"} · ${s.callsign}` : (s.web_status || "Nepřihlášen");
   $("trWeb").className = s.online ? "ok" : "warn";
   $("trSim").textContent = s.connected ? "✔ Připojeno" : s.status; $("trSim").className = s.connected ? "ok" : "warn";
@@ -356,7 +433,8 @@ function renderTracker(full) {
   if (l) {
     $("trScore").textContent = fmt1(l.skore); $("trScore").className = "big " + scoreCls(l.skore);
     $("trVerdict").textContent = l.hodnoceni;
-    $("trLand").textContent = `${nf.format(l.fpm)} fpm · ${fmt1(l.g)} G · ${l.odlet || "????"} → ${l.prilet || "????"} · ${String(l.cas).slice(11, 16)}`;
+    $("trLand").innerHTML = `${nf.format(l.fpm)} fpm · ${fmtG(l.g)} G · ${esc(l.odlet || "????")} → ${esc(l.prilet || "????")} · ${String(l.cas).slice(11, 16)}`
+      + (l.draha ? `<br>${esc(l.draha)}` : "") + (l.odskoky ? ` · odskoky: ${l.odskoky}` : "");
   }
   $("trLog").textContent = (s.log || []).slice().reverse().map(([t, m]) => `${t}  ${m}`).join("\n") || "Zatím nic.";
   $("trUpd").innerHTML = s.update ? `<div class="upd-banner"><span>Nová verze ${esc(s.update.version)} je připravená</span>
@@ -392,6 +470,7 @@ function showNotConfigured(view) {
 /* ---------- živá mapa ---------- */
 let map = null, markers = new Map(), trails = new Map(), liveTimer = null, liveRows = [], liveTick = 0;
 let airports = [], airportLayer = null, apRenderer = null, trailRenderer = null, lastFlightId = null;
+let tdLayer = null, planLines = new Map(), metarCache = new Map(), metarTimer = null;
 
 const ALT_STOPS = [[0, [249, 115, 22]], [4000, [234, 179, 8]], [10000, [34, 197, 94]], [20000, [6, 182, 212]], [30000, [59, 130, 246]], [40000, [168, 85, 247]]];
 function altColor(alt) {
@@ -440,8 +519,11 @@ function initMap() {
     d.innerHTML = 'Výška trasy (ft)<div class="bar"></div><div class="ticks"><span>0</span><span>10k</span><span>20k</span><span>30k</span><span>40k</span></div>'; return d; };
   legend.addTo(map);
   airportLayer = L.layerGroup().addTo(map);
-  L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer }, { position: "topright" }).addTo(map);
-  map.on("moveend", drawAirports);
+  tdLayer = L.layerGroup().addTo(map);
+  L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Místa přistání": tdLayer }, { position: "topright" }).addTo(map);
+  map.on("moveend", () => { drawAirports(); scheduleMetar(); });
+  const zoomCls = () => map.getContainer().classList.toggle("zoom-low", map.getZoom() < 11);
+  map.on("zoomend", zoomCls); zoomCls();
   fetch("letiste.json").then(r => r.json()).then(d => { airports = d; drawAirports(); }).catch(() => {});
   refreshLive();
   liveTimer = setInterval(refreshLive, 8000);
@@ -461,13 +543,113 @@ function drawAirports() {
       renderer: apRenderer, radius: big ? 6 : 4.5, weight: 2.5,
       color: big ? "#116B26" : "#5C6E63", fillColor: "#fff", fillOpacity: 1
     }).addTo(airportLayer);
-    const here = liveRows.filter(r => r.lat != null && Math.abs(r.lat - lat) < 0.06 && Math.abs(r.lon - lon) < 0.09);
-    c.bindPopup(`<div class="pop-cs">${esc(icao)}</div><div><b>${esc(name)}</b></div>${city ? `<div class="muted">${esc(city)}</div>` : ""}
-      ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
-      <div class="muted" style="margin-top:6px">METAR a linky Jáchym Air brzy</div>`);
-    if (z >= 8 || (big && z >= 6)) c.bindTooltip(esc(icao), { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
-    else c.bindTooltip(`${esc(icao)} – ${esc(name)}`, { direction: "top" });
+    const m = metarCache.get(icao);
+    c.bindPopup(() => {
+      const here = liveRows.filter(r => r.lat != null && Math.abs(r.lat - lat) < 0.06 && Math.abs(r.lon - lon) < 0.09);
+      return `<div class="pop-cs">${esc(icao)}</div><div><b>${esc(name)}</b></div>${city ? `<div class="muted">${esc(city)}</div>` : ""}
+        ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
+        ${metarCache.get(icao) ? metarHtml(metarCache.get(icao)) : '<div class="muted" style="margin-top:6px">METAR pro toto letiště není k dispozici.</div>'}`;
+    }, { maxWidth: 340 });
+    const label = `${m?.fltCat ? `<i class="cat cat-${esc(m.fltCat)}"></i>` : ""}${esc(icao)}${m && m.temp != null ? `<span class="wx">${Math.round(m.temp)}° ${wxIcon(m)}</span>` : ""}`;
+    if (z >= 8 || (big && z >= 6)) c.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
+    else c.bindTooltip(`${label} – ${esc(name)}`, { direction: "top" });
   }
+}
+
+/* ---------- počasí (METAR) ---------- */
+function scheduleMetar() {
+  clearTimeout(metarTimer);
+  metarTimer = setTimeout(loadMetar, 600);
+}
+async function loadMetar() {
+  if (!map || map.getZoom() < 6 || !map.hasLayer(airportLayer)) return;
+  const b = map.getBounds();
+  const f = (v, up) => (up ? Math.ceil(v * 2) : Math.floor(v * 2)) / 2;
+  const bbox = [f(Math.max(-90, b.getSouth()), 0), f(Math.max(-180, b.getWest()), 0), f(Math.min(90, b.getNorth()), 1), f(Math.min(180, b.getEast()), 1)].join(",");
+  try {
+    const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?bbox=${bbox}`, { headers: { apikey: CFG.SUPABASE_KEY } });
+    if (!r.ok) return;
+    const list = await r.json();
+    for (const m of list || []) if (m.icaoId) metarCache.set(m.icaoId, m);
+    drawAirports();
+  } catch { /* počasí je jen doplněk */ }
+}
+function wxIcon(m) {
+  const wx = m.wxString || "", cov = (m.clouds || []).map(c => c.cover);
+  if (/TS/.test(wx)) return "⛈️";
+  if (/SN|SG|PL|GR/.test(wx)) return "🌨️";
+  if (/RA|DZ|SH/.test(wx)) return "🌧️";
+  if (/FG|BR|HZ/.test(wx)) return "🌫️";
+  if (cov.includes("OVC") || cov.includes("OVX")) return "☁️";
+  if (cov.includes("BKN")) return "🌥️";
+  if (cov.includes("SCT")) return "⛅";
+  if (cov.includes("FEW")) return "🌤️";
+  return "☀️";
+}
+const CAT_TXT = { VFR: "VFR", MVFR: "MVFR", IFR: "IFR", LIFR: "LIFR" };
+const COVER_TXT = { FEW: "skoro jasno", SCT: "polojasno", BKN: "oblačno", OVC: "zataženo", OVX: "nebe neviditelné", CLR: "jasno", SKC: "jasno", CAVOK: "CAVOK" };
+function metarHtml(m) {
+  const wind = m.wspd == null ? "–" : m.wspd === 0 ? "bezvětří"
+    : `${m.wdir === "VRB" ? "proměnlivý" : String(m.wdir).padStart(3, "0") + "°"} ${m.wspd} kt${m.wgst ? `, nárazy ${m.wgst} kt` : ""}`;
+  let vis = "–";
+  if (m.visib != null) {
+    const v = String(m.visib);
+    vis = v.includes("+") ? "10 km a více" : `${fmt1(parseFloat(v) * 1.609)} km`;
+  }
+  const clouds = (m.clouds || []).map(c => `${COVER_TXT[c.cover] || c.cover}${c.base != null ? ` ${nf.format(c.base)} ft` : ""}`).join(", ") || "bez oblačnosti";
+  return `<div class="metar-box">
+    <div style="display:flex;align-items:center;gap:8px"><b>Počasí ${wxIcon(m)}</b>${m.fltCat ? `<span class="cat-chip cat-${esc(m.fltCat)}">${esc(CAT_TXT[m.fltCat] || m.fltCat)}</span>` : ""}</div>
+    <dl>
+      <dt>Teplota</dt><dd>${m.temp != null ? Math.round(m.temp) + " °C" : "–"}${m.dewp != null ? ` · rosný bod ${Math.round(m.dewp)} °C` : ""}</dd>
+      <dt>Vítr</dt><dd>${wind}</dd>
+      <dt>Dohlednost</dt><dd>${vis}</dd>
+      <dt>Oblačnost</dt><dd>${esc(clouds)}</dd>
+      ${m.wxString ? `<dt>Jevy</dt><dd>${esc(m.wxString)}</dd>` : ""}
+      <dt>QNH</dt><dd>${m.altim != null ? Math.round(m.altim) + " hPa" : "–"}</dd>
+    </dl>
+    <div class="metar-raw">${esc(m.rawOb || "")}</div></div>`;
+}
+
+/* ---------- karta přistání ---------- */
+function rwyText(f) {
+  if (!f.rwy) return null;
+  const d = f.rwy_dist_m, o = Number(f.rwy_offset_m);
+  const where = d == null ? "" : d >= 0 ? ` · ${nf.format(d)} m za prahem` : ` · ${nf.format(-d)} m před prahem`;
+  const side = isNaN(o) ? "" : Math.abs(o) < 0.5 ? " · na ose" : ` · ${fmt1(Math.abs(o))} m ${o > 0 ? "vpravo" : "vlevo"} od osy`;
+  return `RWY ${esc(f.rwy)}${where}${side}`;
+}
+function windText(f) {
+  if (f.wind_kt == null) return null;
+  let t = `${String(f.wind_dir ?? 0).padStart(3, "0")}° / ${f.wind_kt} kt`;
+  if (f.headwind != null) t += ` · ${f.headwind >= 0 ? "čelní" : "zadní"} ${Math.abs(f.headwind)} kt`;
+  if (f.crosswind) t += ` · boční ${Math.abs(f.crosswind)} kt ${f.crosswind > 0 ? "zprava" : "zleva"}`;
+  return t;
+}
+function landingCardHtml(f) {
+  const rows = [
+    ["Dosednutí", `${nf.format(f.fpm)} fpm · ${fmtG(f.g)} G`],
+    f.td_ias != null ? ["Rychlost", `IAS ${f.td_ias} kt · GS ${f.td_gs} kt`] : null,
+    rwyText(f) ? ["Dráha", rwyText(f)] : null,
+    windText(f) ? ["Vítr", windText(f)] : null,
+    f.bounces != null ? ["Odskoky", f.bounces ? String(f.bounces) : "žádné"] : null,
+  ].filter(Boolean);
+  return `<div class="lcard"><div class="lcard-head">${scoreHtml(f.score)}<div><b>${verdictOf(f.score)}</b>
+    <span class="muted">${esc(f.callsign || f.profiles?.username || "")}${f.arr_icao ? " · " + esc(f.arr_icao) : ""} · ${fmtDate(f.landed_at)}</span></div></div>
+    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
+}
+function tdIcon(score) {
+  const col = score >= 8 ? "#1E9B36" : score >= 6 ? "#8A9A18" : score >= 3 ? "#C2410C" : "#B91C1C";
+  return L.divIcon({ className: "td-ic", iconSize: [30, 30], iconAnchor: [4, 28], popupAnchor: [10, -26],
+    html: `<div class="td-pin" style="background:${col}"><span>${fmt1(score)}</span></div>` });
+}
+const TD_FIELDS = "id, user_id, callsign, arr_icao, score, fpm, g, td_lat, td_lon, td_ias, td_gs, wind_dir, wind_kt, headwind, crosswind, bounces, rwy, rwy_dist_m, rwy_offset_m, landed_at, profiles(username)";
+async function refreshTouchdowns() {
+  if (!tdLayer) return;
+  const { data, error } = await sb.from("flights").select(TD_FIELDS).not("td_lat", "is", null)
+    .gte("landed_at", new Date(Date.now() - 48 * 3600e3).toISOString()).order("landed_at", { ascending: false }).limit(150);
+  if (error) return;
+  tdLayer.clearLayers();
+  for (const f of data || []) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(tdLayer);
 }
 
 function verdictOf(s) {
@@ -477,7 +659,7 @@ function landingToast(f) {
   const t = document.createElement("div");
   t.className = "toast" + (jaiSet.has(f.user_id) ? " jai" : "");
   t.innerHTML = `${scoreHtml(f.score)}<div><b>🛬 ${esc(f.callsign || f.profiles?.username)}</b> přistál${f.arr_icao ? " v " + esc(f.arr_icao) : ""}
-    <div class="muted">${nf.format(f.fpm)} fpm · ${fmt1(f.g)} G · ${verdictOf(f.score)}</div></div>`;
+    <div class="muted">${nf.format(f.fpm)} fpm · ${fmtG(f.g)} G · ${verdictOf(f.score)}</div></div>`;
   $("toasts").prepend(t);
   setTimeout(() => t.remove(), 15000);
 }
@@ -501,6 +683,7 @@ function timeAgo(d) {
 }
 
 async function refreshLive() {
+  if (liveTick % 8 === 0) refreshTouchdowns();
   if (liveTick++ % 2 === 0) refreshRecent();
   const since = new Date(Date.now() - 120000).toISOString();
   const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url)").gte("updated_at", since);
@@ -515,8 +698,15 @@ async function refreshLive() {
       <div><a href="#/pilot/${encodeURIComponent(r.profiles?.username || "")}">${esc(r.profiles?.username)}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}</div>
       <div>${esc(r.aircraft || "")}</div>
       <div>${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}</div>
-      ${r.dep_icao ? `<div>Odlet: ${esc(r.dep_icao)}</div>` : ""}
+      ${r.plan?.dep ? `<div><b>${esc(r.plan.dep)} → ${esc(r.plan.arr)}</b>${r.plan.altn ? ` <span class="muted">(alt. ${esc(r.plan.altn)})</span>` : ""}</div>`
+        : r.dep_icao ? `<div>Odlet: ${esc(r.dep_icao)}</div>` : ""}
       ${r.profiles?.stream_url ? `<div style="margin-top:6px"><a class="stream-btn" href="${esc(r.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}`;
+    const fixes = Array.isArray(r.plan?.fixes) ? r.plan.fixes : [];
+    let pl = planLines.get(r.user_id);
+    if (fixes.length > 1) {
+      const st = { color: isJai ? "#1E9B36" : "#66788A", weight: 2, opacity: .7, dashArray: "6 7", interactive: false };
+      if (!pl) { pl = L.polyline(fixes, st).addTo(map); planLines.set(r.user_id, pl); } else { pl.setLatLngs(fixes); pl.setStyle(st); }
+    } else if (pl) { map.removeLayer(pl); planLines.delete(r.user_id); }
     const pts = Array.isArray(r.trail) ? r.trail.slice() : [];
     if (pts.length) pts.push([r.lat, r.lon, r.alt || 0]);
     let tr = trails.get(r.user_id);
@@ -535,6 +725,7 @@ async function refreshLive() {
   }
   for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); }
   for (const [id, t] of trails) if (!seen.has(id)) { map.removeLayer(t); trails.delete(id); }
+  for (const [id, l] of planLines) if (!seen.has(id)) { map.removeLayer(l); planLines.delete(id); }
 
   const sorted = [...liveRows].sort((a, b) => (jaiSet.has(b.user_id) - jaiSet.has(a.user_id)) || (b.alt - a.alt));
   $("airCount").textContent = `Ve vzduchu (${sorted.filter(r => r.phase !== "Na zemi").length})`;
@@ -542,7 +733,7 @@ async function refreshLive() {
     <button class="air-item ${jaiSet.has(r.user_id) ? "jai" : ""}" data-id="${esc(r.user_id)}">
       <div class="air-cs">${esc(r.callsign || r.profiles?.username)}</div>
       <div class="air-sub">${esc(r.profiles?.username)} · ${esc(r.aircraft || "")}</div>
-      <div class="air-nums">${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}${r.dep_icao ? " · z " + esc(r.dep_icao) : ""}</div>
+      <div class="air-nums">${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : r.dep_icao ? " · z " + esc(r.dep_icao) : ""}</div>
     </button>`).join("")
     : '<div class="empty">Právě nikdo neletí. Spusť tracker a objevíš se tady.</div>';
   document.querySelectorAll(".air-item").forEach(b => b.onclick = () => {
@@ -570,7 +761,7 @@ async function renderLeaderboard() {
     !data.length ? '<div class="card">Zatím tu nejsou žádná přistání. Buď první!</div>' :
     `<div class="table-wrap"><table><thead><tr><th></th><th>Pilot</th><th>Známka</th><th>FPM</th><th>G</th><th>Trasa</th><th>Letadlo</th><th>Datum</th></tr></thead><tbody>
     ${data.map((f, i) => `<tr><td class="rank">${i + 1}</td><td>${pilotLink(f.profiles, jaiSet.has(f.user_id))}</td><td>${scoreHtml(f.score)}</td>
-      <td>${nf.format(f.fpm)}</td><td>${fmt1(f.g)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td class="muted">${fmtDate(f.landed_at)}</td></tr>`).join("")}
+      <td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td class="muted">${fmtDate(f.landed_at)}</td></tr>`).join("")}
     </tbody></table></div>`;
 
   const { data: ps } = await sb.from("pilot_stats").select("*").gt("flights", 0).order("minutes", { ascending: false }).limit(15);
@@ -600,7 +791,7 @@ async function renderPilot(username) {
   if (!p) { el.innerHTML = '<div class="card">Pilot nenalezen.</div>'; return; }
   const hours = p.minutes / 60, rk = rankOf(hours);
   const { data: prof } = await sb.from("profiles").select("stream_url").eq("id", p.id).maybeSingle();
-  const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
+  const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score, rwy").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
   el.innerHTML = `
     <div class="profile-head">${avatar(p, p.is_jai)}
       <div><h1 class="profile-name">${esc(p.username)}</h1>
@@ -617,10 +808,11 @@ async function renderPilot(username) {
     <h2 class="section-title">Historie letů</h2>
     ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a uvidíš jeho trasu.</p>' : ""}
     <div class="flight-map" id="flightMap"></div>
+    <div class="flight-card" id="flightCard"></div>
     ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' :
-    `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
+    `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>Dráha</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
     ${fl.map(f => `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
-      <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${nf.format(f.fpm)}</td><td>${fmt1(f.g)}</td><td>${scoreHtml(f.score)}</td></tr>`).join("")}
+      <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${f.rwy ? esc(f.rwy) : '<span class="muted">–</span>'}</td><td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${scoreHtml(f.score)}</td></tr>`).join("")}
     </tbody></table></div>`}`;
   el.querySelectorAll("tr.clickable").forEach(tr => {
     const open = () => { el.querySelectorAll("tr.sel").forEach(x => x.classList.remove("sel")); tr.classList.add("sel"); showFlightPath(tr.dataset.fid); };
@@ -631,7 +823,10 @@ async function renderPilot(username) {
 let flightMap = null;
 async function showFlightPath(id) {
   const box = $("flightMap");
-  const { data: f } = await sb.from("flights").select("path, dep_icao, arr_icao").eq("id", id).maybeSingle();
+  const { data: f } = await sb.from("flights").select("path, plan_arr, plan_altn, route, crew_status, " + TD_FIELDS).eq("id", id).maybeSingle();
+  $("flightCard").innerHTML = f ? `<div class="card">${landingCardHtml(f)}
+    ${f.route ? `<div class="plan-route"><b>Trasa podle plánu:</b> ${esc(f.route)}</div>` : ""}
+    ${f.crew_status ? `<p class="muted" style="margin:8px 0 0">Crew center: ${esc(f.crew_status)}</p>` : ""}</div>` : "";
   box.classList.add("on");
   if (flightMap) { flightMap.remove(); flightMap = null; }
   const dark = matchMedia("(prefers-color-scheme: dark)").matches;
@@ -648,6 +843,7 @@ async function showFlightPath(id) {
   const line = L.polyline(pts.map(p => [p[0], p[1]]), { opacity: 0, interactive: false }).addTo(flightMap);
   L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(flightMap);
   L.circleMarker([pts[pts.length - 1][0], pts[pts.length - 1][1]], { radius: 6, color: "#fff", fillColor: "#1E9B36", fillOpacity: 1, weight: 3 }).bindTooltip("Přistání " + (f.arr_icao || "")).addTo(flightMap);
+  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(flightMap);
   flightMap.fitBounds(line.getBounds().pad(0.2));
   box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -697,6 +893,7 @@ function renderAccount(msg) {
         <div class="field"><label for="pUser">Uživatelské jméno</label><input id="pUser" value="${esc(p.username)}" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}"></div>
         <div class="field"><label for="pCs">Volací znak</label><input id="pCs" value="${esc(p.callsign || "")}" maxlength="12"></div>
         <div class="field"><label for="pStream">Odkaz na tvůj stream (nepovinné)</label><input id="pStream" type="url" value="${esc(p.stream_url || "")}" placeholder="https://www.twitch.tv/… nebo https://www.youtube.com/@…"><small>Twitch, YouTube nebo Kick. Na mapě se u tebe objeví tlačítko „Sledovat stream“.</small></div>
+        <div class="field"><label for="pSb">Uživatelské jméno v SimBriefu (nepovinné)</label><input id="pSb" value="${esc(p.simbrief_user || "")}" maxlength="40" placeholder="např. jachym12"><small>Aplikace podle něj načte tvůj letový plán.</small></div>
         <button class="btn">Uložit profil</button>
         <a class="btn ghost" href="#/pilot/${encodeURIComponent(p.username || "")}" style="margin-left:8px">Zobrazit profil</a>
       </form>
@@ -708,9 +905,37 @@ function renderAccount(msg) {
         <p class="muted">Spusť <b>JachymAirTracker.exe</b> a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na <b>Další informace</b> a pak <b>Přesto spustit</b>.</p>
         <button class="btn ghost" id="logout">Odhlásit se</button>
       </div>
+      <div class="card" id="crewCard"><h2 class="section-title">Crew center Jáchym Air</h2><p class="muted">Načítám…</p></div>
     </div>`;
+  renderCrewCard();
   $("logout").onclick = async () => { await sb.auth.signOut(); me = null; updateNav(); renderAccount(); };
   $("profileForm").onsubmit = onProfileSubmit;
+}
+
+async function renderCrewCard(msg) {
+  const box = $("crewCard"); if (!box || !me) return;
+  const { data: row } = await sb.from("jai_members").select("pilot_ident, pilot_name").eq("user_id", me.user.id).maybeSingle();
+  const m = msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : "";
+  if (row) {
+    box.innerHTML = `<h2 class="section-title">Crew center Jáchym Air</h2>${m}
+      <p><span class="badge">Pilot Jáchym Air</span> ${row.pilot_ident ? `<b>${esc(row.pilot_ident)}</b>` : ""} ${row.pilot_name ? esc(row.pilot_name) : ""}</p>
+      <p class="muted">Tvoje letadlo svítí na mapě zeleně. ${appApi ? "Odesílání letů do crew centra nastavíš v záložce Tracker." : "Aby se lety samy odesílaly i do crew centra, vlož klíč také do aplikace (záložka Tracker)."}</p>`;
+    return;
+  }
+  box.innerHTML = `<h2 class="section-title">Crew center Jáchym Air</h2>${m}
+    <p>Jsi pilot Jáchym Air? Propoj účet s <a href="https://crew.jachymair.com" target="_blank" rel="noopener">crew centrem</a> a na mapě budeš svítit zeleně.</p>
+    <form id="crewForm"><div class="field"><label for="crewKey">API klíč z crew centra</label><input id="crewKey" type="password" required autocomplete="off">
+    <small>Najdeš ho v crew centru ve svém profilu. Klíč slouží jen k jednorázovému ověření a nikde se neukládá.</small></div>
+    <button class="btn">Propojit</button></form>`;
+  $("crewForm").onsubmit = async e => {
+    e.preventDefault();
+    const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Ověřuji…";
+    const { data, error } = await sb.functions.invoke("jai-link", { body: { api_key: $("crewKey").value.trim() } });
+    let text = data?.msg;
+    if (error && !text) { try { text = (await error.context.json()).msg; } catch { text = error.message; } }
+    if (data?.ok) { await loadJai(); updateNav(); renderCrewCard({ ok: true, text: `Propojeno! Vítej mezi piloty Jáchym Air${data.ident ? ", " + data.ident : ""}.` }); }
+    else renderCrewCard({ ok: false, text: text || "Propojení se nepovedlo." });
+  };
 }
 
 async function onAuthSubmit(e) {
@@ -742,7 +967,9 @@ async function onProfileSubmit(e) {
   try {
     const stream = $("pStream").value.trim();
     if (stream && !/^https:\/\/(www\.|m\.)?(twitch\.tv|youtube\.com|youtu\.be|kick\.com)\//.test(stream)) throw new Error("Odkaz na stream musí vést na Twitch, YouTube nebo Kick (začínat https://).");
-    const upd = { username: $("pUser").value.trim(), callsign: $("pCs").value.trim().toUpperCase() || null, stream_url: stream || null };
+    const sbUser = $("pSb").value.trim();
+    if (sbUser && !/^[A-Za-z0-9_.@-]{1,40}$/.test(sbUser)) throw new Error("Jméno ze SimBriefu obsahuje nepovolené znaky.");
+    const upd = { username: $("pUser").value.trim(), callsign: $("pCs").value.trim().toUpperCase() || null, stream_url: stream || null, simbrief_user: sbUser || null };
     const file = $("fAv").files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) throw new Error("Obrázek je větší než 2 MB.");

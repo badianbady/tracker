@@ -75,6 +75,8 @@
   .big .unit { color: var(--green-deep); opacity: 1; }
   .dlbl { font-size: 14px; font-weight: 600; color: var(--green-deep); margin-top: 5px; }
   .segments { display: flex; gap: 4px; }
+  .rwy { font-size: 15px; font-weight: 600; color: var(--green-deep); }
+  .rwy:empty { display: none; }
   .seg { width: 22px; height: 8px; border-radius: 2px; background: #E2EDE4; }
   .seg.on { background: var(--green); }
   .landing.show .seg.on { animation: fill .3s both; }
@@ -99,6 +101,7 @@
         <div><div class="big" id="lG">1,00<span class="unit">G</span></div><div class="dlbl">Přetížení</div></div>
       </div>
       <div class="segments" id="segs"></div>
+      <div class="rwy" id="lRwy"></div>
     </div>
   </div>
 
@@ -173,6 +176,7 @@
     $("lVerdict").textContent = l.hodnoceni;
     $("lFpm").innerHTML = nf.format(l.fpm) + unit("fpm");
     $("lG").innerHTML = l.g.toFixed(2).replace(".", ",") + unit("G");
+    $("lRwy").textContent = [l.draha, l.odskoky ? `odskoky: ${l.odskoky}` : ""].filter(Boolean).join(" · ");
     const on = Math.round(l.skore);
     [...segs.children].forEach((s, i) => {
       s.classList.toggle("on", i < on);

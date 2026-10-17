@@ -18,6 +18,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -45,6 +46,10 @@ HISTORY_FILE = os.path.join(DATA_DIR, "historie_pristani.json")
 ACCOUNT_FILE = os.path.join(DATA_DIR, "ucet.json")
 QUEUE_FILE = os.path.join(DATA_DIR, "neodeslane_lety.json")
 AIRPORTS_FILE = os.path.join(DATA_DIR, "letiste_v2.json")
+RUNWAYS_FILE = os.path.join(DATA_DIR, "drahy_v1.json")
+CREW_FILE = os.path.join(DATA_DIR, "crew.json")
+RUNWAYS_URL = "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/runways.csv"
+CREW_URL = "https://crew.jachymair.com"
 
 
 def web_url():
@@ -95,6 +100,11 @@ state = {
     "username": None,
     "log": [],
     "update": None,
+    "plan": None,
+    "plan_ver": 0,
+    "simbrief_user": None,
+    "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None},
+    "last_flight": None,
     "trail": [],
     "trail_ver": 0,
 }
@@ -148,6 +158,90 @@ def load_airports():
         log(f"Databáze letišť připravena ({len(out)} letišť).")
     except Exception as e:
         log("Databázi letišť se nepodařilo stáhnout, lety budou bez ICAO kódů:", e)
+
+
+RUNWAYS = []
+
+
+def load_runways():
+    """Databáze drah (OurAirports) pro rozbor dosednutí."""
+    global RUNWAYS
+    if os.path.exists(RUNWAYS_FILE):
+        try:
+            with open(RUNWAYS_FILE, "r", encoding="utf-8") as f:
+                RUNWAYS = json.load(f)
+            return
+        except Exception:
+            pass
+    try:
+        with urllib.request.urlopen(RUNWAYS_URL, timeout=60) as r:
+            text = r.read().decode("utf-8")
+        out = []
+        for row in csv.DictReader(io.StringIO(text)):
+            if row.get("closed") == "1":
+                continue
+            try:
+                le = [row["le_ident"], float(row["le_latitude_deg"]), float(row["le_longitude_deg"]),
+                      float(row.get("le_displaced_threshold_ft") or 0)]
+                he = [row["he_ident"], float(row["he_latitude_deg"]), float(row["he_longitude_deg"]),
+                      float(row.get("he_displaced_threshold_ft") or 0)]
+            except (ValueError, KeyError):
+                continue
+            width = float(row.get("width_ft") or 150)
+            out.append([row["airport_ident"], le, he, width])
+        with open(RUNWAYS_FILE, "w", encoding="utf-8") as f:
+            json.dump(out, f)
+        RUNWAYS = out
+        log(f"Databáze drah připravena ({len(out)} drah).")
+    except Exception as e:
+        log("Databázi drah se nepodařilo stáhnout:", e)
+
+
+def runway_at(lat, lon, hdg):
+    """Najde dráhu, na kterou letadlo dosedlo, a spočítá vzdálenost za prahem a odchylku od osy."""
+    best = None
+    coslat = math.cos(math.radians(lat))
+    for apt, a, b, width in RUNWAYS:
+        if abs(a[1] - lat) > 0.06 or abs(a[2] - lon) > 0.1:
+            continue
+        for thr, end in ((a, b), (b, a)):
+            ex = (end[2] - thr[2]) * coslat * 111320
+            ey = (end[1] - thr[1]) * 110540
+            length = math.hypot(ex, ey)
+            if length < 100:
+                continue
+            brg = math.degrees(math.atan2(ex, ey)) % 360
+            if abs((hdg - brg + 180) % 360 - 180) > 40:
+                continue
+            px = (lon - thr[2]) * coslat * 111320
+            py = (lat - thr[1]) * 110540
+            along = (px * ex + py * ey) / length
+            cross = (px * ey - py * ex) / length      # kladné = vpravo od osy
+            if not (-150 <= along <= length + 50) or abs(cross) > width * 0.3048 / 2 + 40:
+                continue
+            if best is None or abs(cross) < abs(best["offset_m"]):
+                best = {"rwy": thr[0], "airport": apt,
+                        "dist_m": round(along - thr[3] * 0.3048),
+                        "offset_m": round(cross, 1), "length_m": round(length)}
+    return best
+
+
+def runway_text(info):
+    if not info:
+        return None
+    off = info["offset_m"]
+    side = "na ose" if abs(off) < 0.5 else f"{abs(off):.1f} m {'vpravo' if off > 0 else 'vlevo'} od osy".replace(".", ",")
+    dist = info["dist_m"]
+    where = f"{dist} m za prahem" if dist >= 0 else f"{-dist} m před prahem"
+    return f"RWY {info['rwy']} · {where} · {side}"
+
+
+def wind_components(wind_dir, wind_kt, hdg):
+    """Čelní (kladná) / zadní (záporná) a boční (kladná = zprava) složka větru."""
+    if wind_dir is None or wind_kt is None:
+        return None, None
+    rel = math.radians((wind_dir - hdg + 360) % 360)
+    return round(wind_kt * math.cos(rel)), round(wind_kt * math.sin(rel))
 
 
 BONUS_NM = {3: 3.0, 2: 1.5, 1: 0.0, 0: -1.0}
@@ -265,12 +359,15 @@ class Cloud:
         return False
 
     def _load_profile(self):
-        code, res = self.request("GET", f"/rest/v1/profiles?id=eq.{self.user_id}&select=username,callsign")
+        code, res = self.request("GET", f"/rest/v1/profiles?id=eq.{self.user_id}&select=username,callsign,simbrief_user")
+        if code == 400:
+            code, res = self.request("GET", f"/rest/v1/profiles?id=eq.{self.user_id}&select=username,callsign")
         if code == 200 and res:
             self.profile = res[0]
             cs = self.profile.get("callsign") or CALLSIGN
             with lock:
                 state["callsign"] = cs
+                state["simbrief_user"] = self.profile.get("simbrief_user")
                 state["online"] = True
                 state["username"] = self.profile.get("username")
                 state["web_status"] = "Přihlášen"
@@ -294,7 +391,18 @@ class Cloud:
             code, res = self._http(method, path, body, token, prefer)
         return code, res
 
-    def send_live(self, s, with_trail=False):
+    def save_profile(self, fields):
+        code, res = self.request("PATCH", f"/rest/v1/profiles?id=eq.{self.user_id}", fields, "return=minimal")
+        return code in (200, 204)
+
+    def call_function(self, name, body):
+        with self.lock:
+            if time.time() > self.expires - 120:
+                self._refresh()
+            token = self.access
+        return self._http("POST", f"/functions/v1/{name}", body, token)
+
+    def send_live(self, s, with_trail=False, with_plan=False):
         body = {
             "user_id": self.user_id, "callsign": s["callsign"], "aircraft": s["aircraft"][:80],
             "lat": s["lat"], "lon": s["lon"], "alt": s["alt"], "gs": s["gs"], "hdg": s["hdg"],
@@ -302,6 +410,10 @@ class Cloud:
         }
         if with_trail:
             body["trail"] = s["trail"]
+        if with_plan:
+            body["plan"] = s["plan"]
+        if s.get("plan") and s["plan"].get("callsign"):
+            body["callsign"] = s["plan"]["callsign"]
         return self.request("POST", "/rest/v1/live?on_conflict=user_id", body, "resolution=merge-duplicates,return=minimal")
 
     def send_flight(self, flight):
@@ -310,6 +422,273 @@ class Cloud:
 
 
 cloud = Cloud()
+
+
+# ---------------- SimBrief ----------------
+def fetch_simbrief(user):
+    """Stáhne poslední OFP ze SimBriefu. Vrací (plan, chyba)."""
+    user = (user or "").strip()
+    if not user:
+        return None, "Zadej své uživatelské jméno ze SimBriefu."
+    param = "userid" if user.isdigit() else "username"
+    url = f"https://www.simbrief.com/api/xml.fetcher.php?{param}={urllib.parse.quote(user)}&json=1"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "JachymAirTracker"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            ofp = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            msg = json.loads(e.read()).get("fetch", {}).get("status")
+        except Exception:
+            msg = None
+        return None, msg or f"SimBrief odpověděl chybou {e.code}. Zkontroluj jméno."
+    except Exception as e:
+        return None, f"SimBrief se nepodařilo načíst: {e}"
+
+    def g(d, *keys):
+        for k in keys:
+            d = d.get(k) if isinstance(d, dict) else None
+        return d if isinstance(d, (str, int, float)) else None
+
+    raw = (ofp.get("navlog") or {}).get("fix") if isinstance(ofp.get("navlog"), dict) else None
+    if isinstance(raw, dict):
+        raw = [raw]
+    pts = []
+    for fx in raw or []:
+        try:
+            pts.append([round(float(fx["pos_lat"]), 4), round(float(fx["pos_long"]), 4)])
+        except (KeyError, TypeError, ValueError):
+            pass
+    dep_lat, dep_lon = g(ofp, "origin", "pos_lat"), g(ofp, "origin", "pos_long")
+    arr_lat, arr_lon = g(ofp, "destination", "pos_lat"), g(ofp, "destination", "pos_long")
+    try:
+        if dep_lat:
+            pts.insert(0, [round(float(dep_lat), 4), round(float(dep_lon), 4)])
+        if arr_lat:
+            pts.append([round(float(arr_lat), 4), round(float(arr_lon), 4)])
+    except ValueError:
+        pass
+    while len(pts) > 400:
+        pts = pts[::2]
+    airline, number = g(ofp, "general", "icao_airline") or "", g(ofp, "general", "flight_number") or ""
+    plan = {
+        "dep": g(ofp, "origin", "icao_code"), "arr": g(ofp, "destination", "icao_code"),
+        "altn": g(ofp, "alternate", "icao_code"),
+        "callsign": g(ofp, "atc", "callsign") or (f"{airline}{number}" or None),
+        "flight_no": f"{airline}{number}" or None,
+        "route": g(ofp, "general", "route"),
+        "aircraft": g(ofp, "aircraft", "icaocode"), "aircraft_name": g(ofp, "aircraft", "name"),
+        "reg": g(ofp, "aircraft", "reg"),
+        "cruise": g(ofp, "general", "initial_altitude"),
+        "distance_nm": g(ofp, "general", "route_distance"),
+        "fuel_ramp": g(ofp, "fuel", "plan_ramp"), "units": g(ofp, "params", "units"),
+        "ete_min": None,
+        "fixes": pts,
+    }
+    try:
+        plan["ete_min"] = round(int(g(ofp, "times", "est_time_enroute")) / 60)
+    except (TypeError, ValueError):
+        pass
+    if not plan["dep"] or not plan["arr"]:
+        return None, "V SimBriefu jsem nenašel žádný letový plán."
+    return plan, None
+
+
+def set_plan(plan):
+    with lock:
+        state["plan"] = plan
+        state["plan_ver"] += 1
+    if plan:
+        log(f"Letový plán: {plan['dep']} → {plan['arr']}" + (f" (alt. {plan['altn']})" if plan.get("altn") else ""))
+
+
+# ---------------- Crew center Jáchym Air (phpVMS) ----------------
+class Crew:
+    """Propojení s crew centrem (phpVMS 7). API klíč zůstává jen v tomto počítači."""
+
+    def __init__(self):
+        self.key, self.auto, self.ident, self.name = None, True, None, None
+        try:
+            with open(CREW_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            self.key, self.auto = d.get("api_key"), d.get("auto", True)
+            self.ident, self.name = d.get("ident"), d.get("name")
+        except Exception:
+            pass
+        self._sync()
+
+    @property
+    def linked(self):
+        return bool(self.key)
+
+    def _sync(self, status=None):
+        with lock:
+            c = state["crew"]
+            c.update({"linked": self.linked, "ident": self.ident, "name": self.name, "auto": self.auto})
+            if status is not None:
+                c["status"] = status
+
+    def _save(self):
+        with open(CREW_FILE, "w", encoding="utf-8") as f:
+            json.dump({"api_key": self.key, "auto": self.auto, "ident": self.ident, "name": self.name}, f)
+
+    def _api(self, method, path, body=None, key=None):
+        req = urllib.request.Request(CREW_URL + path, method=method,
+                                     data=json.dumps(body).encode("utf-8") if body is not None else None)
+        req.add_header("X-API-Key", key or self.key or "")
+        req.add_header("Accept", "application/json")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("User-Agent", "JachymAirTracker")
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                raw = r.read()
+                return r.status, (json.loads(raw) if raw else None)
+        except urllib.error.HTTPError as e:
+            raw = e.read()
+            try:
+                return e.code, json.loads(raw)
+            except Exception:
+                return e.code, {"message": raw.decode("utf-8", "ignore")[:300]}
+        except Exception as e:
+            return 0, {"message": str(e)}
+
+    @staticmethod
+    def _err(res, code):
+        if isinstance(res, dict):
+            if isinstance(res.get("error"), dict):
+                return res["error"].get("message") or str(res["error"])
+            if res.get("errors"):
+                return "; ".join(f"{k}: {', '.join(v) if isinstance(v, list) else v}" for k, v in res["errors"].items()) \
+                    if isinstance(res["errors"], dict) else str(res["errors"])
+            if res.get("message"):
+                return res["message"]
+        return f"chyba {code}"
+
+    def link(self, key):
+        key = (key or "").strip()
+        if not key:
+            return False, "Vlož svůj API klíč z crew centra."
+        code, res = self._api("GET", "/api/user", key=key)
+        if code != 200:
+            return False, "Crew center klíč nepřijal: " + self._err(res, code)
+        pilot = (res or {}).get("data") or {}
+        self.key = key
+        self.ident = pilot.get("ident") or pilot.get("pilot_id")
+        self.name = pilot.get("name") or pilot.get("name_private")
+        self._save()
+        msg = f"Propojeno jako {self.ident or self.name}"
+        if state["online"]:
+            c2, r2 = cloud.call_function("jai-link", {"api_key": key})
+            if c2 == 200 and (r2 or {}).get("ok"):
+                msg += " · na mapě jsi teď pilot Jáchym Air ✔"
+            else:
+                msg += " · členství na webu se nepodařilo potvrdit: " + str((r2 or {}).get("msg") or (r2 or {}).get("message") or c2)
+        self._sync(msg)
+        log(msg)
+        return True, msg
+
+    def unlink(self):
+        self.key = self.ident = self.name = None
+        try:
+            os.remove(CREW_FILE)
+        except OSError:
+            pass
+        self._sync("Odpojeno")
+
+    def set_auto(self, auto):
+        self.auto = bool(auto)
+        self._save()
+        self._sync()
+
+    def bids(self):
+        code, res = self._api("GET", "/api/user/bids")
+        if code != 200:
+            return None, self._err(res, code)
+        return (res or {}).get("data") or [], None
+
+    def _pick_aircraft(self, flight, plan):
+        """Vybere letadlo z flotily crew centra – podle registrace ze SimBriefu, jinak první vhodné."""
+        reg = ((plan or {}).get("reg") or "").replace("-", "").upper()
+        icao = ((plan or {}).get("aircraft") or "").upper()
+        candidates = []
+        for sf in flight.get("subfleets") or []:
+            candidates += sf.get("aircraft") or []
+        if not candidates:
+            code, res = self._api("GET", "/api/user/fleet")
+            for sf in ((res or {}).get("data") or []) if code == 200 else []:
+                candidates += sf.get("aircraft") or []
+        for a in candidates:
+            if reg and (a.get("registration") or "").replace("-", "").upper() == reg:
+                return a
+        for a in candidates:
+            if icao and (a.get("icao") or "").upper() == icao:
+                return a
+        return candidates[0] if candidates else None
+
+    def file_flight(self, fl, fuel_lbs=None):
+        """Odešle dokončený let do crew centra jako PIREP. Vrací text stavu."""
+        try:
+            status = self._file(fl, fuel_lbs)
+        except Exception as e:
+            status = f"Chyba při odesílání do crew centra: {e}"
+        self._sync(status)
+        log("Crew center: " + status)
+        with lock:
+            if state.get("last_flight") and state["last_flight"]["flight"] is fl:
+                state["last_flight"]["crew"] = status
+        return status[:300]
+
+    def _file(self, fl, fuel_lbs):
+        dep, arr = fl.get("dep_icao"), fl.get("arr_icao")
+        bids, err = self.bids()
+        if bids is None:
+            return f"Nepodařilo se načíst rezervace: {err}"
+        match = None
+        for b in bids:
+            f = b.get("flight") or {}
+            if f.get("dpt_airport_id") == dep and f.get("arr_airport_id") in (arr, fl.get("plan_arr")):
+                match = f
+                break
+        if not match:
+            return f"Let neodeslán – v crew centru nemáš rezervaci (bid) pro {dep or '?'} → {arr or '?'}."
+        with lock:
+            plan = dict(state["plan"]) if state.get("plan") else None
+        ac = self._pick_aircraft(match, plan)
+        if not ac:
+            return "Let neodeslán – v crew centru jsem nenašel žádné letadlo pro tento let."
+        pre = {
+            "airline_id": match.get("airline_id"), "aircraft_id": ac.get("id"), "flight_id": match.get("id"),
+            "flight_number": match.get("flight_number"), "route_code": match.get("route_code"),
+            "route_leg": match.get("route_leg"), "flight_type": match.get("flight_type") or "J",
+            "dpt_airport_id": match.get("dpt_airport_id"), "arr_airport_id": match.get("arr_airport_id"),
+            "route": fl.get("route") or match.get("route"), "source_name": "JAI Tracker",
+            "planned_distance": match.get("distance", {}).get("nmi") if isinstance(match.get("distance"), dict) else match.get("distance"),
+        }
+        pre = {k: v for k, v in pre.items() if v not in (None, "")}
+        code, res = self._api("POST", "/api/pireps/prefile", pre)
+        if code not in (200, 201):
+            return "Crew center odmítl let (prefile): " + self._err(res, code)
+        pid = ((res or {}).get("data") or {}).get("id")
+        notes = f"JAI Tracker: přistání {fl.get('score')}/10, {fl.get('fpm')} fpm, {fl.get('g')} G"
+        if fl.get("rwy"):
+            notes += f", RWY {fl['rwy']}"
+        body = {
+            "flight_time": max(1, round(fl.get("duration_min") or 0)),
+            "distance": fl.get("distance_nm") or 0,
+            "fuel_used": fuel_lbs or 0,
+            "landing_rate": fl.get("fpm"),
+            "source_name": "JAI Tracker",
+            "route": fl.get("route") or None,
+            "notes": notes,
+        }
+        body = {k: v for k, v in body.items() if v is not None}
+        code, res = self._api("POST", f"/api/pireps/{pid}/file", body)
+        if code not in (200, 201):
+            return "Crew center odmítl let (file): " + self._err(res, code)
+        return f"Let {match.get('flight_number') or ''} odeslán do crew centra ✔ (PIREP {pid})"
+
+
+crew = Crew()
 
 
 def queue_flight(flight):
@@ -345,6 +724,7 @@ def flush_queue():
 def upload_loop():
     last_flush = 0
     sent_trail_ver, last_trail_t = -1, 0
+    sent_plan_ver = -1
     while True:
         time.sleep(5)
         if not state["online"] or state["demo"]:
@@ -354,9 +734,12 @@ def upload_loop():
         if s["connected"]:
             try:
                 with_trail = s["trail_ver"] != sent_trail_ver and (time.time() - last_trail_t > 20 or not s["trail"])
-                code, res = cloud.send_live(s, with_trail)
+                with_plan = s["plan_ver"] != sent_plan_ver
+                code, res = cloud.send_live(s, with_trail, with_plan)
                 if with_trail and code in (200, 201, 204):
                     sent_trail_ver, last_trail_t = s["trail_ver"], time.time()
+                if with_plan and code in (200, 201, 204):
+                    sent_plan_ver = s["plan_ver"]
                 if code not in (200, 201, 204):
                     log("Web odmítl polohu:", code, (res or {}).get("message"))
             except Exception as e:
@@ -443,6 +826,8 @@ class FlightRecorder:
             self.ground_pos = (lat, lon)
         if not on_ground:
             if self.was_on_ground:
+                if self.pending:
+                    self.pending["bounces"] += 1
                 self.air_since = t
                 if self.takeoff is None or self.takeoff.get("landed"):
                     gp = self.ground_pos or (lat, lon)
@@ -463,13 +848,13 @@ class FlightRecorder:
             airborne = t - (self.air_since or t)
             if airborne > 15 and t - self.last_landing_t > 10:
                 gmax = max([gg for tt, gg in self.recent_g if t - tt < 0.6] + [g])
-                self.pending = {"t": t, "fpm": -abs(self.last_air_vs), "g": gmax, "info": dict(info)}
+                self.pending = {"t": t, "fpm": -abs(self.last_air_vs), "g": gmax, "info": dict(info), "bounces": 0}
                 self.last_landing_t = t
 
         if self.pending:
             self.pending["g"] = max(self.pending["g"], g)
-            if t - self.pending["t"] >= 2.0:
-                self._finish()
+            if t - self.pending["t"] >= 6.0:
+                self._finish(info)
 
         self.recent_g = [(tt, gg) for tt, gg in self.recent_g if t - tt < 2]
         self.was_on_ground = on_ground
@@ -486,7 +871,8 @@ class FlightRecorder:
 
     def _start(self, t, lat, lon, known):
         ap = nearest_airport(lat, lon) if known else None
-        self.takeoff = {"t": t, "iso": now_iso(), "icao": ap[0] if ap else None, "name": ap[1] if ap else None, "landed": False}
+        self.takeoff = {"t": t, "iso": now_iso(), "icao": ap[0] if ap else None, "name": ap[1] if ap else None,
+                        "landed": False, "fuel": state.get("fuel_lbs")}
         self.dist = 0.0
         self.last_pos = (lat, lon)
         self.path = []
@@ -497,7 +883,7 @@ class FlightRecorder:
         if known:
             log(f"🛫 Vzlet{' z ' + ap[0] if ap else ''}")
 
-    def _finish(self):
+    def _finish(self, now_info=None):
         p, self.pending = self.pending, None
         self.ground_pos = None
         fpm, source = p["fpm"], "vs"
@@ -513,6 +899,15 @@ class FlightRecorder:
         score = landing_score(fpm, g)
         info = p["info"]
         ap = nearest_airport(info.get("lat", 0), info.get("lon", 0))
+        hdg = info.get("hdg", 0)
+        rwy = runway_at(info.get("lat", 0), info.get("lon", 0), hdg) if RUNWAYS else None
+        head, cross = wind_components(info.get("wind_dir"), info.get("wind_kt"), hdg)
+        to0 = self.takeoff or {}
+        fuel_used = None
+        if to0.get("fuel") is not None and state.get("fuel_lbs") is not None:
+            fuel_used = max(0, round(to0["fuel"] - state["fuel_lbs"]))
+        with lock:
+            plan = dict(state["plan"]) if state.get("plan") else None
         rec = {
             "id": int(time.time() * 1000),
             "cas": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -522,6 +917,10 @@ class FlightRecorder:
             "prilet": ap[0] if ap else None,
             "lat": round(info.get("lat", 0), 5), "lon": round(info.get("lon", 0), 5),
             "zdroj_fpm": source,
+            "draha": runway_text(rwy),
+            "odskoky": p["bounces"],
+            "ias": round(info.get("ias", 0)), "gs": round(info.get("gs", 0)),
+            "vitr": None if info.get("wind_dir") is None else [round(info["wind_dir"]), round(info["wind_kt"]), head, cross],
         }
         with lock:
             state["landing"] = rec
@@ -531,6 +930,8 @@ class FlightRecorder:
             callsign = state["callsign"]
         save_landing(rec)
         log(f"🛬 PŘISTÁNÍ{' v ' + ap[0] if ap else ''}: {fpm} fpm | {g} G | {score}/10 – {rec['hodnoceni']}")
+        if rec["draha"]:
+            log("   " + rec["draha"])
 
         to = self.takeoff or {"t": p["t"], "iso": None}
         to["landed"] = True
@@ -543,9 +944,24 @@ class FlightRecorder:
             "distance_nm": round(self.dist, 1),
             "fpm": max(-6000, min(0, fpm)), "g": min(10, g), "score": score,
             "path": self.path + [[round(info.get("lat", 0), 4), round(info.get("lon", 0), 4), 0]],
+            "td_lat": round(info.get("lat", 0), 6), "td_lon": round(info.get("lon", 0), 6),
+            "td_ias": round(info.get("ias", 0)), "td_gs": round(info.get("gs", 0)), "td_hdg": round(hdg) % 360,
+            "wind_dir": None if info.get("wind_dir") is None else round(info["wind_dir"]) % 360,
+            "wind_kt": None if info.get("wind_kt") is None else round(info["wind_kt"]),
+            "headwind": head, "crosswind": cross, "bounces": p["bounces"],
+            "rwy": rwy and rwy["rwy"], "rwy_dist_m": rwy and rwy["dist_m"], "rwy_offset_m": rwy and rwy["offset_m"],
+            "fuel_used_kg": None if fuel_used is None else round(fuel_used * 0.4536),
+            "plan_arr": plan and plan.get("arr"), "plan_altn": plan and plan.get("altn"),
+            "route": plan and (plan.get("route") or "")[:2000],
         }
+        if plan and plan.get("callsign"):
+            flight["callsign"] = plan["callsign"]
+        with lock:
+            state["last_flight"] = {"flight": flight, "fuel_lbs": fuel_used, "crew": None}
         if self.upload and state["online"]:
             def send():
+                if crew.linked and crew.auto:
+                    flight["crew_status"] = crew.file_flight(flight, fuel_used)
                 if cloud.send_flight(flight):
                     log("   Let uložen na web ✔")
                 else:
@@ -618,6 +1034,8 @@ def sim_loop():
             else:
                 rec.touchdown_reader = read_td
             title, title_t = "", 0.0
+            wind_dir = wind_kt = None
+            slow_t = 0.0
             fails = 0
 
             while True:
@@ -648,9 +1066,21 @@ def sim_loop():
                         raw = raw.decode("utf-8", "ignore")
                     title = (raw or "").strip("\x00 ")
                     title_t = t
+                if t - slow_t > 2:
+                    slow_t = t
+                    try:
+                        wind_dir = aq.get("AMBIENT_WIND_DIRECTION")
+                        wind_kt = aq.get("AMBIENT_WIND_VELOCITY")
+                        fuel = aq.get("FUEL_TOTAL_QUANTITY_WEIGHT")
+                        if fuel is not None:
+                            with lock:
+                                state["fuel_lbs"] = fuel
+                    except Exception:
+                        pass
 
                 push(on_ground, alt, agl, ias, gs, vs, hdg, g, lat, lon, title)
-                rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "alt": alt, "hdg": hdg})
+                rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "ias": ias,
+                                                 "alt": alt, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
                 time.sleep(0.05)
         except Exception as e:
             if "Did not find" not in str(e):
@@ -706,7 +1136,8 @@ def demo_loop():
         agl = 0 if og else alt - 1200
         name = "Boeing 737-800 Jáchym Air 7T-JAY"
         push(og, alt, agl, gs * 0.95, gs, vs, 270, g, lat, lon, name)
-        rec.update(now, og, vs, g, {"aircraft": name, "lat": lat, "lon": lon, "gs": gs, "alt": alt, "hdg": 270})
+        rec.update(now, og, vs, g, {"aircraft": name, "lat": lat, "lon": lon, "gs": gs, "ias": gs * 0.95, "alt": alt,
+                                    "hdg": 270, "wind_dir": 250, "wind_kt": 8})
         time.sleep(0.05)
 
 
@@ -839,7 +1270,7 @@ def start_background(demo=False):
                 state["web_status"] = "Web nedostupný, zkouším znovu…"
             time.sleep(15)
 
-    threading.Thread(target=load_airports, daemon=True).start()
+    threading.Thread(target=lambda: (load_airports(), load_runways()), daemon=True).start()
     threading.Thread(target=web_login, daemon=True).start()
     threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
     threading.Thread(target=upload_loop, daemon=True).start()

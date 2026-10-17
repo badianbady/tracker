@@ -9,8 +9,29 @@ import os
 import subprocess
 import sys
 import threading
+import traceback
+import tkinter  # noqa: F401  (načteno hned, aby se při sestavení vždy zabalilo i záložní okno)
 
 import tracker_core as core
+
+ERROR_FILE = os.path.join(core.DATA_DIR, "chyby.txt")
+
+
+def write_error(title, exc_text):
+    try:
+        with open(ERROR_FILE, "a", encoding="utf-8") as f:
+            f.write(f"\n===== {title} (verze {core.VERSION}) =====\n{exc_text}\n")
+    except Exception:
+        pass
+
+
+def message_box(text, title="Jáchym Air Tracker"):
+    """Okno se zprávou bez závislosti na tkinteru."""
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, text, title, 0x10)
+    except Exception:
+        pass
 
 
 class Api:
@@ -18,8 +39,14 @@ class Api:
 
     def get_state(self):
         with core.lock:
-            s = {k: v for k, v in core.state.items() if k not in ("trail", "log")}
+            s = {k: v for k, v in core.state.items() if k not in ("trail", "log", "plan", "last_flight", "crew")}
             s["log"] = [list(x) for x in core.state["log"][-20:]]
+            s["crew"] = dict(core.state["crew"])
+            plan = core.state.get("plan")
+            s["plan"] = {k: v for k, v in plan.items() if k != "fixes"} if plan else None
+            lf = core.state.get("last_flight")
+            s["last_flight"] = {"dep": lf["flight"].get("dep_icao"), "arr": lf["flight"].get("arr_icao"),
+                                "crew": lf.get("crew")} if lf else None
         s["version"] = core.VERSION
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
@@ -31,6 +58,45 @@ class Api:
     def logout(self):
         core.cloud.logout()
         return True
+
+    # ---- SimBrief ----
+    def load_simbrief(self, user=None):
+        user = (user or core.state.get("simbrief_user") or "").strip()
+        plan, err = core.fetch_simbrief(user)
+        if err:
+            return {"ok": False, "msg": err}
+        core.set_plan(plan)
+        if user != core.state.get("simbrief_user") and core.state["online"]:
+            if core.cloud.save_profile({"simbrief_user": user}):
+                with core.lock:
+                    core.state["simbrief_user"] = user
+        return {"ok": True}
+
+    def clear_plan(self):
+        core.set_plan(None)
+        return True
+
+    # ---- Crew center ----
+    def crew_link(self, key):
+        ok, msg = core.crew.link(key)
+        return {"ok": ok, "msg": msg}
+
+    def crew_unlink(self):
+        core.crew.unlink()
+        return True
+
+    def crew_set_auto(self, auto):
+        core.crew.set_auto(auto)
+        return True
+
+    def crew_file_last(self):
+        lf = core.state.get("last_flight")
+        if not lf:
+            return {"ok": False, "msg": "Zatím není žádný let k odeslání."}
+        if not core.crew.linked:
+            return {"ok": False, "msg": "Nejdřív propoj crew center."}
+        status = core.crew.file_flight(lf["flight"], lf.get("fuel_lbs"))
+        return {"ok": "✔" in status, "msg": status}
 
     def copy_text(self, text):
         try:
@@ -93,10 +159,17 @@ def main():
             run_webview()
             return
         except Exception as e:
-            core.log("Web uvnitř aplikace nejde zobrazit, používám jednoduché okno:", e)
+            write_error("Web uvnitř aplikace", traceback.format_exc())
+            core.log("Web uvnitř aplikace nejde zobrazit, používám jednoduché okno:", repr(e))
     import app_tk
     app_tk.run_tk()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        tb = traceback.format_exc()
+        write_error("Pád aplikace", tb)
+        message_box("Aplikace narazila na chybu a musí se zavřít.\n\n"
+                    f"Podrobnosti jsou uložené v:\n{ERROR_FILE}\n\n{tb[-600:]}")
