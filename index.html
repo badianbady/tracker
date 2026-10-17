@@ -122,7 +122,7 @@
             font: 800 13px var(--display); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transform: rotate(-45deg); }
   .td-pin span { transform: rotate(45deg); }
   .td-ic { background: none; border: 0; }
-  .zoom-low .td-ic { display: none; }
+  .zoom-low .td-ic:not(.td-focus) { display: none; }
   .lcard { min-width: 260px; font-family: var(--body); }
   .lcard-head { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
   .lcard-head b { font-family: var(--display); font-size: 18px; display: block; line-height: 1.1; }
@@ -141,6 +141,51 @@
   .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
   .switch input { width: 18px; height: 18px; accent-color: var(--green); }
   .plan-route { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: var(--muted); word-break: break-word; margin-top: 6px; }
+  .wxi { width: 16px; height: 16px; vertical-align: -3px; }
+  .wxi.big { width: 22px; height: 22px; vertical-align: -5px; }
+  .wp-label { background: rgba(255,255,255,.9); border: 0; box-shadow: none; color: #3B4B42; font: 600 10.5px var(--body); padding: 0 4px; border-radius: 3px; }
+  .wp-label::before { display: none; }
+  .wp-hide .wp-label { display: none; }
+  .map-settings { background: var(--surface); color: var(--text); border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.2); font-family: var(--body); }
+  .map-settings > button { width: 34px; height: 34px; border: 0; background: none; cursor: pointer; font-size: 18px; color: var(--text); }
+  .map-settings .ms-body { display: none; padding: 4px 14px 14px; width: 230px; }
+  .map-settings.open .ms-body { display: block; }
+  .map-settings label { display: block; font-weight: 600; font-size: 14px; margin-top: 10px; }
+  .map-settings input[type=range] { width: 100%; accent-color: var(--green); }
+  .map-settings .chk { display: flex; gap: 8px; align-items: center; }
+  .map-settings .chk input { accent-color: var(--green); width: 16px; height: 16px; }
+  .air-panel.detail .air-head, .air-panel.detail .air-list, .air-panel.detail .recent { display: none; }
+  #flightPanel { display: none; overflow-y: auto; flex: 1; }
+  .air-panel.detail #flightPanel { display: block; }
+  .air-panel.detail { width: 360px; }
+  .fp-top { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; }
+  .fp-back { border: 0; background: none; color: var(--green); font-weight: 700; cursor: pointer; font-size: 15px; padding: 4px 0; }
+  .live-dot { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: var(--green); }
+  .live-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+  .fp-photo { position: relative; aspect-ratio: 16 / 9; background: var(--bg); overflow: hidden; display: grid; place-items: center; color: var(--muted); }
+  .fp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .fp-photo .credit { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 4px; text-decoration: none; }
+  .fp-id { padding: 12px 16px 4px; }
+  .fp-cs { font-family: var(--display); font-weight: 800; font-size: 30px; line-height: 1.05; }
+  .fp-route { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); align-items: start; }
+  .fp-route .ap { font-family: var(--display); font-weight: 800; font-size: 26px; line-height: 1; }
+  .fp-route .apn { font-size: 12px; color: var(--muted); min-height: 2.4em; }
+  .fp-route .r { text-align: right; }
+  .fp-route .mid { padding-top: 4px; color: var(--muted); }
+  .fp-times { font-size: 13px; margin-top: 6px; }
+  .fp-times div { display: flex; justify-content: space-between; gap: 6px; }
+  .fp-route .r .fp-times div { flex-direction: row-reverse; }
+  .fp-times b { font-variant-numeric: tabular-nums; }
+  .dly { font-weight: 700; font-size: 12px; } .dly.ok { color: var(--green); } .dly.warn { color: var(--warn); } .dly.bad { color: var(--danger); }
+  .fp-prog { height: 6px; background: var(--line); border-radius: 3px; margin: 0 16px; position: relative; }
+  .fp-prog i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 3px; }
+  .fp-sec { padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  .fp-sec h4 { margin: 0 0 8px; font-family: var(--display); font-size: 17px; }
+  .fp-stats { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; }
+  .fp-stats b { display: block; font-family: var(--display); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .fp-stats span { font-size: 11px; color: var(--muted); }
+  .plane-ic.sel svg { filter: drop-shadow(0 0 6px rgba(30,155,54,.9)) !important; }
+  @media (max-width: 700px) { .air-panel.detail { width: auto; max-height: 60%; } }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -234,6 +279,7 @@
       </div>
       <div class="air-list" id="airList"><div class="empty">Načítám…</div></div>
       <div class="recent"><h3>Poslední přistání</h3><div id="recentList"><div class="empty">Načítám…</div></div></div>
+      <div id="flightPanel"></div>
     </aside>
   </section>
   <section class="view" id="view-zebricek"><div class="page" id="zebricek"></div></section>
@@ -447,11 +493,14 @@ const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
-  const view = views.includes(r) ? r : "map";
+  const view = r === "let" ? "map" : views.includes(r) ? r : "map";
   views.forEach(v => $("view-" + v).classList.toggle("on", v === view));
   document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.r === (view === "pilot" ? "piloti" : view)));
   if (notConfigured) { showNotConfigured(view); return; }
-  if (view === "map") { initMap(); setTimeout(() => map.invalidateSize(), 50); }
+  if (view === "map") {
+    initMap(); setTimeout(() => map.invalidateSize(), 50);
+    if (r === "let") openFocus(parts); else if (focus) closeFocus();
+  }
   if (view === "zebricek") renderLeaderboard();
   if (view === "piloti") renderPilots();
   if (view === "pilot") renderPilot(decodeURIComponent(parts[1] || ""));
@@ -471,6 +520,7 @@ function showNotConfigured(view) {
 let map = null, markers = new Map(), trails = new Map(), liveTimer = null, liveRows = [], liveTick = 0;
 let airports = [], airportLayer = null, apRenderer = null, trailRenderer = null, lastFlightId = null;
 let tdLayer = null, planLines = new Map(), metarCache = new Map(), metarTimer = null;
+let wpLayers = new Map(), focusLayer = null, focus = null, photoCache = new Map();
 
 const ALT_STOPS = [[0, [249, 115, 22]], [4000, [234, 179, 8]], [10000, [34, 197, 94]], [20000, [6, 182, 212]], [30000, [59, 130, 246]], [40000, [168, 85, 247]]];
 function altColor(alt) {
@@ -491,11 +541,11 @@ function drawAltTrail(group, pts, weight, renderer) {
 }
 const PLANE = "M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z";
 
-function planeIcon(hdg, isJai) {
+function planeIcon(hdg, isJai, sel) {
   const col = isJai ? "#1E9B36" : "#66788A";
   const size = isJai ? 34 : 28;
   return L.divIcon({
-    className: "plane-ic", iconSize: [size, size], iconAnchor: [size / 2, size / 2],
+    className: "plane-ic" + (sel ? " sel" : ""), iconSize: [size, size], iconAnchor: [size / 2, size / 2],
     html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform:rotate(${hdg || 0}deg);filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))"><path d="${PLANE}" fill="${col}" stroke="#fff" stroke-width="1.2"/></svg>`
   });
 }
@@ -522,7 +572,9 @@ function initMap() {
   tdLayer = L.layerGroup().addTo(map);
   L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Místa přistání": tdLayer }, { position: "topright" }).addTo(map);
   map.on("moveend", () => { drawAirports(); scheduleMetar(); });
-  const zoomCls = () => map.getContainer().classList.toggle("zoom-low", map.getZoom() < 11);
+  settingsControl().addTo(map);
+  focusLayer = L.layerGroup().addTo(map);
+  const zoomCls = () => { map.getContainer().classList.toggle("zoom-low", map.getZoom() < 11); map.getContainer().classList.toggle("wp-hide", map.getZoom() < 6); };
   map.on("zoomend", zoomCls); zoomCls();
   fetch("letiste.json").then(r => r.json()).then(d => { airports = d; drawAirports(); }).catch(() => {});
   refreshLive();
@@ -550,9 +602,45 @@ function drawAirports() {
         ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
         ${metarCache.get(icao) ? metarHtml(metarCache.get(icao)) : '<div class="muted" style="margin-top:6px">METAR pro toto letiště není k dispozici.</div>'}`;
     }, { maxWidth: 340 });
-    const label = `${m?.fltCat ? `<i class="cat cat-${esc(m.fltCat)}"></i>` : ""}${esc(icao)}${m && m.temp != null ? `<span class="wx">${Math.round(m.temp)}° ${wxIcon(m)}</span>` : ""}`;
+    const showWx = settings.weather && m;
+    const label = `${showWx && m.fltCat ? `<i class="cat cat-${esc(m.fltCat)}"></i>` : ""}${esc(icao)}${showWx && m.temp != null ? `<span class="wx">${Math.round(m.temp)}° ${wxIcon(m)}</span>` : ""}`;
     if (z >= 8 || (big && z >= 6)) c.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
     else c.bindTooltip(`${label} – ${esc(name)}`, { direction: "top" });
+  }
+}
+
+/* ---------- nastavení mapy (uložené v prohlížeči) ---------- */
+const SETTINGS_KEY = "jai-nastaveni-mapy";
+const settings = Object.assign({ trail: 5, waypoints: true, weather: true },
+  (() => { try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; } })());
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* bez úložiště */ } }
+function settingsControl() {
+  const c = L.control({ position: "topright" });
+  c.onAdd = () => {
+    const d = L.DomUtil.create("div", "map-settings leaflet-control");
+    d.innerHTML = `<button title="Nastavení mapy" aria-label="Nastavení mapy">⚙</button><div class="ms-body">
+      <label for="msTrail">Tloušťka tras: <span id="msTrailV">${settings.trail}</span> px</label>
+      <input type="range" id="msTrail" min="2" max="12" step="1" value="${settings.trail}">
+      <label class="chk"><input type="checkbox" id="msWp" ${settings.waypoints ? "checked" : ""}> Body trasy ze SimBriefu</label>
+      <label class="chk"><input type="checkbox" id="msWx" ${settings.weather ? "checked" : ""}> Počasí u letišť</label></div>`;
+    L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
+    d.querySelector("button").onclick = () => d.classList.toggle("open");
+    d.querySelector("#msTrail").oninput = e => { settings.trail = +e.target.value; d.querySelector("#msTrailV").textContent = settings.trail; saveSettings(); renderLive(); redrawFocus(); };
+    d.querySelector("#msWp").onchange = e => { settings.waypoints = e.target.checked; saveSettings(); wpLayers.forEach(w => map.removeLayer(w.group)); wpLayers.clear(); renderLive(); redrawFocus(); };
+    d.querySelector("#msWx").onchange = e => { settings.weather = e.target.checked; saveSettings(); drawAirports(); };
+    return d;
+  };
+  return c;
+}
+
+/* ---------- body trasy ---------- */
+function drawWaypoints(group, fixes) {
+  group.clearLayers();
+  if (!settings.waypoints) return;
+  for (const f of fixes) {
+    if (!f[2]) continue;
+    L.circleMarker([f[0], f[1]], { radius: 3.5, weight: 1.5, color: "#64748B", fillColor: "#fff", fillOpacity: 1, renderer: apRenderer })
+      .bindTooltip(esc(f[2]), { permanent: true, direction: "right", offset: [5, 0], className: "wp-label" }).addTo(group);
   }
 }
 
@@ -574,18 +662,31 @@ async function loadMetar() {
     drawAirports();
   } catch { /* počasí je jen doplněk */ }
 }
-function wxIcon(m) {
+const CLOUD = "M7.5 19h9.2a4.3 4.3 0 0 0 .4-8.6 5.8 5.8 0 0 0-11.1 1.3A3.7 3.7 0 0 0 7.5 19z";
+const WX_SVG = {
+  sun: `<circle cx="12" cy="12" r="4.6" fill="#FBBF24"/><g stroke="#FBBF24" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></g>`,
+  few: `<circle cx="9" cy="9" r="3.6" fill="#FBBF24"/><g stroke="#FBBF24" stroke-width="1.7" stroke-linecap="round"><path d="M9 2.4v1.6M2.4 9h1.6M4.3 4.3l1.1 1.1M13.7 4.3l-1.1 1.1"/></g><path d="${CLOUD}" transform="translate(3 2) scale(.82)" fill="#F1F5F9" stroke="#94A3B8" stroke-width="1.3"/>`,
+  sct: `<circle cx="8.5" cy="8.5" r="3.6" fill="#FBBF24"/><path d="${CLOUD}" transform="translate(1.5 1) scale(.92)" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1.3"/>`,
+  bkn: `<path d="${CLOUD}" transform="translate(-1 -2)" fill="#CBD5E1" stroke="#64748B" stroke-width="1.3"/><path d="${CLOUD}" transform="translate(3 2) scale(.8)" fill="#E2E8F0" stroke="#64748B" stroke-width="1.3"/>`,
+  ovc: `<path d="${CLOUD}" fill="#94A3B8" stroke="#475569" stroke-width="1.3"/>`,
+  rain: `<path d="${CLOUD}" transform="translate(0 -3)" fill="#94A3B8" stroke="#475569" stroke-width="1.3"/><g stroke="#3B82F6" stroke-width="1.8" stroke-linecap="round"><path d="M8 18.5l-1 2.5M12 18.5l-1 2.5M16 18.5l-1 2.5"/></g>`,
+  snow: `<path d="${CLOUD}" transform="translate(0 -3)" fill="#CBD5E1" stroke="#64748B" stroke-width="1.3"/><g fill="#60A5FA"><circle cx="8" cy="20" r="1.3"/><circle cx="12" cy="21.5" r="1.3"/><circle cx="16" cy="20" r="1.3"/></g>`,
+  ts: `<path d="${CLOUD}" transform="translate(0 -3)" fill="#64748B" stroke="#334155" stroke-width="1.3"/><path d="M12.5 15l-3 4.5h2.6l-1.6 4 4.5-5.6h-2.7l1.7-2.9z" fill="#FACC15" stroke="#CA8A04" stroke-width=".6"/>`,
+  fog: `<g stroke="#94A3B8" stroke-width="2" stroke-linecap="round"><path d="M4 8h16M3 12h18M5 16h14M7 20h10"/></g>`,
+};
+function wxKind(m) {
   const wx = m.wxString || "", cov = (m.clouds || []).map(c => c.cover);
-  if (/TS/.test(wx)) return "⛈️";
-  if (/SN|SG|PL|GR/.test(wx)) return "🌨️";
-  if (/RA|DZ|SH/.test(wx)) return "🌧️";
-  if (/FG|BR|HZ/.test(wx)) return "🌫️";
-  if (cov.includes("OVC") || cov.includes("OVX")) return "☁️";
-  if (cov.includes("BKN")) return "🌥️";
-  if (cov.includes("SCT")) return "⛅";
-  if (cov.includes("FEW")) return "🌤️";
-  return "☀️";
+  if (/TS/.test(wx)) return "ts";
+  if (/SN|SG|PL|GR/.test(wx)) return "snow";
+  if (/RA|DZ|SH/.test(wx)) return "rain";
+  if (/FG|BR|HZ/.test(wx)) return "fog";
+  if (cov.includes("OVC") || cov.includes("OVX")) return "ovc";
+  if (cov.includes("BKN")) return "bkn";
+  if (cov.includes("SCT")) return "sct";
+  if (cov.includes("FEW")) return "few";
+  return "sun";
 }
+const wxIcon = (m, big) => `<svg class="wxi${big ? " big" : ""}" viewBox="0 0 24 24" aria-hidden="true">${WX_SVG[wxKind(m)]}</svg>`;
 const CAT_TXT = { VFR: "VFR", MVFR: "MVFR", IFR: "IFR", LIFR: "LIFR" };
 const COVER_TXT = { FEW: "skoro jasno", SCT: "polojasno", BKN: "oblačno", OVC: "zataženo", OVX: "nebe neviditelné", CLR: "jasno", SKC: "jasno", CAVOK: "CAVOK" };
 function metarHtml(m) {
@@ -598,7 +699,7 @@ function metarHtml(m) {
   }
   const clouds = (m.clouds || []).map(c => `${COVER_TXT[c.cover] || c.cover}${c.base != null ? ` ${nf.format(c.base)} ft` : ""}`).join(", ") || "bez oblačnosti";
   return `<div class="metar-box">
-    <div style="display:flex;align-items:center;gap:8px"><b>Počasí ${wxIcon(m)}</b>${m.fltCat ? `<span class="cat-chip cat-${esc(m.fltCat)}">${esc(CAT_TXT[m.fltCat] || m.fltCat)}</span>` : ""}</div>
+    <div style="display:flex;align-items:center;gap:8px"><b>Počasí ${wxIcon(m, true)}</b>${m.fltCat ? `<span class="cat-chip cat-${esc(m.fltCat)}">${esc(CAT_TXT[m.fltCat] || m.fltCat)}</span>` : ""}</div>
     <dl>
       <dt>Teplota</dt><dd>${m.temp != null ? Math.round(m.temp) + " °C" : "–"}${m.dewp != null ? ` · rosný bod ${Math.round(m.dewp)} °C` : ""}</dd>
       <dt>Vítr</dt><dd>${wind}</dd>
@@ -635,11 +736,12 @@ function landingCardHtml(f) {
   ].filter(Boolean);
   return `<div class="lcard"><div class="lcard-head">${scoreHtml(f.score)}<div><b>${verdictOf(f.score)}</b>
     <span class="muted">${esc(f.callsign || f.profiles?.username || "")}${f.arr_icao ? " · " + esc(f.arr_icao) : ""} · ${fmtDate(f.landed_at)}</span></div></div>
-    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl></div>`;
+    <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+    ${f.id && !(focus?.type === "flight" && focus.id === f.id) ? `<a href="#/let/${f.id}" style="display:inline-block;margin-top:8px;font-weight:700">Detail letu →</a>` : ""}</div>`;
 }
-function tdIcon(score) {
+function tdIcon(score, keep) {
   const col = score >= 8 ? "#1E9B36" : score >= 6 ? "#8A9A18" : score >= 3 ? "#C2410C" : "#B91C1C";
-  return L.divIcon({ className: "td-ic", iconSize: [30, 30], iconAnchor: [4, 28], popupAnchor: [10, -26],
+  return L.divIcon({ className: "td-ic" + (keep ? " td-focus" : ""), iconSize: [30, 30], iconAnchor: [4, 28], popupAnchor: [10, -26],
     html: `<div class="td-pin" style="background:${col}"><span>${fmt1(score)}</span></div>` });
 }
 const TD_FIELDS = "id, user_id, callsign, arr_icao, score, fpm, g, td_lat, td_lon, td_ias, td_gs, wind_dir, wind_kt, headwind, crosswind, bounces, rwy, rwy_dist_m, rwy_offset_m, landed_at, profiles(username)";
@@ -671,7 +773,7 @@ async function refreshRecent() {
     lastFlightId = Math.max(lastFlightId ?? 0, ...data.map(f => f.id));
   }
   $("recentList").innerHTML = !data?.length ? '<div class="empty">Zatím žádná přistání.</div>' : data.map(f => `
-    <a class="recent-item" href="#/pilot/${encodeURIComponent(f.profiles?.username || "")}">${scoreHtml(f.score)}
+    <a class="recent-item" href="#/let/${f.id}">${scoreHtml(f.score)}
       <div><b>${esc(f.callsign || f.profiles?.username)}${jaiSet.has(f.user_id) ? ' <span class="badge">JAI</span>' : ""}</b>
       <span class="muted">${esc(f.arr_icao || "?")} · ${nf.format(f.fpm)} fpm · ${timeAgo(f.landed_at)}</span></div></a>`).join("");
 }
@@ -689,43 +791,56 @@ async function refreshLive() {
   const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url)").gte("updated_at", since);
   if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
   liveRows = data || [];
+  renderLive();
+}
+
+function renderLive() {
+  if (!map) return;
   const seen = new Set();
+  const w = settings.trail;
   for (const r of liveRows) {
     if (r.lat == null || r.lon == null) continue;
     const isJai = jaiSet.has(r.user_id);
+    const sel = focus?.type === "live" && focus.id === r.user_id;
     seen.add(r.user_id);
-    const popup = `<div class="pop-cs">${esc(r.callsign || r.profiles?.username)}</div>
-      <div><a href="#/pilot/${encodeURIComponent(r.profiles?.username || "")}">${esc(r.profiles?.username)}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}</div>
-      <div>${esc(r.aircraft || "")}</div>
-      <div>${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}</div>
-      ${r.plan?.dep ? `<div><b>${esc(r.plan.dep)} → ${esc(r.plan.arr)}</b>${r.plan.altn ? ` <span class="muted">(alt. ${esc(r.plan.altn)})</span>` : ""}</div>`
-        : r.dep_icao ? `<div>Odlet: ${esc(r.dep_icao)}</div>` : ""}
-      ${r.profiles?.stream_url ? `<div style="margin-top:6px"><a class="stream-btn" href="${esc(r.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}`;
-    const fixes = Array.isArray(r.plan?.fixes) ? r.plan.fixes : [];
+    // plánovaná trasa + body
+    const fixes = focus?.type === "flight" ? [] : Array.isArray(r.plan?.fixes) ? r.plan.fixes : [];
     let pl = planLines.get(r.user_id);
     if (fixes.length > 1) {
-      const st = { color: isJai ? "#1E9B36" : "#66788A", weight: 2, opacity: .7, dashArray: "6 7", interactive: false };
-      if (!pl) { pl = L.polyline(fixes, st).addTo(map); planLines.set(r.user_id, pl); } else { pl.setLatLngs(fixes); pl.setStyle(st); }
-    } else if (pl) { map.removeLayer(pl); planLines.delete(r.user_id); }
+      const st = { color: isJai ? "#1E9B36" : "#66788A", weight: Math.max(2, w * 0.45), opacity: sel ? .95 : .65, dashArray: "6 7", interactive: false };
+      const ll = fixes.map(f => [f[0], f[1]]);
+      if (!pl) { pl = L.polyline(ll, st).addTo(map); planLines.set(r.user_id, pl); } else { pl.setLatLngs(ll); pl.setStyle(st); }
+      const sig = fixes.length + "|" + r.plan.dep + r.plan.arr + "|" + settings.waypoints;
+      let wp = wpLayers.get(r.user_id);
+      if (!wp) { wp = { sig: null, group: L.layerGroup().addTo(map) }; wpLayers.set(r.user_id, wp); }
+      if (wp.sig !== sig) { drawWaypoints(wp.group, fixes); wp.sig = sig; }
+    } else {
+      if (pl) { map.removeLayer(pl); planLines.delete(r.user_id); }
+      const wp = wpLayers.get(r.user_id); if (wp) { map.removeLayer(wp.group); wpLayers.delete(r.user_id); }
+    }
+    // uletěná trasa podle výšky
     const pts = Array.isArray(r.trail) ? r.trail.slice() : [];
     if (pts.length) pts.push([r.lat, r.lon, r.alt || 0]);
     let tr = trails.get(r.user_id);
     if (pts.length > 1) {
       if (!tr) { tr = L.layerGroup().addTo(map); trails.set(r.user_id, tr); }
-      drawAltTrail(tr, pts, isJai ? 4 : 3, trailRenderer);
+      drawAltTrail(tr, pts, isJai || sel ? w + 1 : w, trailRenderer);
     } else if (tr) { map.removeLayer(tr); trails.delete(r.user_id); }
+    // letadlo
     let m = markers.get(r.user_id);
     if (!m) {
       m = L.marker([r.lat, r.lon], { icon: planeIcon(r.hdg, isJai), zIndexOffset: isJai ? 1000 : 0 }).addTo(map);
+      m.on("click", () => { location.hash = "#/let/live/" + r.user_id; });
       markers.set(r.user_id, m);
     } else {
-      m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai));
+      m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai, sel));
     }
-    m.bindPopup(popup);
+    m.unbindTooltip().bindTooltip(`<b>${esc(r.callsign || r.profiles?.username)}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : ""}`, { direction: "top", offset: [0, -14] });
   }
   for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); }
   for (const [id, t] of trails) if (!seen.has(id)) { map.removeLayer(t); trails.delete(id); }
   for (const [id, l] of planLines) if (!seen.has(id)) { map.removeLayer(l); planLines.delete(id); }
+  for (const [id, wp] of wpLayers) if (!seen.has(id)) { map.removeLayer(wp.group); wpLayers.delete(id); }
 
   const sorted = [...liveRows].sort((a, b) => (jaiSet.has(b.user_id) - jaiSet.has(a.user_id)) || (b.alt - a.alt));
   $("airCount").textContent = `Ve vzduchu (${sorted.filter(r => r.phase !== "Na zemi").length})`;
@@ -736,9 +851,143 @@ async function refreshLive() {
       <div class="air-nums">${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${esc(r.phase || "")}${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : r.dep_icao ? " · z " + esc(r.dep_icao) : ""}</div>
     </button>`).join("")
     : '<div class="empty">Právě nikdo neletí. Spusť tracker a objevíš se tady.</div>';
-  document.querySelectorAll(".air-item").forEach(b => b.onclick = () => {
-    const m = markers.get(b.dataset.id); if (m) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 8)); m.openPopup(); }
+  document.querySelectorAll(".air-item").forEach(b => b.onclick = () => { location.hash = "#/let/live/" + b.dataset.id; });
+  if (focus?.type === "live") renderFlightPanel();
+}
+
+/* ---------- detail letu (živý i dokončený) ---------- */
+const apByCode = code => airports.find(a => a[0] === code);
+const hm = d => d ? new Date(d).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }) : "–";
+function delayHtml(sched, actual) {
+  if (!sched || !actual) return "";
+  const m = Math.round((new Date(actual) - new Date(sched)) / 60000);
+  if (Math.abs(m) <= 3) return '<span class="dly ok">včas</span>';
+  if (m < 0) return `<span class="dly ok">${-m} min dříve</span>`;
+  return `<span class="dly ${m > 15 ? "bad" : "warn"}">+${m} min</span>`;
+}
+async function getPhoto(reg) {
+  if (!reg) return null;
+  const key = reg.toUpperCase();
+  if (!photoCache.has(key)) {
+    photoCache.set(key, fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?reg=${encodeURIComponent(key)}`, { headers: { apikey: CFG.SUPABASE_KEY } })
+      .then(r => r.ok ? r.json() : null).then(d => d?.photo || null).catch(() => null));
+  }
+  return photoCache.get(key);
+}
+function photoPlaceholder(ac) {
+  return `<div style="text-align:center"><svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" opacity=".35"><path d="${PLANE}"/></svg>
+    <div style="font-size:13px">${esc(ac || "Fotka letadla není k dispozici")}</div></div>`;
+}
+function loadPhotoInto(reg, ac) {
+  const box = $("fpPhoto"); if (!box) return;
+  box.dataset.reg = reg || "";
+  getPhoto(reg).then(p => {
+    const b = $("fpPhoto"); if (!b || b.dataset.reg !== (reg || "")) return;
+    b.innerHTML = p?.src ? `<img src="${esc(p.src)}" alt="Fotka letadla ${esc(reg)}">
+      <a class="credit" href="${esc(p.link || "https://www.planespotters.net")}" target="_blank" rel="noopener">Foto © ${esc(p.photographer || "Planespotters.net")}</a>` : photoPlaceholder(ac);
   });
+}
+
+async function openFocus(parts) {
+  if (!map) return;
+  $("view-map").querySelector(".air-panel").classList.add("detail");
+  if (parts[1] === "live") {
+    focus = { type: "live", id: parts[2], centered: false };
+    focusLayer.clearLayers();
+    renderFlightPanel();
+    return;
+  }
+  const id = Number(parts[1]);
+  $("flightPanel").innerHTML = '<div class="empty">Načítám let…</div>';
+  const { data: f } = await sb.from("flights").select("*, profiles(username, avatar_url, stream_url)").eq("id", id).maybeSingle();
+  if (!f) { $("flightPanel").innerHTML = '<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">Let nenalezen.</div>'; $("fpBack").onclick = closeFocus; return; }
+  focus = { type: "flight", id, data: f };
+  renderLive();
+  redrawFocus(true);
+  renderFlightPanel();
+}
+function redrawFocus(fit) {
+  if (!focusLayer || focus?.type !== "flight") return;
+  const f = focus.data;
+  focusLayer.clearLayers();
+  const fixes = Array.isArray(f.plan_fixes) ? f.plan_fixes : [];
+  if (fixes.length > 1) {
+    L.polyline(fixes.map(x => [x[0], x[1]]), { color: "#66788A", weight: Math.max(2, settings.trail * 0.45), opacity: .7, dashArray: "6 7", interactive: false }).addTo(focusLayer);
+    drawWaypoints(L.layerGroup().addTo(focusLayer), fixes);
+  }
+  const pts = Array.isArray(f.path) ? f.path : [];
+  if (pts.length > 1) drawAltTrail(L.layerGroup().addTo(focusLayer), pts, settings.trail + 1, trailRenderer);
+  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
+  if (pts.length) L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(focusLayer);
+  if (fit) {
+    const all = pts.map(p => [p[0], p[1]]).concat(fixes.map(x => [x[0], x[1]]));
+    if (all.length > 1) map.fitBounds(L.latLngBounds(all).pad(0.15), { paddingTopLeft: [380, 0] });
+    else if (f.td_lat != null) map.setView([f.td_lat, f.td_lon], 13);
+  }
+}
+function closeFocus() {
+  focus = null;
+  if (focusLayer) focusLayer.clearLayers();
+  $("view-map").querySelector(".air-panel").classList.remove("detail");
+  if (location.hash.startsWith("#/let")) history.replaceState(null, "", "#/");
+  renderLive();
+}
+
+function renderFlightPanel() {
+  const el = $("flightPanel");
+  let d, live = focus?.type === "live";
+  if (live) {
+    const r = liveRows.find(x => x.user_id === focus.id);
+    if (!r) { el.innerHTML = '<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">Tento pilot už neletí. Dokončený let najdeš na jeho profilu.</div>'; $("fpBack").onclick = closeFocus; return; }
+    if (!focus.centered) { map.setView([r.lat, r.lon], Math.max(map.getZoom(), 7)); focus.centered = true; }
+    const p = r.plan || {};
+    d = { callsign: r.callsign, profiles: r.profiles, user_id: r.user_id, aircraft: r.aircraft, reg: r.reg || p.reg, ac: p.aircraft,
+          dep: p.dep || r.dep_icao, arr: p.arr, altn: p.altn, sched_off: p.sched_off, sched_on: p.sched_on, takeoff_at: r.takeoff_at,
+          eta: r.takeoff_at && p.ete_min ? new Date(new Date(r.takeoff_at).getTime() + p.ete_min * 60000).toISOString() : null,
+          route: p.route, r, fixes: p.fixes };
+  } else {
+    const f = focus.data;
+    d = { ...f, ac: f.ac_icao, dep: f.dep_icao, arr: f.arr_icao, altn: f.plan_altn, fixes: f.plan_fixes };
+  }
+  const isJai = jaiSet.has(d.user_id);
+  const depAp = apByCode(d.dep), arrAp = apByCode(d.arr);
+  let prog = "";
+  if (live && d.fixes?.length > 1) {
+    const a = d.fixes[0], b = d.fixes[d.fixes.length - 1];
+    const total = map.distance([a[0], a[1]], [b[0], b[1]]), left = map.distance([d.r.lat, d.r.lon], [b[0], b[1]]);
+    const pct = Math.max(0, Math.min(100, (1 - left / total) * 100));
+    prog = `<div class="fp-prog" title="${Math.round(pct)} %"><i style="width:${pct}%"></i></div>`;
+  }
+  const keepPhoto = $("fpPhoto")?.dataset.reg === (d.reg || "") ? $("fpPhoto").innerHTML : null;
+  el.innerHTML = `
+    <div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button>${live ? '<span class="live-dot">Živě</span>' : `<span class="muted" style="font-size:13px">${fmtDate(d.landed_at)}</span>`}</div>
+    <div class="fp-photo" id="fpPhoto">${keepPhoto ?? photoPlaceholder(d.ac || d.aircraft)}</div>
+    <div class="fp-id"><div class="fp-cs">${esc(d.callsign || d.profiles?.username || "")}</div>
+      <div class="muted"><a href="#/pilot/${encodeURIComponent(d.profiles?.username || "")}">${esc(d.profiles?.username || "")}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}
+      · ${esc([d.ac, d.reg].filter(Boolean).join(" · ") || (d.aircraft || "").slice(0, 40))}</div></div>
+    <div class="fp-route">
+      <div><div class="ap">${esc(d.dep || "????")}</div><div class="apn">${esc(depAp?.[1] || "")}</div>
+        <div class="fp-times"><div><span class="muted">Plán vzlet</span><b>${hm(d.sched_off)}</b></div>
+        <div><span class="muted">Vzlet</span><b>${hm(d.takeoff_at)}</b></div><div>${delayHtml(d.sched_off, d.takeoff_at)}</div></div></div>
+      <div class="mid"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(90deg)"><path d="${PLANE}"/></svg></div>
+      <div class="r"><div class="ap">${esc(d.arr || "????")}</div><div class="apn">${esc(arrAp?.[1] || "")}</div>
+        <div class="fp-times"><div><span class="muted">Plán přistání</span><b>${hm(d.sched_on)}</b></div>
+        ${live ? `<div><span class="muted">Odhad</span><b>${hm(d.eta)}</b></div><div>${delayHtml(d.sched_on, d.eta)}</div>`
+               : `<div><span class="muted">Přistání</span><b>${hm(d.landed_at)}</b></div><div>${delayHtml(d.sched_on, d.landed_at)}</div>`}</div></div>
+    </div>
+    ${prog ? `<div style="padding:12px 0 4px">${prog}</div>` : ""}
+    ${live ? `<div class="fp-sec"><div class="fp-stats">
+        <div><b>${nf.format(d.r.alt || 0)}</b><span>Výška ft</span></div><div><b>${d.r.gs || 0}</b><span>GS kt</span></div>
+        <div><b>${(d.r.vs > 0 ? "+" : "") + nf.format(d.r.vs || 0)}</b><span>V/S fpm</span></div><div><b>${String(d.r.hdg ?? 0).padStart(3, "0")}°</b><span>Kurz</span></div></div>
+        <div class="muted" style="text-align:center;margin-top:8px">${esc(d.r.phase || "")}${d.altn ? ` · alternativa ${esc(d.altn)}` : ""}</div></div>`
+      : `<div class="fp-sec">${landingCardHtml(d)}</div>
+         <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
+         <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
+    ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
+    ${d.profiles?.stream_url ? `<div class="fp-sec"><a class="stream-btn" href="${esc(d.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}
+    ${!live && d.crew_status ? `<div class="fp-sec muted" style="font-size:13px">Crew center: ${esc(d.crew_status)}</div>` : ""}`;
+  $("fpBack").onclick = closeFocus;
+  if (keepPhoto == null) loadPhotoInto(d.reg, d.ac || d.aircraft);
 }
 
 /* ---------- žebříček ---------- */
@@ -806,46 +1055,16 @@ async function renderPilot(username) {
       <div class="stat"><b>${p.best_score != null ? fmt1(p.best_score) : "–"}</b><span>Nejlepší přistání</span></div>
     </div>
     <h2 class="section-title">Historie letů</h2>
-    ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a uvidíš jeho trasu.</p>' : ""}
-    <div class="flight-map" id="flightMap"></div>
-    <div class="flight-card" id="flightCard"></div>
+    ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a otevře se jeho detail na mapě.</p>' : ""}
     ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' :
     `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>Dráha</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
     ${fl.map(f => `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
       <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${f.rwy ? esc(f.rwy) : '<span class="muted">–</span>'}</td><td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${scoreHtml(f.score)}</td></tr>`).join("")}
     </tbody></table></div>`}`;
   el.querySelectorAll("tr.clickable").forEach(tr => {
-    const open = () => { el.querySelectorAll("tr.sel").forEach(x => x.classList.remove("sel")); tr.classList.add("sel"); showFlightPath(tr.dataset.fid); };
+    const open = () => { location.hash = "#/let/" + tr.dataset.fid; };
     tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); };
   });
-}
-
-let flightMap = null;
-async function showFlightPath(id) {
-  const box = $("flightMap");
-  const { data: f } = await sb.from("flights").select("path, plan_arr, plan_altn, route, crew_status, " + TD_FIELDS).eq("id", id).maybeSingle();
-  $("flightCard").innerHTML = f ? `<div class="card">${landingCardHtml(f)}
-    ${f.route ? `<div class="plan-route"><b>Trasa podle plánu:</b> ${esc(f.route)}</div>` : ""}
-    ${f.crew_status ? `<p class="muted" style="margin:8px 0 0">Crew center: ${esc(f.crew_status)}</p>` : ""}</div>` : "";
-  box.classList.add("on");
-  if (flightMap) { flightMap.remove(); flightMap = null; }
-  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
-  flightMap = L.map(box, { worldCopyJump: true });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, className: dark ? "tiles-dark" : "",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(flightMap);
-  const pts = Array.isArray(f?.path) ? f.path : [];
-  if (pts.length < 2) {
-    flightMap.setView([49.8, 15.5], 4);
-    L.popup().setLatLng([49.8, 15.5]).setContent("Tento let nemá uloženou trasu (ukládá se od trackeru 0.3).").openOn(flightMap);
-    return;
-  }
-  drawAltTrail(L.layerGroup().addTo(flightMap), pts, 4.5, L.canvas());
-  const line = L.polyline(pts.map(p => [p[0], p[1]]), { opacity: 0, interactive: false }).addTo(flightMap);
-  L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(flightMap);
-  L.circleMarker([pts[pts.length - 1][0], pts[pts.length - 1][1]], { radius: 6, color: "#fff", fillColor: "#1E9B36", fillOpacity: 1, weight: 3 }).bindTooltip("Přistání " + (f.arr_icao || "")).addTo(flightMap);
-  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(flightMap);
-  flightMap.fitBounds(line.getBounds().pad(0.2));
-  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* ---------- účet ---------- */

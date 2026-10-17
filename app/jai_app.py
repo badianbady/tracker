@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 import traceback
 import tkinter  # noqa: F401  (načteno hned, aby se při sestavení vždy zabalilo i záložní okno)
 
@@ -132,7 +133,7 @@ def run_webview():
     if not url:
         raise RuntimeError("Adresa webu není nastavená")
     webview.create_window(
-        "Jáchym Air Tracker", url + "?app=1", js_api=Api(),
+        "Jáchym Air Tracker", f"{url}?app=1&v={int(time.time())}", js_api=Api(),
         width=1360, height=860, min_size=(960, 620), background_color="#F3F6F4",
     )
     storage = os.path.join(core.DATA_DIR, "webview")
@@ -141,10 +142,16 @@ def run_webview():
 
 
 def main():
+    server = None
+    # po aktualizaci chvíli počkej, než se stará verze úplně vypne a uvolní port
+    for _ in range(30 if "--po-aktualizaci" in sys.argv else 3):
+        try:
+            server = core.QuietServer(("127.0.0.1", core.PORT), core.Handler)
+            break
+        except OSError:
+            time.sleep(0.5)
     core.cleanup_old_exe()
-    try:
-        server = core.QuietServer(("127.0.0.1", core.PORT), core.Handler)
-    except OSError:
+    if server is None:
         import tkinter as tk
         from tkinter import messagebox
         r = tk.Tk()

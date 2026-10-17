@@ -101,6 +101,8 @@ state = {
     "log": [],
     "update": None,
     "plan": None,
+    "reg": None,
+    "ac_model": None,
     "plan_ver": 0,
     "simbrief_user": None,
     "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None},
@@ -408,6 +410,8 @@ class Cloud:
             "lat": s["lat"], "lon": s["lon"], "alt": s["alt"], "gs": s["gs"], "hdg": s["hdg"],
             "vs": s["vs"], "phase": s["phase"], "dep_icao": (s.get("dep") or {}).get("icao"),
         }
+        body["reg"] = s.get("reg") or ((s.get("plan") or {}).get("reg"))
+        body["takeoff_at"] = (s.get("dep") or {}).get("iso")
         if with_trail:
             body["trail"] = s["trail"]
         if with_plan:
@@ -456,20 +460,27 @@ def fetch_simbrief(user):
     pts = []
     for fx in raw or []:
         try:
-            pts.append([round(float(fx["pos_lat"]), 4), round(float(fx["pos_long"]), 4)])
+            ident = fx.get("ident") or ""
+            if fx.get("type") in ("ltlg",) or ident in ("TOC", "TOD"):
+                ident = ""
+            pts.append([round(float(fx["pos_lat"]), 4), round(float(fx["pos_long"]), 4), ident[:8]])
         except (KeyError, TypeError, ValueError):
             pass
     dep_lat, dep_lon = g(ofp, "origin", "pos_lat"), g(ofp, "origin", "pos_long")
     arr_lat, arr_lon = g(ofp, "destination", "pos_lat"), g(ofp, "destination", "pos_long")
     try:
         if dep_lat:
-            pts.insert(0, [round(float(dep_lat), 4), round(float(dep_lon), 4)])
+            pts.insert(0, [round(float(dep_lat), 4), round(float(dep_lon), 4), ""])
         if arr_lat:
-            pts.append([round(float(arr_lat), 4), round(float(arr_lon), 4)])
+            pts.append([round(float(arr_lat), 4), round(float(arr_lon), 4), ""])
     except ValueError:
         pass
     while len(pts) > 400:
-        pts = pts[::2]
+        mid = pts[1:-1]
+        thin = [p for i, p in enumerate(mid) if p[2] or i % 2 == 0]
+        if len(thin) == len(mid):
+            thin = mid[::2]
+        pts = pts[:1] + thin + pts[-1:]
     airline, number = g(ofp, "general", "icao_airline") or "", g(ofp, "general", "flight_number") or ""
     plan = {
         "dep": g(ofp, "origin", "icao_code"), "arr": g(ofp, "destination", "icao_code"),
@@ -489,6 +500,11 @@ def fetch_simbrief(user):
         plan["ete_min"] = round(int(g(ofp, "times", "est_time_enroute")) / 60)
     except (TypeError, ValueError):
         pass
+    for key in ("sched_out", "sched_off", "sched_on", "sched_in"):
+        try:
+            plan[key] = datetime.fromtimestamp(int(g(ofp, "times", key)), timezone.utc).isoformat()
+        except (TypeError, ValueError, OSError):
+            plan[key] = None
     if not plan["dep"] or not plan["arr"]:
         return None, "V SimBriefu jsem nenašel žádný letový plán."
     return plan, None
@@ -879,7 +895,7 @@ class FlightRecorder:
         self.last_pt_hdg = None
         self._add_point(t, lat, lon, 0)
         with lock:
-            state["dep"] = {"icao": self.takeoff["icao"]}
+            state["dep"] = {"icao": self.takeoff["icao"], "iso": self.takeoff["iso"] if known else None}
         if known:
             log(f"🛫 Vzlet{' z ' + ap[0] if ap else ''}")
 
@@ -953,6 +969,10 @@ class FlightRecorder:
             "fuel_used_kg": None if fuel_used is None else round(fuel_used * 0.4536),
             "plan_arr": plan and plan.get("arr"), "plan_altn": plan and plan.get("altn"),
             "route": plan and (plan.get("route") or "")[:2000],
+            "sched_off": plan and plan.get("sched_off"), "sched_on": plan and plan.get("sched_on"),
+            "plan_fixes": plan and plan.get("fixes"),
+            "reg": ((plan or {}).get("reg") or state.get("reg") or None),
+            "ac_icao": ((plan or {}).get("aircraft") or state.get("ac_model") or None),
         }
         if plan and plan.get("callsign"):
             flight["callsign"] = plan["callsign"]
@@ -1066,6 +1086,17 @@ def sim_loop():
                         raw = raw.decode("utf-8", "ignore")
                     title = (raw or "").strip("\x00 ")
                     title_t = t
+                    try:
+                        vals = []
+                        for k in ("ATC_ID", "ATC_MODEL"):
+                            v = aq.get(k)
+                            if isinstance(v, bytes):
+                                v = v.decode("utf-8", "ignore")
+                            vals.append((v or "").strip("\x00 ")[:12] or None)
+                        with lock:
+                            state["reg"], state["ac_model"] = vals
+                    except Exception:
+                        pass
                 if t - slow_t > 2:
                     slow_t = t
                     try:
@@ -1240,7 +1271,9 @@ def apply_update(info, on_progress=None):
         os.remove(old)
     os.rename(exe, old)
     os.rename(new, exe)
-    subprocess.Popen([exe], close_fds=True)
+    env = dict(os.environ)
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"   # nová verze nesmí převzít dočasné soubory té staré
+    subprocess.Popen([exe, "--po-aktualizaci"], close_fds=True, env=env)
     os._exit(0)
 
 
