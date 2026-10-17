@@ -105,7 +105,7 @@ state = {
     "ac_model": None,
     "plan_ver": 0,
     "simbrief_user": None,
-    "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None},
+    "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None, "bids": []},
     "last_flight": None,
     "trail": [],
     "trail_ver": 0,
@@ -523,12 +523,13 @@ class Crew:
     """Propojení s crew centrem (phpVMS 7). API klíč zůstává jen v tomto počítači."""
 
     def __init__(self):
-        self.key, self.auto, self.ident, self.name = None, True, None, None
+        self.key, self.auto, self.ident, self.name, self.prefs = None, True, None, None, {}
         try:
             with open(CREW_FILE, "r", encoding="utf-8") as f:
                 d = json.load(f)
             self.key, self.auto = d.get("api_key"), d.get("auto", True)
             self.ident, self.name = d.get("ident"), d.get("name")
+            self.prefs = d.get("prefs") or {}
         except Exception:
             pass
         self._sync()
@@ -546,7 +547,7 @@ class Crew:
 
     def _save(self):
         with open(CREW_FILE, "w", encoding="utf-8") as f:
-            json.dump({"api_key": self.key, "auto": self.auto, "ident": self.ident, "name": self.name}, f)
+            json.dump({"api_key": self.key, "auto": self.auto, "ident": self.ident, "name": self.name, "prefs": self.prefs}, f)
 
     def _api(self, method, path, body=None, key=None):
         req = urllib.request.Request(CREW_URL + path, method=method,
@@ -601,10 +602,14 @@ class Crew:
                 msg += " · členství na webu se nepodařilo potvrdit: " + str((r2 or {}).get("msg") or (r2 or {}).get("message") or c2)
         self._sync(msg)
         log(msg)
+        threading.Thread(target=self.refresh_bids, daemon=True).start()
         return True, msg
 
     def unlink(self):
         self.key = self.ident = self.name = None
+        self.prefs = {}
+        with lock:
+            state["crew"]["bids"] = []
         try:
             os.remove(CREW_FILE)
         except OSError:
@@ -616,19 +621,71 @@ class Crew:
         self._save()
         self._sync()
 
+    @staticmethod
+    def _flight_of(b):
+        """phpVMS 7 vrací rezervace jako seznam letů; starší verze je balí do {"flight": …}."""
+        return b.get("flight") if isinstance(b.get("flight"), dict) else b
+
     def bids(self):
         code, res = self._api("GET", "/api/user/bids")
         if code != 200:
             return None, self._err(res, code)
-        return (res or {}).get("data") or [], None
+        flights = [self._flight_of(b) for b in ((res or {}).get("data") or [])]
+        self._publish_bids(flights)
+        return flights, None
+
+    def _publish_bids(self, flights):
+        out = []
+        for f in flights:
+            al = f.get("airline") or {}
+            out.append({"id": str(f.get("id")), "flight_number": f"{al.get('icao') or ''}{f.get('flight_number') or ''}",
+                        "dep": f.get("dpt_airport_id"), "arr": f.get("arr_airport_id"),
+                        "aircraft": self.prefs.get(str(f.get("id")), {}).get("reg")})
+        with lock:
+            state["crew"]["bids"] = out
+
+    def refresh_bids(self):
+        if self.linked:
+            self.bids()
+
+    def add_bid(self, flight_id, aircraft=None):
+        code, res = self._api("PUT", "/api/user/bids", {"flight_id": flight_id})
+        if code == 409:
+            msg = "Tento let už máš rezervovaný."
+        elif code not in (200, 201):
+            return False, "Crew center rezervaci odmítl: " + self._err(res, code)
+        else:
+            msg = "Let rezervován ✔"
+        if aircraft:
+            self.prefs[str(flight_id)] = aircraft
+            self._save()
+        self.bids()
+        log(msg)
+        return True, msg
+
+    def remove_bid(self, flight_id):
+        code, res = self._api("DELETE", "/api/user/bids", {"flight_id": flight_id})
+        if code not in (200, 201, 204):
+            return False, "Rezervaci se nepodařilo zrušit: " + self._err(res, code)
+        self.prefs.pop(str(flight_id), None)
+        self._save()
+        self.bids()
+        return True, "Rezervace zrušena."
 
     def _pick_aircraft(self, flight, plan):
         """Vybere letadlo z flotily crew centra – podle registrace ze SimBriefu, jinak první vhodné."""
         reg = ((plan or {}).get("reg") or "").replace("-", "").upper()
         icao = ((plan or {}).get("aircraft") or "").upper()
+        pref = self.prefs.get(str(flight.get("id"))) or {}
         candidates = []
-        for sf in flight.get("subfleets") or []:
+        for sf in (flight.get("subfleet") or flight.get("subfleets") or []):
             candidates += sf.get("aircraft") or []
+        if pref.get("id") is not None:
+            for a in candidates:
+                if str(a.get("id")) == str(pref["id"]):
+                    return a
+            if not candidates:
+                return {"id": pref["id"], "registration": pref.get("reg")}
         if not candidates:
             code, res = self._api("GET", "/api/user/fleet")
             for sf in ((res or {}).get("data") or []) if code == 200 else []:
@@ -660,8 +717,7 @@ class Crew:
         if bids is None:
             return f"Nepodařilo se načíst rezervace: {err}"
         match = None
-        for b in bids:
-            f = b.get("flight") or {}
+        for f in bids:
             if f.get("dpt_airport_id") == dep and f.get("arr_airport_id") in (arr, fl.get("plan_arr")):
                 match = f
                 break
@@ -673,7 +729,8 @@ class Crew:
         if not ac:
             return "Let neodeslán – v crew centru jsem nenašel žádné letadlo pro tento let."
         pre = {
-            "airline_id": match.get("airline_id"), "aircraft_id": ac.get("id"), "flight_id": match.get("id"),
+            "airline_id": match.get("airline_id") or (match.get("airline") or {}).get("id"),
+            "aircraft_id": ac.get("id"), "flight_id": match.get("id"),
             "flight_number": match.get("flight_number"), "route_code": match.get("route_code"),
             "route_leg": match.get("route_leg"), "flight_type": match.get("flight_type") or "J",
             "dpt_airport_id": match.get("dpt_airport_id"), "arr_airport_id": match.get("arr_airport_id"),
@@ -701,6 +758,9 @@ class Crew:
         code, res = self._api("POST", f"/api/pireps/{pid}/file", body)
         if code not in (200, 201):
             return "Crew center odmítl let (file): " + self._err(res, code)
+        self.prefs.pop(str(match.get("id")), None)
+        self._save()
+        threading.Thread(target=self.refresh_bids, daemon=True).start()
         return f"Let {match.get('flight_number') or ''} odeslán do crew centra ✔ (PIREP {pid})"
 
 
@@ -1308,3 +1368,12 @@ def start_background(demo=False):
     threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
     threading.Thread(target=upload_loop, daemon=True).start()
     threading.Thread(target=check_update, daemon=True).start()
+
+    def bids_loop():
+        while True:
+            try:
+                crew.refresh_bids()
+            except Exception:
+                pass
+            time.sleep(300)
+    threading.Thread(target=bids_loop, daemon=True).start()

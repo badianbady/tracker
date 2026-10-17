@@ -154,7 +154,7 @@
   .map-settings input[type=range] { width: 100%; accent-color: var(--green); }
   .map-settings .chk { display: flex; gap: 8px; align-items: center; }
   .map-settings .chk input { accent-color: var(--green); width: 16px; height: 16px; }
-  .air-panel.detail .air-head, .air-panel.detail .air-list, .air-panel.detail .recent { display: none; }
+  .air-panel.detail .air-head, .air-panel.detail .air-list, .air-panel.detail .recent, .air-panel.detail .hl { display: none; }
   #flightPanel { display: none; overflow-y: auto; flex: 1; }
   .air-panel.detail #flightPanel { display: block; }
   .air-panel.detail { width: 360px; }
@@ -186,6 +186,64 @@
   .fp-stats span { font-size: 11px; color: var(--muted); }
   .plane-ic.sel svg { filter: drop-shadow(0 0 6px rgba(30,155,54,.9)) !important; }
   @media (max-width: 700px) { .air-panel.detail { width: auto; max-height: 60%; } }
+  .hl { padding: 12px 14px 0; display: flex; flex-direction: column; gap: 8px; flex: none; }
+  .hl:empty { display: none; }
+  .hl-card { display: flex; gap: 10px; align-items: center; text-decoration: none; color: var(--text); border-radius: 12px; padding: 10px 12px;
+             background: var(--green-soft); border: 1px solid transparent; }
+  .hl-card:hover { border-color: var(--green); }
+  .hl-card.yt { background: #FDECEE; } @media (prefers-color-scheme: dark) { .hl-card.yt { background: #3A1A20; } }
+  .hl-ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff; background: var(--green); font-size: 17px; }
+  .hl-card.yt .hl-ic { background: #E11D48; }
+  .hl-k { font-size: 12px; font-weight: 700; color: var(--green-deep); text-transform: none; }
+  .hl-card.yt .hl-k { color: #BE123C; }
+  @media (prefers-color-scheme: dark) { .hl-k { color: #8BE3A0; } .hl-card.yt .hl-k { color: #FDA4AF; } }
+  .hl-t { font-weight: 700; line-height: 1.2; } .hl-s { font-size: 13px; color: var(--muted); }
+  .ev-big { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; margin-bottom: 20px; }
+  .ev-big .ev-head { background: var(--green); color: #fff; padding: 20px 24px; }
+  .ev-big .ev-head .k { font-weight: 700; opacity: .85; }
+  .ev-big .ev-head h2 { font-size: 32px; margin-top: 4px; }
+  .ev-route { display: flex; align-items: center; gap: 16px; font-family: var(--display); font-weight: 800; font-size: 40px; margin-top: 10px; flex-wrap: wrap; }
+  .ev-route small { display: block; font: 500 14px var(--body); opacity: .85; }
+  .ev-body { padding: 20px 24px; }
+  .ev-meta { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-weight: 600; margin-bottom: 12px; }
+  .ev-text { white-space: normal; line-height: 1.6; }
+  .ev-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .ev-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .ev-card .thumb { aspect-ratio: 16 / 9; background: #111 center / cover no-repeat; position: relative; }
+  .ev-card .thumb .live { position: absolute; left: 10px; top: 10px; background: #E11D48; color: #fff; font-weight: 800; font-size: 12px; padding: 2px 8px; border-radius: 4px; }
+  .ev-card .in { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .ev-card h3 { font-size: 20px; }
+  .ev-kind { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .btn.yt-btn { background: #E11D48; } .btn.yt-btn:hover { background: #BE123C; }
+  .adm-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .adm-row:last-child { border-bottom: 0; }
+  .field select, .field textarea { padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--text); font: inherit; }
+  .field textarea { min-height: 120px; resize: vertical; }
+  .row2 > *, .row3 > * { min-width: 0; }
+  .field input, .field select, .field textarea { min-width: 0; width: 100%; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .row2, .row3 { grid-template-columns: 1fr; } }
+  .link-btn { border: 0; background: none; color: var(--green); font-weight: 700; cursor: pointer; padding: 0; font: inherit; }
+  .link-btn.danger { color: var(--danger); }
+  .rt-sec { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .rt-sec h5 { margin: 4px 0 6px; font: 700 13px var(--body); color: var(--green-deep); }
+  @media (prefers-color-scheme: dark) { .rt-sec h5 { color: #8BE3A0; } }
+  .rt-list { max-height: 210px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding-right: 2px; }
+  .rt-box { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center; text-align: left; width: 100%;
+            border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 9px; padding: 6px 9px; cursor: pointer; font: inherit; font-size: 13px; }
+  .rt-box:hover { border-color: var(--green); background: var(--green-soft); }
+  .rt-box b { font-family: var(--display); font-size: 15px; }
+  .rt-box .no { color: var(--green-deep); font-weight: 700; }
+  @media (prefers-color-scheme: dark) { .rt-box .no { color: #8BE3A0; } }
+  .rt-box .mu { color: var(--muted); font-size: 12px; grid-column: 2 / 4; }
+  .ac-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .ac-row:last-child { border-bottom: 0; }
+  .ac-row input { accent-color: var(--green); width: 16px; height: 16px; }
+  .ac-row .here { color: var(--green); font-weight: 700; font-size: 12px; }
+  .ac-row .away { color: var(--muted); font-size: 12px; }
+  .bid-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .bid-row:last-child { border-bottom: 0; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -263,6 +321,8 @@
     <a href="#/" data-r="map">Mapa</a>
     <a href="#/zebricek" data-r="zebricek">Žebříček</a>
     <a href="#/piloti" data-r="piloti">Piloti</a>
+    <a href="#/novinky" data-r="novinky">Novinky</a>
+    <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
     <a href="#/tracker" data-r="tracker" id="navTracker" style="display:none">Tracker</a>
     <a href="#/ucet" data-r="ucet" id="navAccount">Přihlásit</a>
   </nav>
@@ -273,6 +333,7 @@
     <div id="map"></div>
     <div class="toast-wrap" id="toasts" aria-live="polite"></div>
     <aside class="air-panel">
+      <div class="hl" id="highlights"></div>
       <div class="air-head">
         <h2 id="airCount">Ve vzduchu</h2>
         <div class="legend"><span><i class="dot" style="background:var(--green)"></i>Jáchym Air</span><span><i class="dot" style="background:var(--other)"></i>Ostatní piloti</span></div>
@@ -287,6 +348,9 @@
   <section class="view" id="view-pilot"><div class="page" id="pilot"></div></section>
   <section class="view" id="view-ucet"><div class="page" id="ucet"></div></section>
   <section class="view" id="view-tracker"><div class="page" id="tracker"></div></section>
+  <section class="view" id="view-novinky"><div class="page" id="novinky"></div></section>
+  <section class="view" id="view-sprava"><div class="page" id="sprava"></div></section>
+  <section class="view" id="view-noveheslo"><div class="page" id="noveheslo"></div></section>
 </main>
 
 <script src="config.js"></script>
@@ -297,6 +361,11 @@ const CFG = window.JAI_CONFIG || {};
 document.getElementById("appName").textContent = CFG.APP_NAME || "JAI Tracker";
 document.title = CFG.APP_NAME || "JAI Tracker";
 
+// odkazy z e-mailů (potvrzení registrace, obnova hesla) – zachytit dřív, než je knihovna z adresy smaže
+const AUTH_HASH = location.hash;
+const AUTH_TYPE = (AUTH_HASH.match(/type=([a-z_]+)/) || [])[1] || null;
+const AUTH_ERROR = (() => { const m = AUTH_HASH.match(/error_description=([^&]+)/); return m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : null; })();
+const BASE_URL = location.origin + location.pathname;
 const notConfigured = !CFG.SUPABASE_URL || CFG.SUPABASE_URL.startsWith("VLOZ");
 const sb = notConfigured ? null : supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_KEY);
 
@@ -378,7 +447,7 @@ async function pollApp() {
 function renderTracker(full) {
   const el = $("tracker"), s = appState;
   if (!appApi || !s) { el.innerHTML = '<div class="card">Tato stránka funguje jen v aplikaci Jáchym Air Tracker.</div>'; return; }
-  const sig = `${s.online}|${s.crew?.linked}|${!!s.plan}`;
+  const sig = `${s.online}|${s.crew?.linked}|${!!s.plan}|${(s.crew?.bids || []).map(b => b.id).join(",")}`;
   if (full || !$("trNums") || sig !== renderTracker.sig) {
     renderTracker.sig = sig;
     el.innerHTML = `<h1 class="page-title">Tracker</h1><p class="lead">Aplikace verze ${esc(s.version)} · běží na tvém PC vedle MSFS</p>
@@ -421,6 +490,10 @@ function renderTracker(full) {
             <label class="switch" style="margin:12px 0"><input type="checkbox" id="crewAuto" ${s.crew.auto ? "checked" : ""}> Po přistání let automaticky odeslat</label>
             <p class="muted" style="margin:0 0 6px">Let se odešle, když máš v crew centru rezervaci (bid) se stejným odletem a cílem.</p>
             <div class="tr-row"><span>Poslední stav</span><b id="crewStatus"></b></div>
+            <h4 style="margin:14px 0 4px;font-family:var(--display);font-size:17px">Moje rezervace</h4>
+            ${(s.crew.bids || []).length ? s.crew.bids.map(b => `<div class="bid-row"><a href="#/linka/${encodeURIComponent(b.id)}"><b>${esc(b.flight_number)}</b> ${esc(b.dep)} → ${esc(b.arr)}</a>
+              <span class="muted" style="font-size:13px">${esc(b.aircraft || "")}</span><button class="link-btn danger" data-unbid="${esc(b.id)}">Zrušit</button></div>`).join("")
+              : '<p class="muted" style="margin:0">Žádné. Klikni na letiště se zeleným bodem a vyber si linku.</p>'}
             <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap"><button class="btn ghost" id="crewFile">Odeslat poslední let</button><button class="btn ghost" id="crewUnlink">Odpojit</button></div>`
           : `<p class="muted">Vlož API klíč ze svého profilu v crew centru. Klíč zůstane jen v tomto počítači a lety se pak budou samy odesílat do crew centra.</p>
             <form id="crewLinkForm"><div class="field"><label for="crewKeyApp">API klíč</label><input id="crewKeyApp" type="password" required autocomplete="off"></div>
@@ -456,6 +529,10 @@ function renderTracker(full) {
       appState = await appApi.get_state(); renderTracker(true); say("crewMsg", r.ok, r.msg);
       if (r.ok) { await loadJai(); updateNav(); }
     };
+    document.querySelectorAll("[data-unbid]").forEach(b => b.onclick = async () => {
+      b.disabled = true; const r = await appApi.crew_unbid(b.dataset.unbid);
+      appState = await appApi.get_state(); renderTracker(true); say("crewMsg", r.ok, r.msg);
+    });
     if ($("crewAuto")) $("crewAuto").onchange = e => appApi.crew_set_auto(e.target.checked);
     if ($("crewFile")) $("crewFile").onclick = async e => {
       busy(e.target, "Odesílám…"); const r = await appApi.crew_file_last();
@@ -489,23 +566,26 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
-  const view = r === "let" ? "map" : views.includes(r) ? r : "map";
+  const view = r === "let" || r === "linka" ? "map" : r === "nove-heslo" ? "noveheslo" : views.includes(r) ? r : "map";
   views.forEach(v => $("view-" + v).classList.toggle("on", v === view));
   document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.r === (view === "pilot" ? "piloti" : view)));
   if (notConfigured) { showNotConfigured(view); return; }
   if (view === "map") {
     initMap(); setTimeout(() => map.invalidateSize(), 50);
-    if (r === "let") openFocus(parts); else if (focus) closeFocus();
+    if (r === "let") openFocus(parts); else if (r === "linka") openRoute(decodeURIComponent(parts[1] || "")); else if (focus) closeFocus();
   }
   if (view === "zebricek") renderLeaderboard();
   if (view === "piloti") renderPilots();
   if (view === "pilot") renderPilot(decodeURIComponent(parts[1] || ""));
   if (view === "ucet") renderAccount();
   if (view === "tracker") renderTracker(true);
+  if (view === "novinky") renderNews(parts[1]);
+  if (view === "sprava") renderAdmin();
+  if (view === "noveheslo") renderNewPassword();
 }
 window.addEventListener("hashchange", router);
 
@@ -521,6 +601,23 @@ let map = null, markers = new Map(), trails = new Map(), liveTimer = null, liveR
 let airports = [], airportLayer = null, apRenderer = null, trailRenderer = null, lastFlightId = null;
 let tdLayer = null, planLines = new Map(), metarCache = new Map(), metarTimer = null;
 let wpLayers = new Map(), focusLayer = null, focus = null, photoCache = new Map();
+let jaiRoutes = [], jaiFleet = [], routesByAp = new Map();
+async function loadRoutes() {
+  if (!sb) return;
+  const [r, f] = await Promise.all([
+    sb.from("jai_routes").select("*").order("flight_number").limit(5000),
+    sb.from("jai_fleet").select("*").limit(5000),
+  ]);
+  if (r.error) return;
+  jaiRoutes = r.data || []; jaiFleet = f.data || [];
+  routesByAp = new Map();
+  for (const rt of jaiRoutes) for (const code of [rt.dep, rt.arr]) {
+    if (!routesByAp.has(code)) routesByAp.set(code, []);
+    routesByAp.get(code).push(rt);
+  }
+}
+const routesReady = new Promise(res => setTimeout(() => loadRoutes().then(res, res), 0));
+const airportsReady = fetch("letiste.json").then(r => r.json()).then(d => { airports = d; }).catch(() => {});
 
 const ALT_STOPS = [[0, [249, 115, 22]], [4000, [234, 179, 8]], [10000, [34, 197, 94]], [20000, [6, 182, 212]], [30000, [59, 130, 246]], [40000, [168, 85, 247]]];
 function altColor(alt) {
@@ -573,10 +670,15 @@ function initMap() {
   L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Místa přistání": tdLayer }, { position: "topright" }).addTo(map);
   map.on("moveend", () => { drawAirports(); scheduleMetar(); });
   settingsControl().addTo(map);
+  map.on("popupopen", e => e.popup.getElement()?.querySelectorAll(".rt-box").forEach(b => {
+    b.onclick = () => { map.closePopup(); location.hash = "#/linka/" + encodeURIComponent(b.dataset.route); };
+  }));
   focusLayer = L.layerGroup().addTo(map);
   const zoomCls = () => { map.getContainer().classList.toggle("zoom-low", map.getZoom() < 11); map.getContainer().classList.toggle("wp-hide", map.getZoom() < 6); };
   map.on("zoomend", zoomCls); zoomCls();
-  fetch("letiste.json").then(r => r.json()).then(d => { airports = d; drawAirports(); }).catch(() => {});
+  airportsReady.then(() => { drawAirports(); renderHighlights(); });
+  routesReady.then(drawAirports);
+  setInterval(renderHighlights, 120000);
   refreshLive();
   liveTimer = setInterval(refreshLive, 8000);
 }
@@ -588,23 +690,25 @@ function drawAirports() {
   const minSize = z >= 7 ? 2 : z >= 4 ? 3 : 9;
   let n = 0;
   for (const [icao, name, lat, lon, size, city] of airports) {
-    if (size < minSize || !b.contains([lat, lon])) continue;
-    if (++n > 800) break;
+    const jai = routesByAp.has(icao);
+    if ((size < minSize && !(jai && z >= 3)) || !b.contains([lat, lon])) continue;
+    if (++n > 900) break;
     const big = size === 3;
     const c = L.circleMarker([lat, lon], {
-      renderer: apRenderer, radius: big ? 6 : 4.5, weight: 2.5,
-      color: big ? "#116B26" : "#5C6E63", fillColor: "#fff", fillOpacity: 1
+      renderer: apRenderer, radius: jai ? 6.5 : big ? 6 : 4.5, weight: jai ? 3 : 2.5,
+      color: jai ? "#fff" : big ? "#116B26" : "#5C6E63", fillColor: jai ? "#1E9B36" : "#fff", fillOpacity: 1
     }).addTo(airportLayer);
     const m = metarCache.get(icao);
     c.bindPopup(() => {
       const here = liveRows.filter(r => r.lat != null && Math.abs(r.lat - lat) < 0.06 && Math.abs(r.lon - lon) < 0.09);
       return `<div class="pop-cs">${esc(icao)}</div><div><b>${esc(name)}</b></div>${city ? `<div class="muted">${esc(city)}</div>` : ""}
         ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
+        ${jai ? routesPopupHtml(icao) : ""}
         ${metarCache.get(icao) ? metarHtml(metarCache.get(icao)) : '<div class="muted" style="margin-top:6px">METAR pro toto letiště není k dispozici.</div>'}`;
     }, { maxWidth: 340 });
     const showWx = settings.weather && m;
     const label = `${showWx && m.fltCat ? `<i class="cat cat-${esc(m.fltCat)}"></i>` : ""}${esc(icao)}${showWx && m.temp != null ? `<span class="wx">${Math.round(m.temp)}° ${wxIcon(m)}</span>` : ""}`;
-    if (z >= 8 || (big && z >= 6)) c.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
+    if (z >= 8 || (big && z >= 6) || (jai && z >= 5)) c.bindTooltip(label, { permanent: true, direction: "right", offset: [6, 0], className: "ap-label" });
     else c.bindTooltip(`${label} – ${esc(name)}`, { direction: "top" });
   }
 }
@@ -855,6 +959,111 @@ function renderLive() {
   if (focus?.type === "live") renderFlightPanel();
 }
 
+/* ---------- linky Jáchym Air ---------- */
+const fltNo = rt => `${rt.airline_icao || ""}${rt.flight_number || ""}${rt.route_leg ? "/" + rt.route_leg : ""}`;
+function routeBox(rt) {
+  return `<button class="rt-box" data-route="${esc(rt.id)}"><span class="no">${esc(fltNo(rt))}</span><b>${esc(rt.dep)} – ${esc(rt.arr)}</b>
+    <span>${rt.flight_time_min ? fmtDur(rt.flight_time_min) + " h" : ""}</span>
+    <span class="mu">${rt.distance_nm ? nf.format(Math.round(rt.distance_nm)) + " nm" : ""}${rt.subfleets?.length ? " · " + esc(rt.subfleets.map(x => x.type || x.name).filter(Boolean).join(", ")) : ""}</span></button>`;
+}
+function routesPopupHtml(icao) {
+  const list = routesByAp.get(icao) || [];
+  const dep = list.filter(r => r.dep === icao), arr = list.filter(r => r.arr === icao);
+  return `<div class="rt-sec"><h5>Linky Jáchym Air (${list.length})</h5><div class="rt-list">
+    ${dep.length ? `<div class="muted" style="font-size:12px;font-weight:700">Odlety</div>${dep.map(routeBox).join("")}` : ""}
+    ${arr.length ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:4px">Přílety</div>${arr.map(routeBox).join("")}` : ""}</div></div>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest?.(".rt-box");
+  if (b) { e.preventDefault(); location.hash = "#/linka/" + encodeURIComponent(b.dataset.route); }
+});
+function gcPoints(a, b, n = 48) {
+  const r = x => x * Math.PI / 180, d = x => x * 180 / Math.PI;
+  const [la1, lo1, la2, lo2] = [r(a[0]), r(a[1]), r(b[0]), r(b[1])];
+  const w = 2 * Math.asin(Math.sqrt(Math.sin((la2 - la1) / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin((lo2 - lo1) / 2) ** 2));
+  if (!w) return [a, b];
+  const out = [];
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, A = Math.sin((1 - f) * w) / Math.sin(w), B = Math.sin(f * w) / Math.sin(w);
+    const x = A * Math.cos(la1) * Math.cos(lo1) + B * Math.cos(la2) * Math.cos(lo2);
+    const y = A * Math.cos(la1) * Math.sin(lo1) + B * Math.cos(la2) * Math.sin(lo2);
+    const z = A * Math.sin(la1) + B * Math.sin(la2);
+    out.push([d(Math.atan2(z, Math.hypot(x, y))), d(Math.atan2(y, x))]);
+  }
+  return out;
+}
+async function openRoute(id) {
+  $("view-map").querySelector(".air-panel").classList.add("detail");
+  $("flightPanel").innerHTML = '<div class="empty">Načítám linku…</div>';
+  await Promise.all([routesReady, airportsReady]);
+  const rt = jaiRoutes.find(r => r.id === id);
+  if (!rt) { $("flightPanel").innerHTML = '<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">Linka nenalezena.</div>'; $("fpBack").onclick = closeFocus; return; }
+  focus = { type: "route", id, data: rt, ac: null };
+  renderLive();
+  focusLayer.clearLayers();
+  const a = apByCode(rt.dep), b = apByCode(rt.arr);
+  if (a && b) {
+    const pts = gcPoints([a[2], a[3]], [b[2], b[3]]);
+    L.polyline(pts, { color: "#1E9B36", weight: Math.max(3, settings.trail - 1), opacity: .9, dashArray: "10 8", interactive: false }).addTo(focusLayer);
+    for (const ap of [a, b]) L.circleMarker([ap[2], ap[3]], { radius: 8, color: "#fff", weight: 3, fillColor: "#1E9B36", fillOpacity: 1 })
+      .bindTooltip(esc(ap[0]), { direction: "top", offset: [0, -8] }).addTo(focusLayer);
+    map.fitBounds(L.latLngBounds(pts).pad(0.25), { paddingTopLeft: [380, 0] });
+  }
+  renderRoutePanel();
+}
+function renderRoutePanel() {
+  const rt = focus.data, a = apByCode(rt.dep), b = apByCode(rt.arr);
+  const sfIds = new Set((rt.subfleets || []).map(x => String(x.id)));
+  const ac = jaiFleet.filter(x => sfIds.has(String(x.subfleet_id))).sort((x, y) => (y.airport_id === rt.dep) - (x.airport_id === rt.dep));
+  const bids = appState?.crew?.bids || [];
+  const myBid = bids.find(x => x.id === String(rt.id));
+  if (!focus.ac && ac.length) focus.ac = ac.find(x => x.airport_id === rt.dep) || ac[0];
+  const sel = focus.ac;
+  const sbUrl = `https://dispatch.simbrief.com/options/custom?airline=${encodeURIComponent(rt.airline_icao || "")}&fltnum=${encodeURIComponent(rt.flight_number || "")}&orig=${encodeURIComponent(rt.dep)}&dest=${encodeURIComponent(rt.arr)}`
+    + (sel?.icao ? `&type=${encodeURIComponent(sel.icao)}` : "") + (sel?.registration ? `&reg=${encodeURIComponent(sel.registration)}` : "");
+  $("flightPanel").innerHTML = `
+    <div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button><span class="badge">Linka Jáchym Air</span></div>
+    <div class="fp-id"><div class="fp-cs">${esc(fltNo(rt))}</div><div class="muted">${rt.flight_type === "C" ? "Charter" : rt.flight_type === "F" ? "Nákladní" : "Pravidelná linka"}</div></div>
+    <div class="fp-route">
+      <div><div class="ap">${esc(rt.dep)}</div><div class="apn">${esc(a?.[1] || "")}</div>${rt.dpt_time ? `<div class="fp-times"><div><span class="muted">Odlet</span><b>${esc(rt.dpt_time)}</b></div></div>` : ""}</div>
+      <div class="mid"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(90deg)"><path d="${PLANE}"/></svg></div>
+      <div class="r"><div class="ap">${esc(rt.arr)}</div><div class="apn">${esc(b?.[1] || "")}</div>${rt.arr_time ? `<div class="fp-times"><div><span class="muted">Přílet</span><b>${esc(rt.arr_time)}</b></div></div>` : ""}</div>
+    </div>
+    <div class="fp-sec"><div class="fp-stats" style="grid-template-columns:repeat(3,1fr)">
+      <div><b>${rt.distance_nm ? nf.format(Math.round(rt.distance_nm)) : "–"}</b><span>nm</span></div>
+      <div><b>${rt.flight_time_min ? fmtDur(rt.flight_time_min) : "–"}</b><span>Doba letu</span></div>
+      <div><b>${esc(rt.alt || "–")}</b><span>Alternativa</span></div></div></div>
+    ${rt.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(rt.route)}</div></div>` : ""}
+    ${rt.notes ? `<div class="fp-sec"><h4>Poznámky</h4><div class="ev-text">${richText(rt.notes)}</div></div>` : ""}
+    <div class="fp-sec"><h4>Letadla pro tuto linku</h4>
+      ${ac.length ? ac.map(x => `<label class="ac-row"><input type="radio" name="acPick" value="${esc(x.id)}" ${sel?.id === x.id ? "checked" : ""}>
+        <div style="flex:1"><b>${esc(x.registration || x.name || "")}</b> <span class="muted">${esc(x.icao || x.subfleet_type || "")} · ${esc(x.subfleet_name || "")}</span></div>
+        ${x.airport_id === rt.dep ? `<span class="here">stojí v ${esc(rt.dep)} ✓</span>` : x.airport_id ? `<span class="away">v ${esc(x.airport_id)}</span>` : ""}</label>`).join("")
+        : `<p class="muted" style="margin:0">${rt.subfleets?.length ? "Typy: " + esc(rt.subfleets.map(x => x.name || x.type).join(", ")) : "Crew center u linky neuvádí letadla."}</p>`}</div>
+    <div class="fp-sec" style="display:flex;flex-direction:column;gap:8px">
+      ${appApi ? (appState?.crew?.linked
+          ? (myBid ? `<button class="btn ghost" id="rtUnbid">Zrušit rezervaci</button><p class="muted" style="margin:0;font-size:13px">Let máš rezervovaný. Po přistání se sám odešle do crew centra.</p>`
+                   : `<button class="btn" id="rtBid">Rezervovat let (bid)</button>`)
+          : `<a class="btn ghost" href="#/tracker">Pro rezervaci propoj crew center</a>`)
+        : `<a class="btn" href="https://crew.jachymair.com" target="_blank" rel="noopener">Rezervovat v crew centru</a>
+           <p class="muted" style="margin:0;font-size:13px">V aplikaci JAI Tracker můžeš let rezervovat rovnou tady.</p>`}
+      <a class="btn ghost" href="${esc(sbUrl)}" target="_blank" rel="noopener">Naplánovat v SimBriefu</a>
+      <div id="rtMsg"></div></div>`;
+  $("fpBack").onclick = closeFocus;
+  document.querySelectorAll('input[name="acPick"]').forEach(i => i.onchange = () => { focus.ac = ac.find(x => x.id === i.value); renderRoutePanel(); });
+  const say = (ok, t) => { $("rtMsg").innerHTML = `<div class="msg ${ok ? "ok" : "err"}" style="margin:0">${esc(t)}</div>`; };
+  if ($("rtBid")) $("rtBid").onclick = async e => {
+    e.target.disabled = true; e.target.textContent = "Rezervuji…";
+    const r = await appApi.crew_bid(rt.id, sel ? { id: sel.id, reg: sel.registration, icao: sel.icao } : null);
+    appState = await appApi.get_state(); renderRoutePanel(); say(r.ok, r.msg);
+  };
+  if ($("rtUnbid")) $("rtUnbid").onclick = async e => {
+    e.target.disabled = true;
+    const r = await appApi.crew_unbid(rt.id);
+    appState = await appApi.get_state(); renderRoutePanel(); say(r.ok, r.msg);
+  };
+}
+
 /* ---------- detail letu (živý i dokončený) ---------- */
 const apByCode = code => airports.find(a => a[0] === code);
 const hm = d => d ? new Date(d).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }) : "–";
@@ -1067,6 +1276,212 @@ async function renderPilot(username) {
   });
 }
 
+/* ---------- novinky, let týdne, YouTube ---------- */
+let eventsCache = null, eventsAt = 0, weekLayer = null;
+async function loadEvents(force) {
+  if (!force && eventsCache && Date.now() - eventsAt < 60000) return eventsCache;
+  const { data, error } = await sb.from("events").select("*").order("starts_at", { ascending: false, nullsFirst: false }).limit(200);
+  if (error) return eventsCache || [];
+  eventsCache = data || []; eventsAt = Date.now();
+  return eventsCache;
+}
+const KIND_TXT = { let_tydne: "Let týdne", youtube: "YouTube event", novinka: "Novinka" };
+const isNow = e => (!e.starts_at || new Date(e.starts_at) <= new Date()) && (!e.ends_at || new Date(e.ends_at) >= new Date());
+const ytEnd = e => e.ends_at ? new Date(e.ends_at) : new Date(new Date(e.starts_at || 0).getTime() + 3 * 3600e3);
+function currentWeekFlight(list) {
+  return list.filter(e => e.kind === "let_tydne" && isNow(e)).sort((a, b) => (b.pinned - a.pinned) || (new Date(b.starts_at) - new Date(a.starts_at)))[0] || null;
+}
+function nextYoutube(list) {
+  return list.filter(e => e.kind === "youtube" && e.starts_at && ytEnd(e) >= new Date()).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))[0] || null;
+}
+function relTime(d) {
+  const ms = new Date(d) - Date.now(), past = ms < 0, m = Math.round(Math.abs(ms) / 60000);
+  let t;
+  if (m < 60) t = `${m} min`;
+  else if (m < 48 * 60) { const h = Math.floor(m / 60); t = `${h} h${m % 60 && h < 10 ? ` ${m % 60} min` : ""}`; }
+  else { const dd = Math.round(m / 1440); t = `${dd} ${dd < 5 ? "dny" : "dní"}`; }
+  return past ? `před ${t}` : `za ${t}`;
+}
+const fmtDT = d => d ? new Date(d).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+function ytId(url) {
+  const m = String(url || "").match(/(?:youtu\.be\/|v=|\/live\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function richText(t) {
+  return esc(t || "").replace(/(https:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/\n/g, "<br>");
+}
+function ytLive(e) { return e.starts_at && new Date(e.starts_at) <= new Date() && ytEnd(e) >= new Date(); }
+
+async function renderHighlights() {
+  if (!sb) return;
+  const list = await loadEvents();
+  const w = currentWeekFlight(list), y = nextYoutube(list);
+  $("highlights").innerHTML = (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
+      <div class="hl-t">${w.dep && w.arr ? `${esc(w.dep)} → ${esc(w.arr)}` : esc(w.title)}</div><div class="hl-s">${esc(w.aircraft || w.title)}</div></div></a>` : "")
+    + (y ? `<a class="hl-card yt" href="#/novinky/${y.id}"><span class="hl-ic">▶</span><div><div class="hl-k">${ytLive(y) ? "Živě teď na YouTube" : "YouTube " + relTime(y.starts_at)}</div>
+      <div class="hl-t">${esc(y.title)}</div><div class="hl-s">${fmtDT(y.starts_at)}</div></div></a>` : "");
+  drawWeekRoute(w);
+}
+function drawWeekRoute(w) {
+  if (!map) return;
+  if (!weekLayer) weekLayer = L.layerGroup().addTo(map);
+  weekLayer.clearLayers();
+  const a = w && apByCode(w.dep), b = w && apByCode(w.arr);
+  if (!a || !b) return;
+  L.polyline([[a[2], a[3]], [b[2], b[3]]], { color: "#F59E0B", weight: 3, opacity: .85, dashArray: "2 8", lineCap: "round", interactive: false }).addTo(weekLayer);
+  for (const ap of [a, b]) L.circleMarker([ap[2], ap[3]], { radius: 7, color: "#F59E0B", weight: 3, fillColor: "#fff", fillOpacity: 1 })
+    .bindTooltip(`★ Let týdne · ${esc(ap[0])}`, { direction: "top" }).on("click", () => { location.hash = "#/novinky/" + w.id; }).addTo(weekLayer);
+}
+
+async function weekLeaderboard(e) {
+  let q = sb.from("flights").select("id, user_id, callsign, aircraft, ac_icao, fpm, g, score, landed_at, duration_min, profiles(username, avatar_url)")
+    .eq("dep_icao", e.dep).eq("arr_icao", e.arr).not("score", "is", null).order("score", { ascending: false }).limit(300);
+  if (e.starts_at) q = q.gte("landed_at", e.starts_at);
+  if (e.ends_at) q = q.lte("landed_at", e.ends_at);
+  const { data } = await q;
+  const want = (e.aircraft || "").toUpperCase().trim();
+  const best = new Map();
+  for (const f of data || []) {
+    if (want && !((f.ac_icao || "").toUpperCase() === want || (f.aircraft || "").toUpperCase().includes(want))) continue;
+    if (!best.has(f.user_id)) best.set(f.user_id, f);
+  }
+  return [...best.values()];
+}
+
+async function renderNews(idParam) {
+  const el = $("novinky");
+  el.innerHTML = '<p class="muted">Načítám…</p>';
+  const [list] = await Promise.all([loadEvents(true), airportsReady]);
+  const sel = idParam ? list.find(e => String(e.id) === idParam) : null;
+  const w = sel?.kind === "let_tydne" ? sel : (!sel ? currentWeekFlight(list) : null);
+  let html = `<h1 class="page-title">Novinky</h1><p class="lead">Let týdne, YouTube eventy a novinky z Jáchym Air.</p>`;
+  if (w) html += await weekBlock(w);
+  if (sel && sel.kind !== "let_tydne") html += `<div style="margin-bottom:24px">${eventCard(sel, true)}</div>`;
+  const others = list.filter(e => e !== w && e !== sel);
+  const upcoming = others.filter(e => e.kind === "youtube" && ytEnd(e) >= new Date()).sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  const rest = others.filter(e => !upcoming.includes(e));
+  if (upcoming.length) html += `<h2 class="section-title">Nadcházející streamy</h2><div class="ev-list" style="margin-bottom:28px">${upcoming.map(e => eventCard(e)).join("")}</div>`;
+  html += `<h2 class="section-title">Všechny novinky</h2>` + (rest.length ? `<div class="ev-list">${rest.map(e => eventCard(e)).join("")}</div>` : '<div class="card">Zatím tu nic není.</div>');
+  el.innerHTML = html;
+}
+async function weekBlock(w) {
+  const a = apByCode(w.dep), b = apByCode(w.arr);
+  const rows = w.dep && w.arr ? await weekLeaderboard(w) : [];
+  return `<div class="ev-big"><div class="ev-head"><div class="k">★ ${isNow(w) ? "Let týdne" : "Let týdne (" + (new Date(w.ends_at) < new Date() ? "skončil" : "brzy") + ")"}</div><h2>${esc(w.title)}</h2>
+      ${w.dep && w.arr ? `<div class="ev-route"><div>${esc(w.dep)}<small>${esc(a?.[1] || "")}</small></div><span>→</span><div>${esc(w.arr)}<small>${esc(b?.[1] || "")}</small></div></div>` : ""}</div>
+    <div class="ev-body"><div class="ev-meta">${w.aircraft ? `<span>✈ ${esc(w.aircraft)}</span>` : ""}${w.starts_at ? `<span>Od ${fmtDT(w.starts_at)}</span>` : ""}${w.ends_at ? `<span>Do ${fmtDT(w.ends_at)} (${relTime(w.ends_at)})</span>` : ""}</div>
+      ${w.body ? `<div class="ev-text">${richText(w.body)}</div>` : ""}
+      ${w.dep && w.arr ? `<h3 class="section-title" style="margin-top:20px">Výsledky (${rows.length} ${rows.length === 1 ? "pilot" : rows.length < 5 && rows.length ? "piloti" : "pilotů"})</h3>
+        ${rows.length ? `<div class="table-wrap"><table><thead><tr><th></th><th>Pilot</th><th>Známka</th><th>FPM</th><th>G</th><th>Doba</th><th></th></tr></thead><tbody>
+          ${rows.map((f, i) => `<tr><td class="rank">${i + 1}</td><td>${pilotLink(f.profiles, jaiSet.has(f.user_id))}</td><td>${scoreHtml(f.score)}</td><td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${fmtDur(f.duration_min)}</td><td><a href="#/let/${f.id}">Detail</a></td></tr>`).join("")}
+          </tbody></table></div>` : `<div class="card">Zatím nikdo neodletěl. Leť ${esc(w.dep)} → ${esc(w.arr)}${w.aircraft ? " s " + esc(w.aircraft) : ""} a buď první!</div>`}` : ""}
+    </div></div>`;
+}
+function eventCard(e, big) {
+  const id = e.kind === "youtube" ? ytId(e.link) : null;
+  return `<div class="ev-card">${id ? `<a class="thumb" href="${esc(e.link)}" target="_blank" rel="noopener" style="background-image:url('https://i.ytimg.com/vi/${id}/hqdefault.jpg')">${ytLive(e) ? '<span class="live">ŽIVĚ</span>' : ""}</a>` : ""}
+    <div class="in"><div class="ev-kind">${KIND_TXT[e.kind]}${e.starts_at ? " · " + fmtDT(e.starts_at) : ""}${e.kind === "youtube" && e.starts_at && new Date(e.starts_at) > new Date() ? " · " + relTime(e.starts_at) : ""}</div>
+      <h3>${esc(e.title)}</h3>
+      ${e.kind === "let_tydne" && e.dep ? `<div style="font-weight:700">${esc(e.dep)} → ${esc(e.arr || "")}${e.aircraft ? ` · ${esc(e.aircraft)}` : ""}</div>` : ""}
+      ${e.body ? `<div class="ev-text muted">${big ? richText(e.body) : richText(e.body.length > 220 ? e.body.slice(0, 220) + "…" : e.body)}</div>` : ""}
+      <div style="margin-top:auto;padding-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${e.link ? `<a class="btn ${e.kind === "youtube" ? "yt-btn" : ""}" href="${esc(e.link)}" target="_blank" rel="noopener">${e.kind === "youtube" ? "▶ Sledovat na YouTube" : "Otevřít odkaz"}</a>` : ""}
+        ${!big && (e.kind === "let_tydne" || (e.body || "").length > 220) ? `<a class="btn ghost" href="#/novinky/${e.id}">Detail</a>` : ""}</div></div></div>`;
+}
+
+/* ---------- správa (jen pro správce) ---------- */
+const toLocalInput = d => d ? new Date(new Date(d).getTime() - new Date(d).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+async function renderAdmin(editId, msg) {
+  const el = $("sprava");
+  if (!me?.profile?.is_admin) { el.innerHTML = '<div class="card">Tahle stránka je jen pro správce webu.</div>'; return; }
+  const list = await loadEvents(true);
+  const e = editId ? list.find(x => x.id === editId) || {} : {};
+  const kind = e.kind || "let_tydne";
+  el.innerHTML = `<h1 class="page-title">Správa</h1><p class="lead">Tady zakládáš let týdne, YouTube eventy a novinky.</p>
+    ${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    <div class="grid2" style="align-items:start">
+      <form class="card" id="evForm"><h2 class="section-title">${e.id ? "Upravit" : "Nová položka"}</h2>
+        <div class="field"><label for="evKind">Typ</label><select id="evKind">
+          <option value="let_tydne" ${kind === "let_tydne" ? "selected" : ""}>Let týdne</option>
+          <option value="youtube" ${kind === "youtube" ? "selected" : ""}>YouTube event</option>
+          <option value="novinka" ${kind === "novinka" ? "selected" : ""}>Novinka</option></select></div>
+        <div class="field"><label for="evTitle">Název</label><input id="evTitle" required maxlength="120" value="${esc(e.title || "")}" placeholder="např. Přes Alpy do Innsbrucku"></div>
+        <div class="row3" id="evFlight">
+          <div class="field"><label for="evDep">Odlet (ICAO)</label><input id="evDep" maxlength="8" value="${esc(e.dep || "")}" placeholder="LKPR"></div>
+          <div class="field"><label for="evArr">Přílet (ICAO)</label><input id="evArr" maxlength="8" value="${esc(e.arr || "")}" placeholder="LOWI"></div>
+          <div class="field"><label for="evAc">Letadlo</label><input id="evAc" maxlength="40" value="${esc(e.aircraft || "")}" placeholder="B738"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="evStart">Začátek</label><input id="evStart" type="datetime-local" value="${toLocalInput(e.starts_at)}"></div>
+          <div class="field"><label for="evEnd">Konec</label><input id="evEnd" type="datetime-local" value="${toLocalInput(e.ends_at)}"></div>
+        </div>
+        <div class="field"><label for="evLink">Odkaz (např. na YouTube stream)</label><input id="evLink" type="url" value="${esc(e.link || "")}" placeholder="https://www.youtube.com/watch?v=…"></div>
+        <div class="field"><label for="evBody">Text</label><textarea id="evBody" maxlength="4000" placeholder="Popis, pravidla, tipy na scenérie…">${esc(e.body || "")}</textarea><small>Odkazy začínající https:// se samy změní na klikací.</small></div>
+        <label class="switch" style="margin-bottom:14px"><input type="checkbox" id="evPin" ${e.pinned ? "checked" : ""}> Připnout (má přednost na hlavní stránce)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">${e.id ? "Uložit změny" : "Vytvořit"}</button>${e.id ? '<button type="button" class="btn ghost" id="evCancel">Zrušit úpravy</button>' : ""}</div>
+      </form>
+      <div class="card" style="grid-column:1/-1"><h2 class="section-title">Linky z crew centra</h2>
+        <p class="muted" style="margin-top:0">Zkopíruje linky a flotilu z crew.jachymair.com, aby byly vidět na mapě. Spusť po každé změně linek v crew centru.</p>
+        <p id="syncInfo">${jaiRoutes.length ? `Teď je na webu <b>${jaiRoutes.length}</b> linek a <b>${jaiFleet.length}</b> letadel (naposledy ${fmtDT(jaiRoutes[0]?.synced_at)}).` : "Zatím žádné linky."}</p>
+        <button class="btn" id="syncBtn" type="button">Synchronizovat linky</button></div>
+      <div class="card"><h2 class="section-title">Všechny položky</h2>
+        ${list.length ? list.map(x => `<div class="adm-row"><div><div class="ev-kind">${KIND_TXT[x.kind]}${x.starts_at ? " · " + fmtDT(x.starts_at) : ""}${isNow(x) && x.kind === "let_tydne" ? " · <b style='color:var(--green)'>právě běží</b>" : ""}</div>
+          <b>${esc(x.title)}</b>${x.dep ? ` <span class="muted">${esc(x.dep)} → ${esc(x.arr || "")}</span>` : ""}</div>
+          <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-edit="${x.id}">Upravit</button><button class="link-btn danger" data-del="${x.id}">Smazat</button></div></div>`).join("")
+          : '<p class="muted">Zatím nic. Vytvoř první let týdne!</p>'}
+      </div></div>`;
+  $("syncBtn").onclick = async e => {
+    e.target.disabled = true; e.target.textContent = "Synchronizuji…";
+    const { data, error } = await sb.functions.invoke("jai-sync", { body: {} });
+    let msg = data?.msg; if (error && !msg) { try { msg = (await error.context.json()).msg; } catch { msg = error.message; } }
+    await loadRoutes(); drawAirports();
+    renderAdmin(null, data?.ok ? { ok: true, text: `Hotovo: ${data.routes} linek a ${data.aircraft} letadel.` } : { ok: false, text: msg || "Synchronizace se nepovedla." });
+  };
+  const syncKind = () => { $("evFlight").style.display = $("evKind").value === "let_tydne" ? "" : "none"; };
+  $("evKind").onchange = syncKind; syncKind();
+  if ($("evCancel")) $("evCancel").onclick = () => renderAdmin();
+  el.querySelectorAll("[data-edit]").forEach(b => b.onclick = () => renderAdmin(Number(b.dataset.edit)));
+  el.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    if (!confirm("Opravdu smazat?")) return;
+    const { error } = await sb.from("events").delete().eq("id", Number(b.dataset.del));
+    renderAdmin(null, error ? { ok: false, text: error.message } : { ok: true, text: "Smazáno." });
+  });
+  $("evForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const k = $("evKind").value, iso = v => v ? new Date(v).toISOString() : null;
+    const row = {
+      kind: k, title: $("evTitle").value.trim(), body: $("evBody").value.trim() || null,
+      dep: k === "let_tydne" ? $("evDep").value.trim().toUpperCase() || null : null,
+      arr: k === "let_tydne" ? $("evArr").value.trim().toUpperCase() || null : null,
+      aircraft: k === "let_tydne" ? $("evAc").value.trim() || null : null,
+      starts_at: iso($("evStart").value), ends_at: iso($("evEnd").value),
+      link: $("evLink").value.trim() || null, pinned: $("evPin").checked,
+    };
+    if (row.link && !row.link.startsWith("https://")) { renderAdmin(e.id, { ok: false, text: "Odkaz musí začínat https://" }); return; }
+    if (row.starts_at && row.ends_at && row.ends_at < row.starts_at) { renderAdmin(e.id, { ok: false, text: "Konec je dřív než začátek." }); return; }
+    const res = e.id ? await sb.from("events").update(row).eq("id", e.id) : await sb.from("events").insert(row);
+    eventsAt = 0;
+    renderAdmin(null, res.error ? { ok: false, text: res.error.message } : { ok: true, text: e.id ? "Uloženo." : "Vytvořeno! Hned je vidět v Novinkách i na mapě." });
+    renderHighlights();
+  };
+}
+
+/* ---------- nové heslo (odkaz z e-mailu) ---------- */
+async function renderNewPassword() {
+  const el = $("noveheslo");
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { el.innerHTML = '<div class="card" style="max-width:440px;margin:0 auto">Odkaz pro změnu hesla vypršel nebo už byl použit. Na stránce <a href="#/ucet">Přihlášení</a> si můžeš nechat poslat nový.</div>'; return; }
+  el.innerHTML = `<div style="max-width:440px;margin:0 auto"><h1 class="page-title">Nové heslo</h1><p class="lead">Zvol si nové heslo k účtu ${esc(session.user.email)}.</p>
+    <div id="npMsg"></div><form class="card" id="npForm"><div class="field"><label for="npPass">Nové heslo</label><input id="npPass" type="password" minlength="8" required autocomplete="new-password"><small>Aspoň 8 znaků</small></div>
+    <button class="btn" style="width:100%">Uložit heslo</button></form></div>`;
+  $("npForm").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.auth.updateUser({ password: $("npPass").value });
+    if (error) { $("npMsg").innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
+    location.hash = "#/ucet"; setTimeout(() => renderAccount({ ok: true, text: "Heslo bylo změněno. Jsi přihlášen." }), 50);
+  };
+}
+
 /* ---------- účet ---------- */
 let authMode = "login";
 async function loadMe() {
@@ -1077,6 +1492,7 @@ async function loadMe() {
   updateNav();
 }
 function updateNav() {
+  $("navAdmin").style.display = me?.profile?.is_admin ? "" : "none";
   const a = $("navAccount");
   a.innerHTML = me?.profile ? `${avatar(me.profile, jaiSet.has(me.user.id), "mini-av")}${esc(me.profile.username)}` : "Přihlásit";
 }
@@ -1097,8 +1513,14 @@ function renderAccount(msg) {
         <div class="field"><label for="fPass">Heslo</label><input id="fPass" type="password" required minlength="8" autocomplete="${authMode === "login" ? "current-password" : "new-password"}">${authMode === "register" ? "<small>Aspoň 8 znaků</small>" : ""}</div>
         <button class="btn" style="width:100%">${authMode === "login" ? "Přihlásit se" : "Vytvořit účet"}</button>
       </form>
-      <p style="text-align:center;margin-top:16px">${authMode === "login" ? 'Nemáš účet? <a href="#" id="swAuth">Zaregistruj se</a>' : 'Už máš účet? <a href="#" id="swAuth">Přihlas se</a>'}</p></div>`;
+      <p style="text-align:center;margin-top:16px">${authMode === "login" ? 'Nemáš účet? <a href="#" id="swAuth">Zaregistruj se</a><br><button class="link-btn" id="forgot" style="margin-top:8px">Zapomněl jsi heslo?</button>' : 'Už máš účet? <a href="#" id="swAuth">Přihlas se</a>'}</p></div>`;
     $("swAuth").onclick = e => { e.preventDefault(); authMode = authMode === "login" ? "register" : "login"; renderAccount(); };
+    if ($("forgot")) $("forgot").onclick = async () => {
+      const email = $("fEmail").value.trim();
+      if (!email) { renderAccount({ ok: false, text: "Nejdřív napiš do pole E-mail svou adresu a pak klikni znovu na „Zapomněl jsi heslo?“." }); return; }
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: BASE_URL });
+      renderAccount(error ? { ok: false, text: error.message } : { ok: true, text: `Pokud účet ${email} existuje, poslali jsme na něj odkaz pro nastavení nového hesla.` });
+    };
     $("authForm").onsubmit = onAuthSubmit;
     return;
   }
@@ -1125,8 +1547,16 @@ function renderAccount(msg) {
         <button class="btn ghost" id="logout">Odhlásit se</button>
       </div>
       <div class="card" id="crewCard"><h2 class="section-title">Crew center Jáchym Air</h2><p class="muted">Načítám…</p></div>
+      <form class="card" id="pwForm"><h2 class="section-title">Změna hesla</h2>
+        <div class="field"><label for="pwNew">Nové heslo</label><input id="pwNew" type="password" minlength="8" required autocomplete="new-password"><small>Aspoň 8 znaků</small></div>
+        <button class="btn">Změnit heslo</button></form>
     </div>`;
   renderCrewCard();
+  $("pwForm").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.auth.updateUser({ password: $("pwNew").value });
+    renderAccount(error ? { ok: false, text: error.message } : { ok: true, text: "Heslo změněno." });
+  };
   $("logout").onclick = async () => { await sb.auth.signOut(); me = null; updateNav(); renderAccount(); };
   $("profileForm").onsubmit = onProfileSubmit;
 }
@@ -1171,7 +1601,7 @@ async function onAuthSubmit(e) {
       const username = $("fUser").value.trim(), callsign = $("fCs").value.trim().toUpperCase();
       const { data: taken } = await sb.from("profiles").select("id").ilike("username", username.replace(/[_%\\]/g, m => "\\" + m)).limit(1);
       if (taken?.length) throw new Error("Toto uživatelské jméno už někdo má.");
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username, callsign } } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username, callsign }, emailRedirectTo: BASE_URL } });
       if (error) throw new Error(error.message);
       if (!data.session) { authMode = "login"; renderAccount({ ok: true, text: "Účet vytvořen. Potvrď ho odkazem v e-mailu a pak se přihlas." }); return; }
       if (appApi) appApi.login(email, password);
@@ -1210,8 +1640,11 @@ async function onProfileSubmit(e) {
   const slow = setTimeout(router, 2500);   // když web odpovídá pomalu, ukaž stránku i tak
   try { await Promise.all([loadJai(), loadMe()]); } catch (e) { console.error(e); }
   clearTimeout(slow);
-  sb.auth.onAuthStateChange(() => setTimeout(loadMe, 0));
+  sb.auth.onAuthStateChange(ev => { setTimeout(loadMe, 0); if (ev === "PASSWORD_RECOVERY") location.hash = "#/nove-heslo"; });
   setInterval(loadJai, 300000);
+  if (AUTH_TYPE === "recovery") { location.hash = "#/nove-heslo"; return; }
+  if (AUTH_TYPE === "signup" || AUTH_TYPE === "email_change") { location.hash = "#/ucet"; setTimeout(() => renderAccount({ ok: true, text: "E-mail potvrzen. Vítej na palubě!" }), 50); return; }
+  if (AUTH_ERROR) { location.hash = "#/ucet"; setTimeout(() => renderAccount({ ok: false, text: "Odkaz z e-mailu nefunguje: " + AUTH_ERROR }), 50); return; }
   router();
 })();
 </script>

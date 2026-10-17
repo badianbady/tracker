@@ -90,6 +90,20 @@ class Api:
         core.crew.set_auto(auto)
         return True
 
+    def crew_bid(self, flight_id, aircraft=None):
+        if not core.crew.linked:
+            return {"ok": False, "msg": "Nejdřív propoj crew center v záložce Tracker."}
+        ok, msg = core.crew.add_bid(flight_id, aircraft)
+        return {"ok": ok, "msg": msg}
+
+    def crew_unbid(self, flight_id):
+        ok, msg = core.crew.remove_bid(flight_id)
+        return {"ok": ok, "msg": msg}
+
+    def crew_refresh(self):
+        core.crew.refresh_bids()
+        return True
+
     def crew_file_last(self):
         lf = core.state.get("last_flight")
         if not lf:
