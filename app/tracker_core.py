@@ -367,7 +367,7 @@ class Cloud:
             code, res = self.request("GET", f"/rest/v1/profiles?id=eq.{self.user_id}&select=username,callsign")
         if code == 200 and res:
             self.profile = res[0]
-            cs = self.profile.get("callsign") or CALLSIGN
+            cs = self.profile.get("username") or CALLSIGN
             with lock:
                 state["callsign"] = cs
                 state["simbrief_user"] = self.profile.get("simbrief_user")
@@ -424,8 +424,11 @@ class Cloud:
         return self.request("POST", "/rest/v1/live?on_conflict=user_id", body, "resolution=merge-duplicates,return=minimal")
 
     def send_flight(self, flight):
-        code, res = self.request("POST", "/rest/v1/flights", flight, "return=minimal")
-        return code in (200, 201)
+        body = clean_flight(flight)
+        code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
+        if code in (200, 201):
+            return True, ""
+        return False, str((res or {}).get("message") or code)
 
 
 cloud = Cloud()
@@ -807,6 +810,40 @@ class Crew:
 crew = Crew()
 
 
+def clean_flight(flight):
+    """Hodnoty ohlídané tak, aby je databáze vždy přijala."""
+    body = {k: v for k, v in flight.items() if k not in ("local_id", "hold_until")}
+    clamp = lambda v, lo, hi: None if v is None else max(lo, min(hi, v))
+    body["distance_nm"] = clamp(body.get("distance_nm"), 0, 11999)
+    body["duration_min"] = clamp(body.get("duration_min"), 0, 1999)
+    body["g"] = clamp(body.get("g"), 0, 10)
+    body["fpm"] = clamp(body.get("fpm"), -6000, 0)
+    for key in ("path", "plan_fixes"):
+        pts = body.get(key)
+        if isinstance(pts, list):
+            pts = [p for p in pts if isinstance(p, list) and len(p) >= 2 and p[0] and p[1]]
+            while len(pts) > 2900:
+                pts = pts[:1] + pts[1:-1:2] + pts[-1:]
+            body[key] = pts
+    for key, n in (("rwy", 8), ("plan_arr", 8), ("plan_altn", 8), ("reg", 12), ("ac_icao", 12), ("va", 8), ("crew_status", 300)):
+        if isinstance(body.get(key), str):
+            body[key] = body[key][:n]
+    return body
+
+
+def unqueue_flight(local_id):
+    if not local_id or not os.path.exists(QUEUE_FILE):
+        return
+    try:
+        with open(QUEUE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        data = [fl for fl in data if fl.get("local_id") != local_id]
+        with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
 def queue_flight(flight):
     data = []
     try:
@@ -828,13 +865,15 @@ def flush_queue():
             data = json.load(f)
     except Exception:
         return
-    left = [fl for fl in data if not cloud.send_flight(fl)]
+    now_t = time.time()
+    left = [fl for fl in data if (fl.get("hold_until") or 0) > now_t or not cloud.send_flight(fl)[0]]
     if left:
         with open(QUEUE_FILE, "w", encoding="utf-8") as f:
             json.dump(left, f, ensure_ascii=False, indent=2)
     else:
         os.remove(QUEUE_FILE)
-        log(f"Odesláno {len(data)} dříve neodeslaných letů ✔")
+    if len(left) < len(data):
+        log(f"Odesláno {len(data) - len(left)} dříve neodeslaných letů ✔")
 
 
 def upload_loop():
@@ -910,7 +949,7 @@ def save_landing(rec):
 
 
 class FlightRecorder:
-    """Sleduje vzlet, uletěnou vzdálenost a přistání; po přistání vytvoří záznam letu."""
+    """Sleduje pojíždění, vzlet, let a přistání. Po dojetí na stání vytvoří a odešle záznam letu."""
 
     def __init__(self, touchdown_reader=None, upload=True):
         self.was_on_ground = None
@@ -918,6 +957,7 @@ class FlightRecorder:
         self.last_air_vs = 0.0
         self.recent_g = []
         self.pending = None
+        self.post = None              # dokončený let čekající na dojetí na stání
         self.last_landing_t = 0.0
         self.touchdown_reader = touchdown_reader
         self.upload = upload
@@ -925,12 +965,38 @@ class FlightRecorder:
         self.dist = 0.0
         self.last_pos = None
         self.ground_pos = None
-        self.path = []
+        self.path = []                # trasa letu (pojíždění + let + pojíždění)
+        self.pre_path = []            # pojíždění před vzletem
         self.last_pt_t = 0
         self.last_pt_hdg = None
+        self.stopped_since = None
 
+    # ---------- body trasy ----------
+    def _publish(self, pts):
+        with lock:
+            state["trail"] = list(pts)
+            state["trail_ver"] += 1
+
+    def _add_point(self, t, lat, lon, alt, hdg=None, target=None):
+        pts = self.path if target is None else target
+        if pts and haversine_nm(pts[-1][0], pts[-1][1], lat, lon) > 40:
+            pts.clear()               # skok o desítky mil = přesun letadla v simulátoru, starou trasu zahodit
+        pts.append([round(lat, 5), round(lon, 5), int(alt)])
+        if len(pts) > 2400:
+            pts[:] = pts[:1] + pts[1:-1:2] + pts[-1:]
+        self.last_pt_t = t
+        self.last_pt_hdg = hdg
+        self._publish(pts)
+
+    def _maybe_point(self, t, lat, lon, alt, hdg, every, turn_deg, target=None):
+        turned = self.last_pt_hdg is not None and abs((hdg - self.last_pt_hdg + 180) % 360 - 180) > turn_deg
+        if t - self.last_pt_t > every or (turned and t - self.last_pt_t > 2):
+            self._add_point(t, lat, lon, alt, hdg, target)
+
+    # ---------- hlavní smyčka ----------
     def update(self, t, on_ground, vs_fpm, g, info):
         lat, lon = info.get("lat", 0), info.get("lon", 0)
+        gs, hdg, alt = info.get("gs", 0), info.get("hdg", 0), info.get("alt", 0)
         if self.was_on_ground is None:
             self.was_on_ground = on_ground
             if not on_ground:
@@ -938,23 +1004,42 @@ class FlightRecorder:
                 self._start(t, lat, lon, known=False)
             return
 
-        if on_ground and info.get("gs", 99) < 5:
-            self.ground_pos = (lat, lon)
+        if on_ground:
+            if gs < 1:
+                self.stopped_since = self.stopped_since or t
+            else:
+                self.stopped_since = None
+            if gs < 5:
+                self.ground_pos = (lat, lon)
+            if self.post:
+                # pojíždění po přistání
+                if gs > 3:
+                    self._maybe_point(t, lat, lon, 0, hdg, 5, 20)
+                stopped = self.stopped_since and t - self.stopped_since > 30
+                if stopped or time.time() - self.post["t"] > 15 * 60:
+                    self.finalize(lat, lon)
+            elif not self.pending:
+                # pojíždění před vzletem
+                if gs > 3:
+                    self._maybe_point(t, lat, lon, 0, hdg, 5, 20, target=self.pre_path)
+                elif self.stopped_since and t - self.stopped_since > 600 and self.pre_path:
+                    self.pre_path = []          # dlouhé stání = začátek nového letu
+                    self._publish([])
+
         if not on_ground:
             if self.was_on_ground:
                 if self.pending:
                     self.pending["bounces"] += 1
                 self.air_since = t
                 if self.takeoff is None or self.takeoff.get("landed"):
+                    if self.post:
+                        self.finalize(lat, lon)  # vzlet znovu (např. touch-and-go) – předchozí let uzavřít
                     gp = self.ground_pos or (lat, lon)
                     self._start(t, gp[0], gp[1], known=True)
                     self.last_pos = (lat, lon)
             self.last_air_vs = vs_fpm
             self.recent_g.append((t, g))
-            hdg = info.get("hdg", 0)
-            turned = self.last_pt_hdg is not None and abs((hdg - self.last_pt_hdg + 180) % 360 - 180) > 8
-            if t - self.last_pt_t > 15 or (turned and t - self.last_pt_t > 3):
-                self._add_point(t, lat, lon, info.get("alt", 0), hdg)
+            self._maybe_point(t, lat, lon, alt, hdg, 15, 8)
             if self.last_pos:
                 step = haversine_nm(self.last_pos[0], self.last_pos[1], lat, lon)
                 if step < 5:
@@ -966,6 +1051,7 @@ class FlightRecorder:
                 gmax = max([gg for tt, gg in self.recent_g if t - tt < 0.6] + [g])
                 self.pending = {"t": t, "fpm": -abs(self.last_air_vs), "g": gmax, "info": dict(info), "bounces": 0}
                 self.last_landing_t = t
+                self._add_point(t, lat, lon, 0, hdg)
 
         if self.pending:
             self.pending["g"] = max(self.pending["g"], g)
@@ -975,29 +1061,50 @@ class FlightRecorder:
         self.recent_g = [(tt, gg) for tt, gg in self.recent_g if t - tt < 2]
         self.was_on_ground = on_ground
 
-    def _add_point(self, t, lat, lon, alt, hdg=None):
-        self.path.append([round(lat, 4), round(lon, 4), int(alt)])
-        if len(self.path) > 2400:
-            self.path = self.path[::2]
-        self.last_pt_t = t
-        self.last_pt_hdg = hdg
-        with lock:
-            state["trail"] = list(self.path)
-            state["trail_ver"] += 1
-
     def _start(self, t, lat, lon, known):
         ap = nearest_airport(lat, lon) if known else None
         self.takeoff = {"t": t, "iso": now_iso(), "icao": ap[0] if ap else None, "name": ap[1] if ap else None,
                         "landed": False, "fuel": state.get("fuel_lbs")}
         self.dist = 0.0
         self.last_pos = (lat, lon)
-        self.path = []
+        self.path = list(self.pre_path) if known else []
+        self.pre_path = []
         self.last_pt_hdg = None
         self._add_point(t, lat, lon, 0)
         with lock:
             state["dep"] = {"icao": self.takeoff["icao"], "iso": self.takeoff["iso"] if known else None}
         if known:
             log(f"🛫 Vzlet{' z ' + ap[0] if ap else ''}")
+
+    def finalize(self, lat=None, lon=None):
+        """Uzavře dokončený let (po dojetí na stání, novém vzletu nebo odpojení simulátoru) a odešle ho."""
+        post, self.post = self.post, None
+        if not post:
+            return
+        flight = post["flight"]
+        path = list(self.path)
+        if lat is not None and lon is not None and lat and lon:
+            path.append([round(lat, 5), round(lon, 5), 0])
+        while len(path) > 2900:
+            path = path[:1] + path[1:-1:2] + path[-1:]
+        flight["path"] = path
+        self.path = []
+        self._publish([])
+        if not self.upload:
+            return
+        unqueue_flight(flight.get("local_id"))
+        fuel_used = post["fuel_lbs"]
+
+        def send():
+            if crew.linked and crew.auto:
+                flight["crew_status"] = crew.file_flight(flight, fuel_used)
+            ok, msg = cloud.send_flight(flight) if state["online"] else (False, "nepřihlášen")
+            if ok:
+                log("   Let uložen na web ✔")
+            else:
+                queue_flight(flight)
+                log(f"   Let se nepodařilo uložit ({msg}), zkusím to znovu později.")
+        threading.Thread(target=send, daemon=True).start()
 
     def _finish(self, now_info=None):
         p, self.pending = self.pending, None
@@ -1041,8 +1148,6 @@ class FlightRecorder:
         with lock:
             state["landing"] = rec
             state["dep"] = None
-            state["trail"] = []
-            state["trail_ver"] += 1
             callsign = state["callsign"]
         save_landing(rec)
         log(f"🛬 PŘISTÁNÍ{' v ' + ap[0] if ap else ''}: {fpm} fpm | {g} G | {score}/10 – {rec['hodnoceni']}")
@@ -1059,7 +1164,7 @@ class FlightRecorder:
             "duration_min": round(max(0, p["t"] - to["t"]) / 60, 1),
             "distance_nm": round(self.dist, 1),
             "fpm": max(-6000, min(0, fpm)), "g": min(10, g), "score": score,
-            "path": self.path + [[round(info.get("lat", 0), 4), round(info.get("lon", 0), 4), 0]],
+            "path": None,
             "td_lat": round(info.get("lat", 0), 6), "td_lon": round(info.get("lon", 0), 6),
             "td_ias": round(info.get("ias", 0)), "td_gs": round(info.get("gs", 0)), "td_hdg": round(hdg) % 360,
             "wind_dir": None if info.get("wind_dir") is None else round(info["wind_dir"]) % 360,
@@ -1079,20 +1184,11 @@ class FlightRecorder:
             flight["callsign"] = plan["callsign"]
         with lock:
             state["last_flight"] = {"flight": flight, "fuel_lbs": fuel_used, "crew": None}
-        if self.upload and state["online"]:
-            def send():
-                if crew.linked and crew.auto:
-                    flight["crew_status"] = crew.file_flight(flight, fuel_used)
-                if cloud.send_flight(flight):
-                    log("   Let uložen na web ✔")
-                else:
-                    queue_flight(flight)
-                    log("   Web nedostupný, let se odešle později.")
-            threading.Thread(target=send, daemon=True).start()
-        elif self.upload:
-            queue_flight(flight)
-
-
+        # let se uloží až po dojetí na stání (aby obsahoval i pojíždění); pojistka pro případ zavření aplikace:
+        flight["local_id"] = rec["id"]
+        if self.upload:
+            queue_flight(dict(flight, hold_until=time.time() + 16 * 60))
+        self.post = {"flight": flight, "fuel_lbs": fuel_used, "t": time.time()}
 def phase_of(on_ground, vs, agl, gs):
     if on_ground:
         return "Na zemi" if gs < 40 else "Rozjezd"
@@ -1179,8 +1275,11 @@ def sim_loop():
                 hdg = aq.get("PLANE_HEADING_DEGREES_TRUE") or 0
                 if abs(hdg) <= 2 * math.pi + 0.01:
                     hdg = math.degrees(hdg)
-                lat = aq.get("PLANE_LATITUDE") or 0
-                lon = aq.get("PLANE_LONGITUDE") or 0
+                lat = aq.get("PLANE_LATITUDE")
+                lon = aq.get("PLANE_LONGITUDE")
+                if lat is None or lon is None or (abs(lat) < 0.01 and abs(lon) < 0.01) or lat == 0 or lon == 0:
+                    time.sleep(0.1)       # simulátor se načítá nebo neposlal polohu – vzorek přeskočit
+                    continue
                 if t - title_t > 10:
                     raw = aq.get("TITLE")
                     if isinstance(raw, bytes):
@@ -1218,6 +1317,8 @@ def sim_loop():
             if "Did not find" not in str(e):
                 log("Spojení s MSFS přerušeno:", e)
                 waiting_logged = False
+            if rec is not None and rec.post:
+                rec.finalize()
             time.sleep(5)
 
 

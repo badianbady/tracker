@@ -67,8 +67,12 @@ class App:
     def _header(self):
         c = tk.Canvas(self.root, height=72, bg=GREEN, highlightthickness=0)
         c.pack(fill="x")
-        c.create_oval(18, 14, 62, 58, outline="white", width=4)
-        c.create_text(41, 37, text="J", fill="white", font=(FONT, 20, "bold"))
+        # logo radar
+        c.create_oval(18, 14, 62, 58, outline="white", width=3)
+        c.create_oval(27, 23, 53, 49, outline="#BFE8C9", width=2)
+        c.create_oval(34, 30, 48, 44, outline="#8FD3A1", width=2)
+        c.create_line(40, 36, 55, 21, fill="white", width=3, capstyle="round")
+        c.create_oval(37, 33, 43, 39, fill="white", outline="")
         c.create_text(76, 28, text="Jáchym Air Tracker", fill="white", font=(FONT, 16, "bold"), anchor="w")
         c.create_text(76, 50, text=f"verze {core.VERSION}", fill="#CFEFD6", font=(FONT, 9), anchor="w")
 

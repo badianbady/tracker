@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JAI Tracker</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%231E9B36'/%3E%3Ccircle cx='32' cy='32' r='23' fill='none' stroke='white' stroke-width='5'/%3E%3Ctext x='32.5' y='44' text-anchor='middle' font-family='Arial' font-weight='700' font-size='30' fill='white'%3EJ%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22%3E%3Crect width=%22120%22 height=%22120%22 rx=%2228%22 fill=%22#1E9B36%22/%3E%3Cg transform=%22translate(15 15) scale(.9)%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%226%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2229%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%223.5%22 opacity=%22.55%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2214%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%223.5%22 opacity=%22.35%22/%3E%3Cpath d=%22M50 50 L50 9 A41 41 0 0 1 79 21 Z%22 fill=%22#fff%22 opacity=%22.28%22/%3E%3Cpath d=%22M50 50 L79 21%22 stroke=%22#fff%22 stroke-width=%225%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%225%22 fill=%22#fff%22/%3E%3Cg transform=%22translate(58 52) scale(.95) rotate(35 12 12)%22%3E%3Cpath d=%22M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z%22 fill=%22#fff%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -339,7 +339,7 @@
 <body>
 <header>
   <a class="brand" href="#/">
-    <svg width="36" height="36" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="27" fill="none" stroke="#fff" stroke-width="5"/><text x="32.5" y="44.5" text-anchor="middle" font-family="Saira Semi Condensed, Arial" font-weight="800" font-size="34" fill="#fff">J</text></svg>
+    <svg width="38" height="38" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="6"/><circle cx="50" cy="50" r="29" fill="none" stroke="#fff" stroke-width="3.5" opacity=".55"/><circle cx="50" cy="50" r="14" fill="none" stroke="#fff" stroke-width="3.5" opacity=".35"/><path d="M50 50 L50 9 A41 41 0 0 1 79 21 Z" fill="#fff" opacity=".28"/><path d="M50 50 L79 21" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="50" cy="50" r="5" fill="#fff"/><g transform="translate(58 52) scale(.95) rotate(35 12 12)"><path d="M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z" fill="#fff"/></g></svg>
     <span id="appName">JAI Tracker</span>
   </a>
   <a class="app-pill" id="appPill" href="#/tracker"><i class="led"></i><span id="appPillText">Tracker</span></a>
@@ -702,10 +702,14 @@ function altColor(alt) {
   return "rgb(168,85,247)";
 }
 // nakreslí trasu obarvenou podle výšky (jako Flightradar24)
+const okPt = p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) && p[0] !== 0 && p[1] !== 0 && Math.abs(p[0]) <= 90 && Math.abs(p[1]) <= 180;
+const kmBetween = (a, b) => { const r = Math.PI / 180, x = (b[1] - a[1]) * r * Math.cos((a[0] + b[0]) / 2 * r), y = (b[0] - a[0]) * r; return Math.hypot(x, y) * 6371; };
 function drawAltTrail(group, pts, weight, renderer) {
   group.clearLayers();
+  pts = (pts || []).filter(okPt);
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i];
+    if (kmBetween(a, b) > 250) continue;        // skok (přesun v simulátoru) – nekreslit
     L.polyline([[a[0], a[1]], [b[0], b[1]]], { color: altColor(((a[2] || 0) + (b[2] || 0)) / 2), weight, opacity: .95, lineCap: "round", renderer }).addTo(group);
   }
 }
@@ -763,7 +767,9 @@ function initMap() {
     maxZoom: 19, attribution: "Tiles &copy; Esri, Maxar, Earthstar Geographics"
   });
   apRenderer = L.canvas({ padding: 0.3 });
-  trailRenderer = L.canvas({ padding: 0.5 });
+  const tp = map.createPane("trasy");          // čáry letů pod letišti a bez zachytávání kliknutí
+  tp.style.zIndex = 390; tp.style.pointerEvents = "none";
+  trailRenderer = L.canvas({ padding: 0.5, pane: "trasy" });
   const legend = L.control({ position: "bottomright" });
   legend.onAdd = () => { const d = L.DomUtil.create("div", "alt-legend");
     d.innerHTML = 'Výška trasy (ft)<div class="bar"></div><div class="ticks"><span>0</span><span>10k</span><span>20k</span><span>30k</span><span>40k</span></div>'; return d; };
@@ -778,7 +784,7 @@ function initMap() {
     b.onclick = () => { map.closePopup(); location.hash = "#/linka/" + encodeURIComponent(b.dataset.route); };
   }));
   focusLayer = L.layerGroup().addTo(map);
-  const zoomCls = () => { map.getContainer().classList.toggle("zoom-low", map.getZoom() < 11); map.getContainer().classList.toggle("wp-hide", map.getZoom() < 6); };
+  const zoomCls = () => { map.getContainer().classList.toggle("zoom-low", map.getZoom() < 9); map.getContainer().classList.toggle("wp-hide", map.getZoom() < 6); };
   map.on("zoomend", zoomCls); zoomCls();
   airportsReady.then(() => { drawAirports(); renderHighlights(); });
   routesReady.then(drawAirports);
@@ -1037,13 +1043,13 @@ function renderLive() {
   const seen = new Set();
   const w = settings.trail;
   for (const r of liveRows) {
-    if (r.lat == null || r.lon == null) continue;
+    if (!okPt([r.lat, r.lon])) continue;
     const isJai = r.va === "JAI";
     const sel = focus?.type === "live" && focus.id === r.user_id;
     const cat = acCategory(r.ac_icao || r.plan?.aircraft, r.aircraft);
     seen.add(r.user_id);
     // plánovaná trasa + body
-    const fixes = focus?.type === "flight" ? [] : Array.isArray(r.plan?.fixes) ? r.plan.fixes : [];
+    const fixes = focus?.type === "flight" ? [] : Array.isArray(r.plan?.fixes) ? r.plan.fixes.filter(okPt) : [];
     let pl = planLines.get(r.user_id);
     if (fixes.length > 1) {
       const st = { color: isJai ? "#1E9B36" : "#66788A", weight: Math.max(2, w * 0.45), opacity: sel ? .95 : .65, dashArray: "6 7", interactive: false };
@@ -1223,8 +1229,18 @@ async function getPhoto(reg) {
   const own = ownPhotos.get(key.replace(/-/g, ""));
   if (own) return { src: own, link: "https://crew.jachymair.com", photographer: "Jáchym Air" };
   if (!photoCache.has(key)) {
+    const direct = async () => {        // záloha: zeptat se Planespotters přímo z prohlížeče
+      for (const v of key.includes("-") ? [key] : [key, key.slice(0, 2) + "-" + key.slice(2), key.slice(0, 1) + "-" + key.slice(1)]) {
+        try {
+          const r = await fetch(`https://api.planespotters.net/pub/photos/reg/${encodeURIComponent(v)}`);
+          const p = r.ok ? (await r.json())?.photos?.[0] : null;
+          if (p) return { src: p.thumbnail_large?.src || p.thumbnail?.src, link: p.link, photographer: p.photographer };
+        } catch { /* bez CORS nebo offline */ }
+      }
+      return null;
+    };
     photoCache.set(key, fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?reg=${encodeURIComponent(key)}`, { headers: { apikey: CFG.SUPABASE_KEY } })
-      .then(r => r.ok ? r.json() : null).then(d => d?.photo || null).catch(() => null));
+      .then(r => r.ok ? r.json() : null).then(d => d?.photo || direct()).catch(direct));
   }
   return photoCache.get(key);
 }
@@ -1818,7 +1834,7 @@ async function renderAdminPhotos() {
     try {
       const blob = await shrinkImage(file, 1600);
       const path = `${reg.replace(/[^A-Za-z0-9-]/g, "")}/${Date.now()}.jpg`;
-      const { error } = await sb.storage.from("aircraft").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+      const { error } = await sb.storage.from("aircraft").upload(path, blob, { contentType: "image/jpeg", upsert: false });
       if (error) throw error;
       const url = sb.storage.from("aircraft").getPublicUrl(path).data.publicUrl;
       const { error: e2 } = await sb.from("aircraft_photos").upsert({ registration: reg.toUpperCase(), url, updated_at: new Date().toISOString() });
@@ -1901,8 +1917,7 @@ function renderAccount(msg) {
       ${msgHtml}
       <form class="card" id="authForm">
         ${authMode === "register" ? `
-        <div class="field"><label for="fUser">Uživatelské jméno</label><input id="fUser" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}" autocomplete="username"><small>3–20 znaků, písmena bez diakritiky, čísla, _ . -</small></div>
-        <div class="field"><label for="fCs">Volací znak (nepovinné)</label><input id="fCs" maxlength="12" placeholder="např. JAI101"></div>` : ""}
+        <div class="field"><label for="fUser">Uživatelské jméno</label><input id="fUser" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}" autocomplete="username"><small>3–20 znaků, písmena bez diakritiky, čísla, _ . -</small></div>` : ""}
         <div class="field"><label for="fEmail">E-mail</label><input id="fEmail" type="email" required autocomplete="email"></div>
         <div class="field"><label for="fPass">Heslo</label><input id="fPass" type="password" required minlength="8" autocomplete="${authMode === "login" ? "current-password" : "new-password"}">${authMode === "register" ? "<small>Aspoň 8 znaků</small>" : ""}</div>
         <button class="btn" style="width:100%">${authMode === "login" ? "Přihlásit se" : "Vytvořit účet"}</button>
@@ -1926,7 +1941,6 @@ function renderAccount(msg) {
         <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">${avatar(p, jaiSet.has(me.user.id)).replace('class="av', 'style="width:72px;height:72px;font-size:26px" class="av')}
           <div class="field" style="margin:0"><label for="fAv">Profilový obrázek</label><input id="fAv" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><small>Max. 2 MB</small></div></div>
         <div class="field"><label for="pUser">Uživatelské jméno</label><input id="pUser" value="${esc(p.username)}" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}"></div>
-        <div class="field"><label for="pCs">Volací znak</label><input id="pCs" value="${esc(p.callsign || "")}" maxlength="12"></div>
         <div class="field"><label for="pStream">Odkaz na tvůj stream (nepovinné)</label><input id="pStream" type="url" value="${esc(p.stream_url || "")}" placeholder="https://www.twitch.tv/… nebo https://www.youtube.com/@…"><small>Twitch, YouTube nebo Kick. Na mapě se u tebe objeví tlačítko „Sledovat stream“.</small></div>
         <div class="field"><label for="pVa">Moje virtuálka</label><select id="pVa"><option value="">Žádná</option>${vaList.filter(v => v.code !== "JAI").map(v => `<option value="${esc(v.code)}" ${p.va_default === v.code ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select>
           <small>Zobrazí se u tvých letů. Jáchym Air se zapíná sám u rezervovaných linek.</small></div>
@@ -1994,10 +2008,10 @@ async function onAuthSubmit(e) {
       if (appApi && !appState?.online) appApi.login(email, password);
       await loadMe(); location.hash = "#/ucet"; renderAccount({ ok: true, text: "Jsi přihlášen. Vítej zpět!" });
     } else {
-      const username = $("fUser").value.trim(), callsign = $("fCs").value.trim().toUpperCase();
+      const username = $("fUser").value.trim();
       const { data: taken } = await sb.from("profiles").select("id").ilike("username", username.replace(/[_%\\]/g, m => "\\" + m)).limit(1);
       if (taken?.length) throw new Error("Toto uživatelské jméno už někdo má.");
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username, callsign }, emailRedirectTo: BASE_URL } });
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { username }, emailRedirectTo: BASE_URL } });
       if (error) throw new Error(error.message);
       if (!data.session) { authMode = "login"; renderAccount({ ok: true, text: "Účet vytvořen. Potvrď ho odkazem v e-mailu a pak se přihlas." }); return; }
       if (appApi) appApi.login(email, password);
@@ -2014,13 +2028,13 @@ async function onProfileSubmit(e) {
     if (stream && !/^https:\/\/(www\.|m\.)?(twitch\.tv|youtube\.com|youtu\.be|kick\.com)\//.test(stream)) throw new Error("Odkaz na stream musí vést na Twitch, YouTube nebo Kick (začínat https://).");
     const sbUser = $("pSb").value.trim();
     if (sbUser && !/^[A-Za-z0-9_.@-]{1,40}$/.test(sbUser)) throw new Error("Jméno ze SimBriefu obsahuje nepovolené znaky.");
-    const upd = { username: $("pUser").value.trim(), callsign: $("pCs").value.trim().toUpperCase() || null, stream_url: stream || null, simbrief_user: sbUser || null, va_default: $("pVa").value || null };
+    const upd = { username: $("pUser").value.trim(), stream_url: stream || null, simbrief_user: sbUser || null, va_default: $("pVa").value || null };
     const file = $("fAv").files[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) throw new Error("Obrázek je větší než 2 MB.");
       const ext = (file.name.split(".").pop() || "png").toLowerCase();
       const path = `${me.user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: true, contentType: file.type });
+      const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: false, contentType: file.type });
       if (upErr) throw new Error(upErr.message);
       upd.avatar_url = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl;
     }
