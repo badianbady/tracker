@@ -104,6 +104,7 @@ state = {
     "reg": None,
     "ac_model": None,
     "va_choice": None,
+    "reg_override": None,
     "plan_ver": 0,
     "simbrief_user": None,
     "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None, "bids": []},
@@ -411,7 +412,7 @@ class Cloud:
             "lat": s["lat"], "lon": s["lon"], "alt": s["alt"], "gs": s["gs"], "hdg": s["hdg"],
             "vs": s["vs"], "phase": s["phase"], "dep_icao": (s.get("dep") or {}).get("icao"),
         }
-        body["reg"] = s.get("reg") or ((s.get("plan") or {}).get("reg"))
+        body["reg"] = current_reg(s)
         body["ac_icao"] = ((s.get("plan") or {}).get("aircraft") or s.get("ac_model") or None)
         body["va"] = current_va(s)
         body["takeoff_at"] = (s.get("dep") or {}).get("iso")
@@ -444,6 +445,15 @@ def load_settings():
             d = json.load(f)
         with lock:
             state["va_choice"] = d.get("va")
+            state["reg_override"] = d.get("reg")
+    except Exception:
+        pass
+
+
+def _save_settings():
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override")}, f)
     except Exception:
         pass
 
@@ -454,11 +464,19 @@ def set_va(code):
         code = None       # JAI se zapíná samo podle rezervace v crew centru
     with lock:
         state["va_choice"] = code
-    try:
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"va": code}, f)
-    except Exception:
-        pass
+    _save_settings()
+
+
+def current_reg(s):
+    """Registrace: ručně zadaná > ze SimBriefu > ze simulátoru (livery často mají vymyšlenou)."""
+    return s.get("reg_override") or (s.get("plan") or {}).get("reg") or s.get("reg") or None
+
+
+def set_reg(reg):
+    reg = "".join(ch for ch in str(reg or "").upper() if ch.isalnum() or ch == "-")[:12] or None
+    with lock:
+        state["reg_override"] = reg
+    _save_settings()
 
 
 def current_va(s, dep=None):
@@ -1176,7 +1194,7 @@ class FlightRecorder:
             "route": plan and (plan.get("route") or "")[:2000],
             "sched_off": plan and plan.get("sched_off"), "sched_on": plan and plan.get("sched_on"),
             "plan_fixes": plan and plan.get("fixes"),
-            "reg": ((plan or {}).get("reg") or state.get("reg") or None),
+            "reg": current_reg(state),
             "ac_icao": ((plan or {}).get("aircraft") or state.get("ac_model") or None),
             "va": current_va(state, dep=to.get("icao")),
         }

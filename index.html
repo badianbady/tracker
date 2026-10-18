@@ -118,9 +118,11 @@
   .tr-landing .info { padding: 16px 22px; align-self: center; }
   .tr-log { font-size: 13px; max-height: 220px; overflow-y: auto; white-space: pre-wrap; color: var(--muted); }
   .upd-banner { background: #FEF3C7; color: #78350F; border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; font-weight: 600; }
-  .td-pin { width: 30px; height: 30px; border-radius: 9px 9px 9px 2px; display: grid; place-items: center; color: #fff;
-            font: 800 13px var(--display); border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); transform: rotate(-45deg); }
-  .td-pin span { transform: rotate(45deg); }
+  .td-pin { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); white-space: nowrap; color: #fff;
+            font: 800 13px var(--display); padding: 3px 8px 4px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); line-height: 1.1; }
+  .td-pin small { font-weight: 600; font-size: 10px; opacity: .9; margin-left: 2px; }
+  .td-pin::after { content: ""; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #fff; }
+  .td-dot { position: absolute; left: 50%; bottom: -3px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; border: 2px solid #fff; }
   .td-ic { background: none; border: 0; }
   .zoom-low .td-ic:not(.td-focus) { display: none; }
   .lcard { min-width: 260px; font-family: var(--body); }
@@ -488,6 +490,10 @@ function renderTracker(full) {
           <div class="tr-row"><span>MSFS</span><b id="trSim"></b></div>
           <div class="tr-row"><span>Fáze letu</span><b id="trPhase"></b></div>
           <div class="tr-row"><span>Létám pro</span><b id="trVaNow"></b></div>
+          <div class="tr-row"><span>Registrace</span><b id="trRegNow"></b></div>
+          <div class="field" style="margin:12px 0 0"><label for="trReg">Vlastní registrace (nepovinné)</label>
+            <div style="display:flex;gap:8px"><input id="trReg" maxlength="12" value="${esc(s.reg_override || "")}" placeholder="např. D-AIHW"><button class="btn ghost" id="trRegSave" type="button">Uložit</button></div>
+            <small>Když ji nevyplníš, použije se registrace ze SimBriefu, jinak ze simulátoru.</small></div>
           <div class="field" style="margin:12px 0 0"><label for="trVa">Moje virtuálka (mimo linky Jáchym Air)</label>
             <select id="trVa"><option value="">Žádná / vlastní lety</option>${vaList.filter(v => v.code !== "JAI").map(v => `<option value="${esc(v.code)}" ${s.va_choice === v.code ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select>
             <small>Zelené letadlo Jáchym Air se zapne samo, když letíš linku rezervovanou v crew centru.</small></div>
@@ -547,6 +553,7 @@ function renderTracker(full) {
       </div>
       <h2 class="section-title" style="margin-top:24px">Události</h2>
       <div class="card tr-log" id="trLog"></div>`;
+    $("trRegSave").onclick = async () => { await appApi.set_reg($("trReg").value.trim()); appState = await appApi.get_state(); renderTracker(false); $("trRegSave").textContent = "Uloženo ✔"; setTimeout(() => $("trRegSave") && ($("trRegSave").textContent = "Uložit"), 1500); };
     $("trVa").onchange = async e => { await appApi.set_va(e.target.value); appState = await appApi.get_state(); };
     if (!s.va_choice && me?.profile?.va_default && !renderTracker.vaInit) { renderTracker.vaInit = true; appApi.set_va(me.profile.va_default); }
     const obs = Object.assign({ styl: "klasik", pos: "", color: "#1E9B36", scale: 100 }, settings.obs || {});
@@ -608,6 +615,7 @@ function renderTracker(full) {
   $("trWeb").textContent = s.online ? `✔ ${s.username || "Přihlášen"} · ${s.callsign}` : (s.web_status || "Nepřihlášen");
   $("trWeb").className = s.online ? "ok" : "warn";
   $("trSim").textContent = s.connected ? "✔ Připojeno" : s.status; $("trSim").className = s.connected ? "ok" : "warn";
+  $("trRegNow").textContent = s.reg_now || "–";
   $("trVaNow").textContent = s.va_now === "JAI" ? "Jáchym Air (rezervovaná linka) ✔" : s.va_now ? vaName(s.va_now) : "–";
   $("trPhase").textContent = s.connected ? s.phase + (s.dep?.icao ? ` · z ${s.dep.icao}` : "") : "–";
   $("trAlt").textContent = s.connected ? nf.format(s.alt) : "–";
@@ -1002,19 +1010,19 @@ function landingCardHtml(f) {
     <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
     ${f.id && !(focus?.type === "flight" && focus.id === f.id) ? `<a href="#/let/${f.id}" style="display:inline-block;margin-top:8px;font-weight:700">Detail letu →</a>` : ""}</div>`;
 }
-function tdIcon(score, keep) {
+function tdIcon(score, keep, fpm) {
   const col = score >= 8 ? "#1E9B36" : score >= 6 ? "#8A9A18" : score >= 3 ? "#C2410C" : "#B91C1C";
-  return L.divIcon({ className: "td-ic" + (keep ? " td-focus" : ""), iconSize: [30, 30], iconAnchor: [4, 28], popupAnchor: [10, -26],
-    html: `<div class="td-pin" style="background:${col}"><span>${fmt1(score)}</span></div>` });
+  return L.divIcon({ className: "td-ic" + (keep ? " td-focus" : ""), iconSize: [0, 0], iconAnchor: [0, 0], popupAnchor: [0, -34],
+    html: `<div class="td-pin" style="background:${col}">${fpm != null ? nf.format(fpm) + "<small>fpm</small>" : fmt1(score)}</div><div class="td-dot" style="background:${col}"></div>` });
 }
-const TD_FIELDS = "id, user_id, callsign, arr_icao, score, fpm, g, td_lat, td_lon, td_ias, td_gs, wind_dir, wind_kt, headwind, crosswind, bounces, rwy, rwy_dist_m, rwy_offset_m, landed_at, profiles(username)";
+const TD_FIELDS = "id, user_id, callsign, arr_icao, score, fpm, g, td_lat, td_lon, td_ias, td_gs, wind_dir, wind_kt, headwind, crosswind, bounces, rwy, rwy_dist_m, rwy_offset_m, landed_at, profiles!flights_user_id_fkey(username)";
 async function refreshTouchdowns() {
   if (!tdLayer) return;
   const { data, error } = await sb.from("flights").select(TD_FIELDS).not("td_lat", "is", null)
     .gte("landed_at", new Date(Date.now() - 48 * 3600e3).toISOString()).order("landed_at", { ascending: false }).limit(150);
   if (error) return;
   tdLayer.clearLayers();
-  for (const f of data || []) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(tdLayer);
+  for (const f of data || []) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, false, f.fpm) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(tdLayer);
 }
 
 function verdictOf(s) {
@@ -1029,7 +1037,7 @@ function landingToast(f) {
   setTimeout(() => t.remove(), 15000);
 }
 async function refreshRecent() {
-  const { data } = await sb.from("flights").select("id, user_id, callsign, arr_icao, score, fpm, g, landed_at, profiles(username)")
+  const { data } = await sb.from("flights").select("id, user_id, callsign, arr_icao, score, fpm, g, landed_at, profiles!flights_user_id_fkey(username)")
     .order("landed_at", { ascending: false }).limit(6);
   if (data?.length) {
     if (lastFlightId !== null) data.filter(f => f.id > lastFlightId).reverse().forEach(landingToast);
@@ -1066,9 +1074,11 @@ function renderLive() {
     const isJai = r.va === "JAI";
     const sel = focus?.type === "live" && focus.id === r.user_id;
     const cat = acCategory(r.ac_icao || r.plan?.aircraft, r.aircraft);
+    const mine = !!me && r.user_id === me.user.id;
+    const showTrack = (mine || sel) && focus?.type !== "flight" && focus?.type !== "route";   // trasy jen mého letu a vybraného letadla
     seen.add(r.user_id);
     // plánovaná trasa + body
-    const fixes = focus?.type === "flight" ? [] : Array.isArray(r.plan?.fixes) ? r.plan.fixes.filter(okPt) : [];
+    const fixes = !showTrack ? [] : Array.isArray(r.plan?.fixes) ? r.plan.fixes.filter(okPt) : [];
     let pl = planLines.get(r.user_id);
     if (fixes.length > 1) {
       const st = { color: isJai ? "#1E9B36" : "#66788A", weight: Math.max(2, w * 0.45), opacity: sel ? .95 : .65, dashArray: "6 7", interactive: false };
@@ -1083,7 +1093,7 @@ function renderLive() {
       const wp = wpLayers.get(r.user_id); if (wp) { map.removeLayer(wp.group); wpLayers.delete(r.user_id); }
     }
     // uletěná trasa podle výšky
-    const pts = Array.isArray(r.trail) ? r.trail.slice() : [];
+    const pts = showTrack && Array.isArray(r.trail) ? r.trail.slice() : [];
     if (pts.length) pts.push([r.lat, r.lon, r.alt || 0]);
     let tr = trails.get(r.user_id);
     if (pts.length > 1) {
@@ -1099,7 +1109,9 @@ function renderLive() {
     } else {
       m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai, sel, cat));
     }
-    m.unbindTooltip().bindTooltip(`<b>${esc(r.callsign || r.profiles?.username)}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : ""}`, { direction: "top", offset: [0, -14] });
+    m.unbindTooltip().bindTooltip(`<b style="font-size:14px">${esc(r.callsign || r.profiles?.username)}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : ""}
+      <br>${esc(r.ac_icao || (r.aircraft || "").slice(0, 30))}${r.reg || r.plan?.reg ? " · " + esc(r.reg || r.plan.reg) : ""}
+      <br>${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${(r.vs > 0 ? "+" : "") + nf.format(r.vs || 0)} fpm<br><span class="muted">${esc(r.phase || "")}</span>`, { direction: "top", offset: [0, -14] });
   }
   for (const [id, m] of markers) if (!seen.has(id)) { map.removeLayer(m); markers.delete(id); }
   for (const [id, t] of trails) if (!seen.has(id)) { map.removeLayer(t); trails.delete(id); }
@@ -1234,6 +1246,18 @@ function delayHtml(sched, actual) {
   if (m < 0) return `<span class="dly ok">${-m} min dříve</span>`;
   return `<span class="dly ${m > 15 ? "bad" : "warn"}">+${m} min</span>`;
 }
+const pilotPhotoCache = new Map();
+const regKey = r => String(r || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function pilotPhoto(userId, keys) {
+  if (!userId || !sb) return null;
+  if (!pilotPhotoCache.has(userId)) {
+    pilotPhotoCache.set(userId, sb.from("pilot_aircraft_photos").select("registration, url").eq("user_id", userId)
+      .then(({ data }) => new Map((data || []).map(p => [regKey(p.registration), p.url]))).catch(() => new Map()));
+  }
+  const m = await pilotPhotoCache.get(userId);
+  for (const k of keys) if (k && m.get(regKey(k))) return m.get(regKey(k));
+  return null;
+}
 let ownPhotos = new Map();
 async function loadOwnPhotos() {
   if (!sb) return;
@@ -1267,11 +1291,11 @@ function photoPlaceholder(ac) {
   return `<div style="text-align:center"><svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" opacity=".35"><path d="${PLANE}"/></svg>
     <div style="font-size:13px">${esc(ac || "Fotka letadla není k dispozici")}</div></div>`;
 }
-function loadPhotoInto(reg, ac) {
+function loadPhotoInto(reg, ac, userId) {
   const box = $("fpPhoto"); if (!box) return;
   box.dataset.reg = reg || "";
   const typeKey = String(ac || "").toUpperCase().match(/^[A-Z0-9]{2,4}$/)?.[0];
-  getPhoto(reg).then(async p => {
+  pilotPhoto(userId, [reg, typeKey]).then(u => u ? { src: u, link: u, photographer: "vlastní fotka pilota" } : getPhoto(reg)).then(async p => {
     if (!p?.src && typeKey) { await ownPhotosReady; const u = ownPhotos.get(typeKey); if (u) p = { src: u, link: "https://crew.jachymair.com", photographer: "Jáchym Air · ilustrační foto typu" }; }
     const b = $("fpPhoto"); if (!b || b.dataset.reg !== (reg || "")) return;
     b.innerHTML = p?.src ? `<img src="${esc(p.src)}" alt="Fotka letadla ${esc(reg)}">
@@ -1290,8 +1314,8 @@ async function openFocus(parts) {
   }
   const id = Number(parts[1]);
   $("flightPanel").innerHTML = '<div class="empty">Načítám let…</div>';
-  const { data: f } = await sb.from("flights").select("*, profiles(username, avatar_url, stream_url)").eq("id", id).maybeSingle();
-  if (!f) { $("flightPanel").innerHTML = '<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">Let nenalezen.</div>'; $("fpBack").onclick = closeFocus; return; }
+  const { data: f, error: fErr } = await sb.from("flights").select("*, profiles!flights_user_id_fkey(username, avatar_url, stream_url)").eq("id", id).maybeSingle();
+  if (!f) { $("flightPanel").innerHTML = `<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">${fErr ? "Let se nepodařilo načíst: " + esc(fErr.message) : "Let nenalezen. Možná byl smazán."}</div>`; $("fpBack").onclick = closeFocus; return; }
   focus = { type: "flight", id, data: f };
   renderLive();
   redrawFocus(true);
@@ -1308,7 +1332,7 @@ function redrawFocus(fit) {
   }
   const pts = Array.isArray(f.path) ? f.path : [];
   if (pts.length > 1) drawAltTrail(L.layerGroup().addTo(focusLayer), pts, settings.trail + 1, trailRenderer);
-  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
+  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true, f.fpm), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
   if (pts.length) L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(focusLayer);
   if (fit) {
     const all = pts.map(p => [p[0], p[1]]).concat(fixes.map(x => [x[0], x[1]]));
@@ -1354,6 +1378,7 @@ function renderFlightPanel() {
   el.innerHTML = `
     <div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button>${live ? '<span class="live-dot">Živě</span>' : `<span class="muted" style="font-size:13px">${fmtDate(d.landed_at)}</span>`}</div>
     <div class="fp-photo" id="fpPhoto">${keepPhoto ?? photoPlaceholder(d.ac || d.aircraft)}</div>
+    ${me && me.user.id === d.user_id ? `<div style="padding:6px 16px 0;text-align:right"><label class="link-btn" style="cursor:pointer;font-size:13px">📷 Nahrát vlastní fotku letadla<input type="file" id="fpMyPhoto" accept="image/png,image/jpeg,image/webp" style="display:none"></label></div>` : ""}
     <div class="fp-id"><div class="fp-cs">${esc(d.callsign || d.profiles?.username || "")}</div>
       <div class="muted"><a href="#/pilot/${encodeURIComponent(d.profiles?.username || "")}">${esc(d.profiles?.username || "")}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}
       · ${esc([d.ac, d.reg].filter(Boolean).join(" · ") || (d.aircraft || "").slice(0, 40))}</div>
@@ -1390,7 +1415,22 @@ function renderFlightPanel() {
     if (error) { alert("Let se nepodařilo smazat: " + error.message); return; }
     lastFlightId = null; closeFocus(); refreshRecent(); refreshTouchdowns();
   };
-  if (keepPhoto == null) loadPhotoInto(d.reg, d.ac || d.aircraft);
+  if (keepPhoto == null) loadPhotoInto(d.reg, d.ac || d.aircraft, d.user_id);
+  if ($("fpMyPhoto")) $("fpMyPhoto").onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const key = regKey(d.reg) || regKey(d.ac) || "VLASTNI";
+    $("fpPhoto").innerHTML = '<div class="muted">Nahrávám fotku…</div>';
+    try {
+      const blob = await shrinkImage(file, 1600);
+      const path = `${me.user.id}/${key}-${Date.now()}.jpg`;
+      const { error } = await sb.storage.from("pilotphotos").upload(path, blob, { contentType: "image/jpeg", upsert: false });
+      if (error) throw error;
+      const url = sb.storage.from("pilotphotos").getPublicUrl(path).data.publicUrl;
+      const { error: e2 } = await sb.from("pilot_aircraft_photos").upsert({ user_id: me.user.id, registration: key, url, updated_at: new Date().toISOString() });
+      if (e2) throw e2;
+    } catch (err) { alert("Fotku se nepodařilo nahrát: " + (err.message || err)); }
+    pilotPhotoCache.delete(me.user.id); $("fpPhoto").dataset.reg = "-"; loadPhotoInto(d.reg, d.ac || d.aircraft, d.user_id);
+  };
 }
 
 /* ---------- žebříček ---------- */
@@ -1405,7 +1445,7 @@ async function renderLeaderboard() {
     <div id="lbHours"><p class="muted">Načítám…</p></div>`;
   el.querySelectorAll(".tab").forEach(b => b.onclick = () => { lbTab = b.dataset.t; renderLeaderboard(); });
 
-  let q = sb.from("flights").select("id, user_id, aircraft, dep_icao, arr_icao, landed_at, fpm, g, score, profiles(username, avatar_url)").not("score", "is", null)
+  let q = sb.from("flights").select("id, user_id, aircraft, dep_icao, arr_icao, landed_at, fpm, g, score, profiles!flights_user_id_fkey(username, avatar_url)").not("score", "is", null)
     .order("score", { ascending: false }).order("fpm", { ascending: false }).limit(25);
   if (lbTab === "week") q = q.gte("landed_at", new Date(Date.now() - 7 * 864e5).toISOString());
   const { data, error } = await q;
@@ -1687,7 +1727,7 @@ function drawWeekRoute(w) {
 }
 
 async function weekLeaderboard(e) {
-  let q = sb.from("flights").select("id, user_id, callsign, aircraft, ac_icao, fpm, g, score, landed_at, duration_min, profiles(username, avatar_url)")
+  let q = sb.from("flights").select("id, user_id, callsign, aircraft, ac_icao, fpm, g, score, landed_at, duration_min, profiles!flights_user_id_fkey(username, avatar_url)")
     .eq("dep_icao", e.dep).eq("arr_icao", e.arr).not("score", "is", null).order("score", { ascending: false }).limit(300);
   if (e.starts_at) q = q.gte("landed_at", e.starts_at);
   if (e.ends_at) q = q.lte("landed_at", e.ends_at);

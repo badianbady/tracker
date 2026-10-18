@@ -50,6 +50,7 @@ class Api:
                                 "crew": lf.get("crew")} if lf else None
         s["version"] = core.VERSION
         s["va_now"] = core.current_va(core.state)
+        s["reg_now"] = core.current_reg(core.state)
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -113,6 +114,10 @@ class Api:
             return {"ok": False, "msg": "Nejdřív propoj crew center."}
         status = core.crew.file_flight(lf["flight"], lf.get("fuel_lbs"))
         return {"ok": "✔" in status, "msg": status}
+
+    def set_reg(self, reg):
+        core.set_reg(reg)
+        return True
 
     def set_va(self, code):
         core.set_va(code)
