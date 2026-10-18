@@ -1266,7 +1266,7 @@ def sim_loop():
                     continue
                 fails = 0
                 on_ground = bool(og)
-                vs = (aq.get("VERTICAL_SPEED") or 0) * 60.0
+                vs = aq.get("VERTICAL_SPEED") or 0          # knihovna vrací rovnou stopy za minutu
                 g = aq.get("G_FORCE") or 1.0
                 alt = aq.get("PLANE_ALTITUDE") or 0
                 agl = aq.get("PLANE_ALT_ABOVE_GROUND") or 0
