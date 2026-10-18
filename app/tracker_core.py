@@ -100,7 +100,11 @@ state = {
     "username": None,
     "log": [],
     "update": None,
-    "plan": None,
+    "plan": None,          # platný plán = SimBrief + ruční úpravy
+    "sb_plan": None,       # plán ze SimBriefu
+    "flight_info": {},     # ručně zadané údaje o letu
+    "squawk": None,
+    "reg_default": False,
     "reg": None,
     "ac_model": None,
     "va_choice": None,
@@ -238,6 +242,21 @@ def runway_text(info):
     dist = info["dist_m"]
     where = f"{dist} m za prahem" if dist >= 0 else f"{-dist} m před prahem"
     return f"RWY {info['rwy']} · {where} · {side}"
+
+
+def squawk_text(v):
+    """Kód transpondéru: simulátor ho posílá v BCO16 (každá číslice = jedna hex číslice)."""
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return None
+    h = format(v, "x")
+    if len(h) <= 4 and all(c in "01234567" for c in h):
+        return h.zfill(4)
+    d = str(v)
+    if len(d) <= 4 and all(c in "01234567" for c in d):
+        return d.zfill(4)
+    return None
 
 
 def wind_components(wind_dir, wind_kt, hdg):
@@ -415,6 +434,7 @@ class Cloud:
         body["reg"] = current_reg(s)
         body["ac_icao"] = ((s.get("plan") or {}).get("aircraft") or s.get("ac_model") or None)
         body["va"] = current_va(s)
+        body["squawk"] = s.get("squawk")
         body["takeoff_at"] = (s.get("dep") or {}).get("iso")
         if with_trail:
             body["trail"] = s["trail"]
@@ -446,6 +466,7 @@ def load_settings():
         with lock:
             state["va_choice"] = d.get("va")
             state["reg_override"] = d.get("reg")
+        TAIL_SEEN.update(d.get("tails") or {})
     except Exception:
         pass
 
@@ -453,7 +474,7 @@ def load_settings():
 def _save_settings():
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override")}, f)
+            json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override"), "tails": TAIL_SEEN}, f)
     except Exception:
         pass
 
@@ -468,8 +489,25 @@ def set_va(code):
 
 
 def current_reg(s):
-    """Registrace: ručně zadaná > ze SimBriefu > ze simulátoru (livery často mají vymyšlenou)."""
-    return s.get("reg_override") or (s.get("plan") or {}).get("reg") or s.get("reg") or None
+    """Registrace: ručně zadaná > ze SimBriefu > ze simulátoru (jen pokud to není výchozí registrace MSFS)."""
+    sim = None if s.get("reg_default") else s.get("reg")
+    return s.get("reg_override") or (s.get("plan") or {}).get("reg") or sim or None
+
+
+TAIL_SEEN = {}     # registrace ze simulátoru -> názvy letadel, u kterých se objevila
+
+
+def note_sim_reg(reg, title):
+    """MSFS hlásí výchozí registraci u každé livery bez vlastní registrace. Když stejnou uvidíme
+    u dvou různých letadel, je to výchozí registrace a nepoužijeme ji."""
+    if not reg:
+        return False
+    titles = TAIL_SEEN.setdefault(reg, [])
+    if title and title not in titles:
+        titles.append(title)
+        del titles[:-5]
+        _save_settings()
+    return len(titles) >= 2
 
 
 def set_reg(reg):
@@ -571,12 +609,40 @@ def fetch_simbrief(user):
     return plan, None
 
 
+INFO_KEYS = ("callsign", "flight_no", "dep", "arr", "altn")
+
+
+def _rebuild_plan():
+    sb = state.get("sb_plan")
+    info = {k: v for k, v in (state.get("flight_info") or {}).items() if v}
+    if not sb and not info:
+        plan = None
+    else:
+        plan = dict(sb) if sb else {"fixes": []}
+        plan.update(info)
+    state["plan"] = plan
+    state["plan_ver"] += 1
+
+
 def set_plan(plan):
+    """Nový plán ze SimBriefu (ruční úpravy se tím vynulují)."""
     with lock:
-        state["plan"] = plan
-        state["plan_ver"] += 1
+        state["sb_plan"] = plan
+        state["flight_info"] = {}
+        _rebuild_plan()
     if plan:
         log(f"Letový plán: {plan['dep']} → {plan['arr']}" + (f" (alt. {plan['altn']})" if plan.get("altn") else ""))
+
+
+def set_flight_info(info):
+    """Ručně zadané údaje o letu – mají přednost před SimBriefem."""
+    clean = {}
+    for k in INFO_KEYS:
+        v = "".join(ch for ch in str((info or {}).get(k) or "").upper() if ch.isalnum())
+        clean[k] = v[:10] or None
+    with lock:
+        state["flight_info"] = clean
+        _rebuild_plan()
 
 
 # ---------------- Crew center Jáchym Air (phpVMS) ----------------
@@ -843,7 +909,7 @@ def clean_flight(flight):
             while len(pts) > 2900:
                 pts = pts[:1] + pts[1:-1:2] + pts[-1:]
             body[key] = pts
-    for key, n in (("rwy", 8), ("plan_arr", 8), ("plan_altn", 8), ("reg", 12), ("ac_icao", 12), ("va", 8), ("crew_status", 300)):
+    for key, n in (("flight_no", 10), ("rwy", 8), ("plan_arr", 8), ("plan_altn", 8), ("reg", 12), ("ac_icao", 12), ("va", 8), ("crew_status", 300)):
         if isinstance(body.get(key), str):
             body[key] = body[key][:n]
     return body
@@ -1191,6 +1257,7 @@ class FlightRecorder:
             "rwy": rwy and rwy["rwy"], "rwy_dist_m": rwy and rwy["dist_m"], "rwy_offset_m": rwy and rwy["offset_m"],
             "fuel_used_kg": None if fuel_used is None else round(fuel_used * 0.4536),
             "plan_arr": plan and plan.get("arr"), "plan_altn": plan and plan.get("altn"),
+            "flight_no": plan and plan.get("flight_no"),
             "route": plan and (plan.get("route") or "")[:2000],
             "sched_off": plan and plan.get("sched_off"), "sched_on": plan and plan.get("sched_on"),
             "plan_fixes": plan and plan.get("fixes"),
@@ -1311,8 +1378,10 @@ def sim_loop():
                             if isinstance(v, bytes):
                                 v = v.decode("utf-8", "ignore")
                             vals.append((v or "").strip("\x00 ")[:12] or None)
+                        default_tail = note_sim_reg(vals[0], title)
                         with lock:
                             state["reg"], state["ac_model"] = vals
+                            state["reg_default"] = default_tail
                     except Exception:
                         pass
                 if t - slow_t > 2:
@@ -1320,6 +1389,10 @@ def sim_loop():
                     try:
                         wind_dir = aq.get("AMBIENT_WIND_DIRECTION")
                         wind_kt = aq.get("AMBIENT_WIND_VELOCITY")
+                        sq = aq.get("TRANSPONDER_CODE:1")
+                        if sq is not None:
+                            with lock:
+                                state["squawk"] = squawk_text(sq)
                         fuel = aq.get("FUEL_TOTAL_QUANTITY_WEIGHT")
                         if fuel is not None:
                             with lock:

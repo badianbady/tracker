@@ -61,7 +61,8 @@ class Api:
     @guarded
     def get_state(self):
         with core.lock:
-            s = {k: v for k, v in core.state.items() if k not in ("trail", "log", "plan", "last_flight", "crew")}
+            s = {k: v for k, v in core.state.items() if k not in ("trail", "log", "plan", "sb_plan", "last_flight", "crew")}
+            s["has_sb_plan"] = bool(core.state.get("sb_plan"))
             s["log"] = [list(x) for x in core.state["log"][-20:]]
             s["crew"] = dict(core.state["crew"])
             plan = core.state.get("plan")
@@ -146,6 +147,13 @@ class Api:
             return {"ok": False, "msg": "Nejdřív propoj crew center."}
         status = core.crew.file_flight(lf["flight"], lf.get("fuel_lbs"))
         return {"ok": "✔" in status, "msg": status}
+
+    @guarded
+    def set_flight_info(self, info):
+        core.set_flight_info(info or {})
+        if isinstance(info, dict) and "reg" in info:
+            core.set_reg(info.get("reg"))
+        return True
 
     @guarded
     def set_reg(self, reg):

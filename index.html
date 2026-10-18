@@ -511,9 +511,7 @@ function renderTracker(full) {
           <div class="tr-row"><span>Fáze letu</span><b id="trPhase"></b></div>
           <div class="tr-row"><span>Létám pro</span><b id="trVaNow"></b></div>
           <div class="tr-row"><span>Registrace</span><b id="trRegNow"></b></div>
-          <div class="field" style="margin:12px 0 0"><label for="trReg">Vlastní registrace (nepovinné)</label>
-            <div style="display:flex;gap:8px"><input id="trReg" maxlength="12" value="${esc(s.reg_override || "")}" placeholder="např. D-AIHW"><button class="btn ghost" id="trRegSave" type="button">Uložit</button></div>
-            <small>Když ji nevyplníš, použije se registrace ze SimBriefu, jinak ze simulátoru.</small></div>
+          <div class="tr-row"><span>Squawk</span><b id="trSquawk"></b></div>
           <div class="field" style="margin:12px 0 0"><label for="trVa">Moje virtuálka (mimo linky Jáchym Air)</label>
             <select id="trVa"><option value="">Žádná / vlastní lety</option>${vaList.filter(v => v.code !== "JAI").map(v => `<option value="${esc(v.code)}" ${s.va_choice === v.code ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select>
             <small>Zelené letadlo Jáchym Air se zapne samo, když letíš linku rezervovanou v crew centru.</small></div>
@@ -532,6 +530,19 @@ function renderTracker(full) {
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
           <div><b id="trAlt">–</b><span>Výška ft</span></div><div><b id="trIas">–</b><span>IAS kt</span></div>
           <div><b id="trGs">–</b><span>GS kt</span></div><div><b id="trVs">–</b><span>V/S fpm</span></div></div></div>
+        <form class="card" id="fiForm"><h2 class="section-title">Údaje o letu</h2>
+          <p class="muted" style="margin-top:0">Vyplní se samy ze SimBriefu. Můžeš je přepsat, ručně zadané mají přednost.</p>
+          <div class="obs-row">
+            <div class="field"><label for="fiCs">Callsign</label><input id="fiCs" maxlength="10" placeholder="JAI11V"></div>
+            <div class="field"><label for="fiNo">Číslo letu</label><input id="fiNo" maxlength="10" placeholder="JAI11"></div>
+            <div class="field"><label for="fiDep">Odlet (ICAO)</label><input id="fiDep" maxlength="4" placeholder="LKPR"></div>
+            <div class="field"><label for="fiArr">Přílet (ICAO)</label><input id="fiArr" maxlength="4" placeholder="EGLL"></div>
+            <div class="field"><label for="fiAlt">Alternativa</label><input id="fiAlt" maxlength="4" placeholder="EGKK"></div>
+            <div class="field"><label for="fiReg">Registrace</label><input id="fiReg" maxlength="12" placeholder="OK-TVS"></div>
+          </div>
+          ${s.reg && s.reg_default ? `<p class="muted" style="font-size:13px;margin:0 0 10px">Simulátor hlásí registraci ${esc(s.reg)}, ale je to výchozí registrace z nastavení MSFS, proto ji nepoužívám.</p>` : ""}
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">Uložit</button><button class="btn ghost" type="button" id="fiReset">${s.has_sb_plan ? "Vrátit podle SimBriefu" : "Vymazat"}</button></div>
+          <div id="fiMsg"></div></form>
         <div class="card"><h2 class="section-title">OBS overlay</h2>
           <div class="obs-row">
             <div class="field"><label for="obsStyl">Styl</label><select id="obsStyl">
@@ -573,7 +584,19 @@ function renderTracker(full) {
       </div>
       <h2 class="section-title" style="margin-top:24px">Události</h2>
       <div class="card tr-log" id="trLog"></div>`;
-    $("trRegSave").onclick = async () => { await appApi.set_reg($("trReg").value.trim()); appState = await appApi.get_state(); renderTracker(false); $("trRegSave").textContent = "Uloženo ✔"; setTimeout(() => $("trRegSave") && ($("trRegSave").textContent = "Uložit"), 1500); };
+    const fi = s.flight_info || {}, pl = s.plan || {};
+    const val = k => fi[k] || pl[k] || "";
+    $("fiCs").value = val("callsign"); $("fiNo").value = val("flight_no"); $("fiDep").value = val("dep"); $("fiArr").value = val("arr"); $("fiAlt").value = val("altn");
+    $("fiReg").value = s.reg_override || s.reg_now || "";
+    $("fiForm").onsubmit = async e => {
+      e.preventDefault();
+      const info = { callsign: $("fiCs").value, flight_no: $("fiNo").value, dep: $("fiDep").value, arr: $("fiArr").value, altn: $("fiAlt").value };
+      await appApi.set_flight_info(info);
+      const reg = $("fiReg").value.trim().toUpperCase();
+      await appApi.set_reg(reg && reg !== (pl.reg || "") ? reg : "");
+      appState = await appApi.get_state(); renderTracker(true); say("fiMsg", true, "Údaje o letu uloženy.");
+    };
+    $("fiReset").onclick = async () => { await appApi.set_flight_info({}); await appApi.set_reg(""); appState = await appApi.get_state(); renderTracker(true); say("fiMsg", true, s.has_sb_plan ? "Vráceno podle SimBriefu." : "Údaje vymazány."); };
     $("trVa").onchange = async e => { await appApi.set_va(e.target.value); appState = await appApi.get_state(); };
     if (!s.va_choice && me?.profile?.va_default && !renderTracker.vaInit) { renderTracker.vaInit = true; appApi.set_va(me.profile.va_default); }
     const obs = Object.assign({ styl: "klasik", pos: "", color: "#1E9B36", scale: 100 }, settings.obs || {});
@@ -636,6 +659,7 @@ function renderTracker(full) {
   $("trWeb").className = s.online ? "ok" : "warn";
   $("trSim").textContent = s.connected ? "✔ Připojeno" : s.status; $("trSim").className = s.connected ? "ok" : "warn";
   $("trRegNow").textContent = s.reg_now || "–";
+  $("trSquawk").textContent = s.connected && s.squawk ? s.squawk : "–";
   $("trVaNow").textContent = s.va_now === "JAI" ? "Jáchym Air (rezervovaná linka) ✔" : s.va_now ? vaName(s.va_now) : "–";
   $("trPhase").textContent = s.connected ? s.phase + (s.dep?.icao ? ` · z ${s.dep.icao}` : "") : "–";
   $("trAlt").textContent = s.connected ? nf.format(s.alt) : "–";
@@ -1133,7 +1157,9 @@ function renderLive() {
     } else {
       m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai, sel, cat));
     }
-    m.unbindTooltip().bindTooltip(`<b style="font-size:14px">${esc(r.callsign || r.profiles?.username)}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr)}` : ""}
+    const cs = r.plan?.callsign || (r.callsign && r.callsign !== r.profiles?.username ? r.callsign : "");
+    m.unbindTooltip().bindTooltip(`<b style="font-size:15px">${esc(cs || r.profiles?.username || "")}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr || "?")}` : ""}
+      <br><span class="muted">${cs ? "Pilot " + esc(r.profiles?.username || "") : "bez callsignu"}${r.plan?.flight_no ? " · let " + esc(r.plan.flight_no) : ""}${r.squawk ? " · squawk " + esc(r.squawk) : ""}</span>
       <br>${esc(r.ac_icao || (r.aircraft || "").slice(0, 30))}${r.reg || r.plan?.reg ? " · " + esc(r.reg || r.plan.reg) : ""}
       <br>${nf.format(r.alt || 0)} ft · ${r.gs || 0} kt · ${(r.vs > 0 ? "+" : "") + nf.format(r.vs || 0)} fpm<br><span class="muted">${esc(r.phase || "")}</span>`, { direction: "top", offset: [0, -14] });
   }
@@ -1380,7 +1406,8 @@ function renderFlightPanel() {
     if (!r) { el.innerHTML = '<div class="fp-top"><button class="fp-back" id="fpBack">← Zpět</button></div><div class="empty">Tento pilot už neletí. Dokončený let najdeš na jeho profilu.</div>'; $("fpBack").onclick = closeFocus; return; }
     if (!focus.centered) { map.setView([r.lat, r.lon], Math.max(map.getZoom(), 7)); focus.centered = true; }
     const p = r.plan || {};
-    d = { callsign: r.callsign, profiles: r.profiles, user_id: r.user_id, aircraft: r.aircraft, reg: r.reg || p.reg, ac: p.aircraft,
+    d = { callsign: p.callsign || (r.callsign !== r.profiles?.username ? r.callsign : null), flight_no: p.flight_no, squawk: r.squawk,
+          profiles: r.profiles, user_id: r.user_id, aircraft: r.aircraft, reg: r.reg || p.reg, ac: r.ac_icao || p.aircraft,
           dep: p.dep || r.dep_icao, arr: p.arr, altn: p.altn, sched_off: p.sched_off, sched_on: p.sched_on, takeoff_at: r.takeoff_at,
           eta: r.takeoff_at && p.ete_min ? new Date(new Date(r.takeoff_at).getTime() + p.ete_min * 60000).toISOString() : null,
           route: p.route, r, fixes: p.fixes };
@@ -1404,8 +1431,9 @@ function renderFlightPanel() {
     <div class="fp-photo" id="fpPhoto">${keepPhoto ?? photoPlaceholder(d.ac || d.aircraft)}</div>
     ${me && me.user.id === d.user_id ? `<div style="padding:6px 16px 0;text-align:right"><label class="link-btn" style="cursor:pointer;font-size:13px">📷 Nahrát vlastní fotku letadla<input type="file" id="fpMyPhoto" accept="image/png,image/jpeg,image/webp" style="display:none"></label></div>` : ""}
     <div class="fp-id"><div class="fp-cs">${esc(d.callsign || d.profiles?.username || "")}</div>
-      <div class="muted"><a href="#/pilot/${encodeURIComponent(d.profiles?.username || "")}">${esc(d.profiles?.username || "")}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}
-      · ${esc([d.ac, d.reg].filter(Boolean).join(" · ") || (d.aircraft || "").slice(0, 40))}</div>
+      <div class="muted">Pilot <a href="#/pilot/${encodeURIComponent(d.profiles?.username || "")}">${esc(d.profiles?.username || "")}</a>${isJai ? ' <span class="badge">JAI</span>' : ""}
+      ${d.flight_no ? ` · let <b>${esc(d.flight_no)}</b>` : ""}${d.squawk ? ` · squawk <b>${esc(d.squawk)}</b>` : ""}</div>
+      <div class="muted">${esc([d.ac, d.reg].filter(Boolean).join(" · ") || (d.aircraft || "").slice(0, 40))}</div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">${isJai ? '<span class="badge">Let Jáchym Air</span>' : vaCode ? `<span class="va-chip">✈ ${esc(vaName(vaCode))}</span>` : ""}<span id="fpFriend"></span></div></div>
     <div class="fp-route">
       <div><div class="ap">${esc(d.dep || "????")}</div><div class="apn">${esc(depAp?.[1] || "")}</div>
