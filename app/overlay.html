@@ -6,7 +6,7 @@
 <title>Jáchym Air – OBS overlay</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --green: #1E9B36;
@@ -15,6 +15,7 @@
     --white: #FFFFFF;
     --ink: #0D2414;
     --scale: 1;
+    --accent-light: #6EE7A0;
   }
   html, body { margin: 0; background: transparent; overflow: hidden; }
   body {
@@ -82,6 +83,58 @@
   .landing.show .seg.on { animation: fill .3s both; }
   @keyframes fill { from { background: #E2EDE4; } }
 
+  /* ---------- pozice ---------- */
+  body.pos-vpravo .wrap { left: auto; right: 40px; align-items: flex-end; transform-origin: right bottom; }
+  body.pos-nahore .wrap { bottom: auto; top: 40px; flex-direction: column-reverse; transform-origin: left top; }
+  body.pos-vpravo.pos-nahore .wrap { transform-origin: right top; }
+
+  /* ---------- styl: minimalistický ---------- */
+  body.styl-mini .bar { height: 54px; border-radius: 27px; background: rgba(10, 20, 14, .72); backdrop-filter: blur(6px); }
+  body.styl-mini .roundel { width: 54px; background: var(--green); }
+  body.styl-mini .roundel svg { width: 36px; height: 36px; }
+  body.styl-mini .aircraft, body.styl-mini .lbl, body.styl-mini .waves, body.styl-mini .cell:nth-child(2) { display: none; }
+  body.styl-mini .callsign { font-size: 22px; }
+  body.styl-mini .ident { min-width: 0; padding: 0 16px 0 14px; }
+  body.styl-mini .val { font-size: 22px; }
+  body.styl-mini .cell { border-left-color: rgba(255,255,255,.15); padding: 0 14px; }
+  body.styl-mini .phase { font-size: 14px; padding: 4px 10px; background: var(--green); color: #fff; }
+  body.styl-mini .score-block { padding: 10px 16px; min-width: 100px; }
+  body.styl-mini .score { font-size: 46px; }
+  body.styl-mini .big { font-size: 28px; }
+
+  /* ---------- styl: tmavý ---------- */
+  body.styl-tmavy .bar { background: rgba(8, 14, 11, .88); border: 1px solid rgba(255,255,255,.08); }
+  body.styl-tmavy .roundel { background: var(--green); }
+  body.styl-tmavy .val { color: var(--accent-light); }
+  body.styl-tmavy .phase { background: var(--green); color: #fff; }
+  body.styl-tmavy .landing { background: rgba(8, 14, 11, .92); color: #E6F0E9; border: 1px solid rgba(255,255,255,.08); }
+  body.styl-tmavy .big { color: #fff; }
+  body.styl-tmavy .big .unit, body.styl-tmavy .dlbl, body.styl-tmavy .rwy { color: var(--accent-light); }
+  body.styl-tmavy .seg { background: rgba(255,255,255,.12); }
+  body.styl-tmavy .seg.on { background: var(--accent-light); }
+
+  /* ---------- styl: kokpit ---------- */
+  body.styl-kokpit { font-family: "JetBrains Mono", Consolas, monospace; }
+  body.styl-kokpit .bar { background: #050806; border: 2px solid #2A3A30; border-radius: 10px; height: 82px; }
+  body.styl-kokpit .roundel { background: #0D1A12; border-right: 2px solid #2A3A30; width: 82px; }
+  body.styl-kokpit .roundel circle, body.styl-kokpit .roundel text { stroke: var(--accent-light); fill: none; }
+  body.styl-kokpit .roundel text { fill: var(--accent-light); stroke: none; }
+  body.styl-kokpit .callsign { color: var(--accent-light); font-size: 24px; letter-spacing: .04em; }
+  body.styl-kokpit .aircraft { color: #8FA89A; font-size: 12px; }
+  body.styl-kokpit .val { color: #4ADE80; font-size: 26px; }
+  body.styl-kokpit .unit { color: #6B8577; font-size: 12px; }
+  body.styl-kokpit .lbl { color: #6B8577; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  body.styl-kokpit .cell, body.styl-kokpit .phase-cell { border-left: 2px solid #1C2A22; }
+  body.styl-kokpit .phase { background: transparent; color: #FBBF24; border: 2px solid #FBBF24; border-radius: 4px; font-size: 14px; }
+  body.styl-kokpit .waves { display: none; }
+  body.styl-kokpit .landing { background: #050806; color: #E6F0E9; border: 2px solid #2A3A30; border-radius: 10px; }
+  body.styl-kokpit .score-block { background: #0D1A12; color: var(--accent-light); border-right: 2px solid #2A3A30; }
+  body.styl-kokpit .big { color: #4ADE80; font-size: 32px; }
+  body.styl-kokpit .big .unit, body.styl-kokpit .dlbl, body.styl-kokpit .rwy { color: #6B8577; }
+  body.styl-kokpit .verdict { color: #FBBF24; }
+  body.styl-kokpit .seg { background: #1C2A22; border-radius: 0; }
+  body.styl-kokpit .seg.on { background: #4ADE80; }
+
   @media (prefers-reduced-motion: reduce) {
     .landing { transition: opacity .2s; transform: none; }
     .landing.show .seg.on { animation: none; }
@@ -138,6 +191,18 @@
 <script>
   const qs = new URLSearchParams(location.search);
   if (qs.get("scale")) document.documentElement.style.setProperty("--scale", qs.get("scale"));
+  const styl = qs.get("styl");
+  if (["mini", "tmavy", "kokpit"].includes(styl)) document.body.classList.add("styl-" + styl);
+  for (const p of (qs.get("pozice") || "").split(",")) if (["vpravo", "nahore"].includes(p)) document.body.classList.add("pos-" + p);
+  const barva = (qs.get("barva") || "").replace(/[^0-9a-fA-F]/g, "");
+  if (barva.length === 6) {
+    const n = parseInt(barva, 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    const mix = (t, k) => "#" + [r, g, b].map(c => Math.round(c + (t - c) * k).toString(16).padStart(2, "0")).join("");
+    const st = document.documentElement.style;
+    st.setProperty("--green", "#" + barva);
+    st.setProperty("--green-deep", mix(0, .32));
+    st.setProperty("--accent-light", mix(255, .45));
+  }
   const SHOW_MS = (Number(qs.get("cas")) || 20) * 1000;   // jak dlouho je karta přistání vidět (s)
 
   const $ = id => document.getElementById(id);

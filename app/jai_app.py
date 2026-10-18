@@ -49,6 +49,7 @@ class Api:
             s["last_flight"] = {"dep": lf["flight"].get("dep_icao"), "arr": lf["flight"].get("arr_icao"),
                                 "crew": lf.get("crew")} if lf else None
         s["version"] = core.VERSION
+        s["va_now"] = core.current_va(core.state)
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -113,6 +114,17 @@ class Api:
         status = core.crew.file_flight(lf["flight"], lf.get("fuel_lbs"))
         return {"ok": "✔" in status, "msg": status}
 
+    def set_va(self, code):
+        core.set_va(code)
+        return True
+
+    def open_url(self, url):
+        import webbrowser
+        if str(url).startswith(("https://", "http://localhost", "http://127.0.0.1")):
+            webbrowser.open(url)
+            return True
+        return False
+
     def copy_text(self, text):
         try:
             subprocess.run("clip", input=str(text).encode("utf-16-le"), check=True,
@@ -126,6 +138,9 @@ class Api:
         if not info:
             return False
 
+        with core.lock:
+            core.state["update_error"] = None
+
         def prog(p):
             with core.lock:
                 core.state["update_progress"] = round(p * 100)
@@ -135,8 +150,10 @@ class Api:
                 core.apply_update(info, prog)
             except Exception as e:
                 core.log("Aktualizace se nepovedla:", e)
+                write_error("Aktualizace", traceback.format_exc())
                 with core.lock:
                     core.state["update_progress"] = None
+                    core.state["update_error"] = f"Aktualizace se nepovedla ({e}). Původní verze zůstala, zkus to znovu."
         threading.Thread(target=work, daemon=True).start()
         return True
 

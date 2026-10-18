@@ -103,6 +103,7 @@ state = {
     "plan": None,
     "reg": None,
     "ac_model": None,
+    "va_choice": None,
     "plan_ver": 0,
     "simbrief_user": None,
     "crew": {"linked": False, "ident": None, "name": None, "auto": True, "status": None, "bids": []},
@@ -411,6 +412,8 @@ class Cloud:
             "vs": s["vs"], "phase": s["phase"], "dep_icao": (s.get("dep") or {}).get("icao"),
         }
         body["reg"] = s.get("reg") or ((s.get("plan") or {}).get("reg"))
+        body["ac_icao"] = ((s.get("plan") or {}).get("aircraft") or s.get("ac_model") or None)
+        body["va"] = current_va(s)
         body["takeoff_at"] = (s.get("dep") or {}).get("iso")
         if with_trail:
             body["trail"] = s["trail"]
@@ -426,6 +429,43 @@ class Cloud:
 
 
 cloud = Cloud()
+
+
+# ---------------- Virtuální aerolinka ----------------
+SETTINGS_FILE = os.path.join(DATA_DIR, "nastaveni.json")
+
+
+def load_settings():
+    try:
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        with lock:
+            state["va_choice"] = d.get("va")
+    except Exception:
+        pass
+
+
+def set_va(code):
+    code = (code or "").strip().upper()[:8] or None
+    if code == "JAI":
+        code = None       # JAI se zapíná samo podle rezervace v crew centru
+    with lock:
+        state["va_choice"] = code
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"va": code}, f)
+    except Exception:
+        pass
+
+
+def current_va(s, dep=None):
+    """Let je za Jáchym Air jen tehdy, když pilot letí linku, kterou má rezervovanou v crew centru."""
+    dep = dep or (s.get("dep") or {}).get("icao") or (s.get("plan") or {}).get("dep")
+    arr = (s.get("plan") or {}).get("arr")
+    for b in (s.get("crew") or {}).get("bids") or []:
+        if dep and b.get("dep") == dep and (not arr or b.get("arr") == arr):
+            return "JAI"
+    return s.get("va_choice") or None
 
 
 # ---------------- SimBrief ----------------
@@ -1033,6 +1073,7 @@ class FlightRecorder:
             "plan_fixes": plan and plan.get("fixes"),
             "reg": ((plan or {}).get("reg") or state.get("reg") or None),
             "ac_icao": ((plan or {}).get("aircraft") or state.get("ac_model") or None),
+            "va": current_va(state, dep=to.get("icao")),
         }
         if plan and plan.get("callsign"):
             flight["callsign"] = plan["callsign"]
@@ -1327,10 +1368,32 @@ def apply_update(info, on_progress=None):
             done += len(chunk)
             if total and on_progress:
                 on_progress(done / total)
+    if total and os.path.getsize(new) != total:
+        os.remove(new)
+        raise IOError("Stažený soubor je neúplný, zkus to znovu.")
+
+    def retry(fn, *args):
+        # antivirus si čerstvě stažený soubor na pár sekund zamyká – zkoušej to znovu
+        last = None
+        for _ in range(40):
+            try:
+                return fn(*args)
+            except OSError as e:
+                last = e
+                time.sleep(0.5)
+        raise last
+
     if os.path.exists(old):
-        os.remove(old)
-    os.rename(exe, old)
-    os.rename(new, exe)
+        try:
+            retry(os.remove, old)
+        except OSError:
+            old = exe + f".old{int(time.time())}"
+    retry(os.rename, exe, old)
+    try:
+        retry(os.rename, new, exe)
+    except OSError:
+        os.rename(old, exe)          # vrátit původní verzi, ať aplikace dál funguje
+        raise
     env = dict(os.environ)
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"   # nová verze nesmí převzít dočasné soubory té staré
     subprocess.Popen([exe, "--po-aktualizaci"], close_fds=True, env=env)
@@ -1339,10 +1402,12 @@ def apply_update(info, on_progress=None):
 
 def cleanup_old_exe():
     if FROZEN:
-        try:
-            os.remove(sys.executable + ".old")
-        except OSError:
-            pass
+        import glob
+        for f in glob.glob(sys.executable + ".old*") + [sys.executable + ".new"]:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
 
 
 def start_background(demo=False):
@@ -1363,6 +1428,7 @@ def start_background(demo=False):
                 state["web_status"] = "Web nedostupný, zkouším znovu…"
             time.sleep(15)
 
+    load_settings()
     threading.Thread(target=lambda: (load_airports(), load_runways()), daemon=True).start()
     threading.Thread(target=web_login, daemon=True).start()
     threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
