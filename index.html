@@ -5,11 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>JAI Tracker</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22%3E%3Crect width=%22120%22 height=%22120%22 rx=%2228%22 fill=%22#1E9B36%22/%3E%3Cg transform=%22translate(15 15) scale(.9)%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%226%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2229%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%223.5%22 opacity=%22.55%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2214%22 fill=%22none%22 stroke=%22#fff%22 stroke-width=%223.5%22 opacity=%22.35%22/%3E%3Cpath d=%22M50 50 L50 9 A41 41 0 0 1 79 21 Z%22 fill=%22#fff%22 opacity=%22.28%22/%3E%3Cpath d=%22M50 50 L79 21%22 stroke=%22#fff%22 stroke-width=%225%22 stroke-linecap=%22round%22/%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%225%22 fill=%22#fff%22/%3E%3Cg transform=%22translate(58 52) scale(.95) rotate(35 12 12)%22%3E%3Cpath d=%22M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z%22 fill=%22#fff%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:500;src:url(fonts/saira-semi-condensed-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:500;src:url(fonts/saira-semi-condensed-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:600;src:url(fonts/saira-semi-condensed-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:600;src:url(fonts/saira-semi-condensed-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:700;src:url(fonts/saira-semi-condensed-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:700;src:url(fonts/saira-semi-condensed-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:800;src:url(fonts/saira-semi-condensed-latin-ext-800-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Saira Semi Condensed';font-style:normal;font-display:swap;font-weight:800;src:url(fonts/saira-semi-condensed-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:400;src:url(fonts/source-sans-3-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:400;src:url(fonts/source-sans-3-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:500;src:url(fonts/source-sans-3-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:500;src:url(fonts/source-sans-3-latin-500-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:600;src:url(fonts/source-sans-3-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:600;src:url(fonts/source-sans-3-latin-600-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:700;src:url(fonts/source-sans-3-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Source Sans 3';font-style:normal;font-display:swap;font-weight:700;src:url(fonts/source-sans-3-latin-700-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
   :root {
     --green: #1E9B36; --green-deep: #116B26; --green-soft: #E3F5E7;
     --bg: #F3F6F4; --surface: #FFFFFF; --text: #102217; --muted: #5C6E63;
@@ -272,6 +285,11 @@
   .ph-card input[type=file] { display: none; }
   .obs-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .obs-url { font-family: ui-monospace, Consolas, monospace; font-size: 12px; background: var(--bg); padding: 8px; border-radius: 8px; word-break: break-all; margin: 10px 0; }
+  .legal { max-width: 780px; line-height: 1.65; }
+  .legal h2 { font-size: 24px; margin: 28px 0 8px; }
+  .legal ul { padding-left: 22px; margin: 8px 0; } .legal li { margin: 4px 0; }
+  .legal table { font-size: 14px; } .legal td, .legal th { white-space: normal; vertical-align: top; }
+  .legal-links { text-align: center; font-size: 13px; color: var(--muted); margin-top: 26px; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -380,6 +398,8 @@
   <section class="view" id="view-novinky"><div class="page" id="novinky"></div></section>
   <section class="view" id="view-pratele"><div class="page" id="pratele"></div></section>
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
+  <section class="view" id="view-soukromi"><div class="page legal" id="soukromi"></div></section>
+  <section class="view" id="view-pravidla"><div class="page legal" id="pravidla"></div></section>
   <section class="view" id="view-sprava"><div class="page" id="sprava"></div></section>
   <section class="view" id="view-noveheslo"><div class="page" id="noveheslo"></div></section>
 </main>
@@ -636,7 +656,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -659,6 +679,8 @@ async function router() {
   if (view === "chat") renderChat(decodeURIComponent(parts[1] || ""));
   if (view === "sprava") renderAdmin();
   if (view === "noveheslo") renderNewPassword();
+  if (view === "soukromi") renderPrivacy();
+  if (view === "pravidla") renderRules();
 }
 window.addEventListener("hashchange", router);
 
@@ -784,7 +806,7 @@ function initMap() {
   legend.addTo(map);
   airportLayer = L.layerGroup().addTo(map);
   tdLayer = L.layerGroup().addTo(map);
-  L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Místa přistání": tdLayer }, { position: "topright" }).addTo(map);
+  L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Moje poslední přistání": tdLayer }, { position: "topright" }).addTo(map);
   map.on("moveend", () => { drawAirports(); scheduleMetar(); });
   settingsControl().addTo(map);
   updateRadar();
@@ -1017,9 +1039,11 @@ function tdIcon(score, keep, fpm) {
 }
 const TD_FIELDS = "id, user_id, callsign, arr_icao, score, fpm, g, td_lat, td_lon, td_ias, td_gs, wind_dir, wind_kt, headwind, crosswind, bounces, rwy, rwy_dist_m, rwy_offset_m, landed_at, profiles!flights_user_id_fkey(username)";
 async function refreshTouchdowns() {
+  // místa přistání jen u otevřeného letu (detail) a u mého vlastního přistání za poslední hodinu
   if (!tdLayer) return;
-  const { data, error } = await sb.from("flights").select(TD_FIELDS).not("td_lat", "is", null)
-    .gte("landed_at", new Date(Date.now() - 48 * 3600e3).toISOString()).order("landed_at", { ascending: false }).limit(150);
+  if (!me) { tdLayer.clearLayers(); return; }
+  const { data, error } = await sb.from("flights").select(TD_FIELDS).not("td_lat", "is", null).eq("user_id", me.user.id)
+    .gte("landed_at", new Date(Date.now() - 3600e3).toISOString()).order("landed_at", { ascending: false }).limit(3);
   if (error) return;
   tdLayer.clearLayers();
   for (const f of data || []) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, false, f.fpm) }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(tdLayer);
@@ -1952,6 +1976,98 @@ async function renderAdminReports() {
   box.querySelectorAll("[data-donerep]").forEach(b => b.onclick = async () => { await sb.from("reports").delete().eq("id", +b.dataset.donerep); renderAdminReports(); });
 }
 
+/* ---------- zásady ochrany osobních údajů a pravidla ---------- */
+const LEGAL_DATE = "18. 10. 2026";
+const contactHtml = () => CFG.CONTACT_EMAIL ? `<a href="mailto:${esc(CFG.CONTACT_EMAIL)}">${esc(CFG.CONTACT_EMAIL)}</a>` : "zprávou správci webu (uživatel <b>jachym12</b>) přes stránku Přátelé";
+const legalLinks = () => `<p class="legal-links"><a href="#/soukromi">Ochrana osobních údajů</a> · <a href="#/pravidla">Pravidla komunity</a></p>`;
+function renderPrivacy() {
+  $("soukromi").innerHTML = `<h1 class="page-title">Ochrana osobních údajů</h1>
+  <p class="lead">Jak JAI Tracker zachází s tvými údaji. Platné od ${LEGAL_DATE}.</p>
+  <h2>Kdo údaje zpracovává</h2>
+  <p>Web a aplikaci JAI Tracker provozuje virtuální aerolinka Jáchym Air (dále „my“). Je to komunitní projekt pro hráče Microsoft Flight Simulatoru, ne komerční služba. Se vším, co se týká tvých údajů, se na nás můžeš obrátit: ${contactHtml()}.</p>
+  <h2>Jaké údaje zpracováváme</h2>
+  <ul>
+    <li><b>Účet:</b> e-mail, uživatelské jméno a heslo. Heslo nikdy neukládáme v čitelné podobě, jen jako zašifrovaný otisk.</li>
+    <li><b>Profil (pokud ho vyplníš):</b> profilový obrázek, odkaz na stream, jméno v SimBriefu, virtuální aerolinka.</li>
+    <li><b>Lety:</b> poloha, výška, rychlost a kurz <b>virtuálního letadla v simulátoru</b> během letu, trasa, letiště, časy, typ a registrace letadla, spotřeba paliva a údaje o přistání. Nejde o tvou skutečnou polohu.</li>
+    <li><b>Komunita:</b> přátelství, zprávy mezi přáteli, reakce na lety, blokace a nahlášení.</li>
+    <li><b>Technické údaje:</b> čas posledního připojení. Poskytovatelé infrastruktury (viz níže) vedou provozní záznamy včetně IP adres.</li>
+    <li><b>Ve tvém zařízení:</b> prohlížeč si pamatuje nastavení mapy a přihlášení. Aplikace ukládá v počítači přihlášení, nastavení a případně API klíč crew centra. Tyto údaje k nám neposílá, s výjimkou jednorázového ověření klíče při propojení s crew centrem.</li>
+  </ul>
+  <h2>Proč a na jakém základě</h2>
+  <ul>
+    <li><b>Provoz služby</b> (sledování letů, mapa, profil, žebříčky, přátelé a zprávy): plnění smlouvy, tedy toho, k čemu ses registrací přihlásil (čl. 6 odst. 1 písm. b GDPR).</li>
+    <li><b>Bezpečnost a moderace</b> (ochrana proti zneužití, řešení nahlášení): oprávněný zájem (čl. 6 odst. 1 písm. f GDPR).</li>
+    <li><b>E-maily</b> posíláme jen nutné: potvrzení registrace, obnovu hesla a změnu e-mailu. Žádnou reklamu ani newslettery.</li>
+  </ul>
+  <h2>Kdo tvé údaje uvidí</h2>
+  <ul>
+    <li><b>Veřejně</b> (i bez přihlášení): uživatelské jméno, profilový obrázek, odkaz na stream, virtuální aerolinka, tvé lety včetně polohy během letu, trasy a přistání, statistiky a reakce.</li>
+    <li><b>Jen ty a příjemce:</b> zprávy. Správce webu může kvůli moderaci zobrazit zprávu, která byla nahlášena.</li>
+    <li><b>Nikdo jiný:</b> tvůj e-mail a heslo.</li>
+  </ul>
+  <h2>Služby, které k provozu používáme</h2>
+  <div class="table-wrap"><table><thead><tr><th>Služba</th><th>K čemu</th><th>Kde</th></tr></thead><tbody>
+    <tr><td>Supabase</td><td>databáze, přihlášení, úložiště fotek, serverové funkce</td><td>EU (Frankfurt)</td></tr>
+    <tr><td>GitHub (Pages, Releases)</td><td>hosting webu a stažení aplikace</td><td>USA*</td></tr>
+    <tr><td>Hosting jachymair.com</td><td>odesílání e-mailů</td><td>podle poskytovatele hostingu</td></tr>
+    <tr><td>OpenStreetMap, Esri</td><td>mapové a satelitní podklady (načítá tvůj prohlížeč)</td><td>EU / USA*</td></tr>
+    <tr><td>RainViewer</td><td>radar srážek, jen když ho zapneš</td><td>mimo EU*</td></tr>
+    <tr><td>aviationweather.gov</td><td>počasí (METAR), přes náš server, bez tvých údajů</td><td>USA</td></tr>
+    <tr><td>Planespotters.net</td><td>fotky letadel podle registrace (přes náš server, záložně z tvého prohlížeče)</td><td>mimo EU*</td></tr>
+    <tr><td>SimBrief</td><td>letový plán, jen když ho v aplikaci načteš</td><td>USA*</td></tr>
+    <tr><td>Crew centrum Jáchym Air</td><td>rezervace a odesílání letů, jen když ho propojíš</td><td>podle poskytovatele (TFDi)</td></tr>
+  </tbody></table></div>
+  <p class="muted" style="font-size:14px">* Při předání mimo EU se služby opírají o standardní smluvní doložky EU nebo o rámec EU–USA pro ochranu osobních údajů. Písma webu máme uložená přímo u sebe, takže se kvůli nim nikam jinam nepřipojuješ.</p>
+  <h2>Jak dlouho údaje uchováváme</h2>
+  <ul>
+    <li>Účet, profil, lety, přátelství a zprávy po dobu existence účtu, nebo dokud je sám nesmažeš.</li>
+    <li>Poloha probíhajícího letu se průběžně přepisuje. Po skončení letu zůstane jen uložený let.</li>
+    <li>Nahlášení do vyřízení správcem.</li>
+  </ul>
+  <h2>Tvá práva</h2>
+  <ul>
+    <li><b>Přístup a přenositelnost:</b> v Můj účet si můžeš stáhnout všechna svá data (tlačítko „Stáhnout moje data“).</li>
+    <li><b>Oprava:</b> profil si upravíš v Můj účet.</li>
+    <li><b>Výmaz:</b> jednotlivé lety smažeš v jejich detailu a celý účet se všemi daty v Můj účet („Smazat účet natrvalo“).</li>
+    <li><b>Námitka a omezení zpracování:</b> napiš nám (kontakt výše).</li>
+    <li><b>Stížnost:</b> můžeš se obrátit na Úřad pro ochranu osobních údajů, <a href="https://uoou.gov.cz" target="_blank" rel="noopener">uoou.gov.cz</a>.</li>
+  </ul>
+  <h2>Děti</h2>
+  <p>JAI Tracker může používat každý fanoušek létání. Pokud ti ještě nebylo <b>15 let</b>, potřebuješ k registraci souhlas rodiče nebo jiného zákonného zástupce. Ukaž mu prosím tuto stránku a pravidla komunity.</p>
+  <h2>Zabezpečení</h2>
+  <p>Veškerá komunikace je šifrovaná (HTTPS). Přístup k údajům hlídají pravidla přímo v databázi, takže například zprávy uvidí jen odesílatel a příjemce a lety může mazat jen jejich pilot a správce.</p>
+  <h2>Změny</h2>
+  <p>Když budeme tyto zásady měnit, upravíme datum výše a o podstatných změnách dáme vědět v Novinkách.</p>
+  ${legalLinks()}`;
+}
+function renderRules() {
+  $("pravidla").innerHTML = `<h1 class="page-title">Pravidla komunity</h1>
+  <p class="lead">JAI Tracker je místo pro všechny, kdo rádi létají. Aby tu bylo dobře každému, platí pár jednoduchých pravidel.</p>
+  <h2>Buď slušný</h2>
+  <ul>
+    <li>Chovej se k ostatním tak, jak chceš, aby se chovali k tobě.</li>
+    <li>Žádné urážky, šikana, obtěžování, vyhrožování ani nenávistné poznámky (kvůli původu, náboženství, pohlaví, orientaci, vzhledu ani čemukoli jinému).</li>
+    <li>Žádný sexuální, násilný ani jinak nevhodný obsah ve zprávách, jménech ani fotkách.</li>
+  </ul>
+  <h2>Chraň sebe i ostatní</h2>
+  <ul>
+    <li>Nikdy nikomu neposílej své heslo ani API klíč. Správce se tě na ně nikdy nezeptá.</li>
+    <li>Nesdílej osobní údaje, své ani cizí: adresu, telefon, školu, fotky lidí a podobně.</li>
+    <li>Když tě někdo obtěžuje nebo ti něco nepříjemného píše, <b>zablokuj ho a nahlas</b> (tlačítka ve zprávách). Správce nahlášení uvidí.</li>
+    <li>Jestli ti ještě nebylo 18, nedomlouvej si setkání s lidmi z internetu bez vědomí rodičů.</li>
+  </ul>
+  <h2>Létej férově</h2>
+  <ul>
+    <li>Žádné podvádění v žebříčcích, například posílání vymyšlených letů nebo upravování dat.</li>
+    <li>Na webu nahrávej jen fotky, které jsou tvoje (třeba screenshoty z MSFS), nebo které smíš použít.</li>
+    <li>Žádný spam ani reklama.</li>
+  </ul>
+  <h2>Co když pravidla někdo poruší</h2>
+  <p>Správce může smazat nevhodný obsah a při vážném nebo opakovaném porušení i účet. Dotazy a připomínky: ${contactHtml()}.</p>
+  ${legalLinks()}`;
+}
+
 /* ---------- nové heslo (odkaz z e-mailu) ---------- */
 async function renderNewPassword() {
   const el = $("noveheslo");
@@ -1997,9 +2113,11 @@ function renderAccount(msg) {
         <div class="field"><label for="fUser">Uživatelské jméno</label><input id="fUser" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_.\\-]{3,20}" autocomplete="username"><small>3–20 znaků, písmena bez diakritiky, čísla, _ . -</small></div>` : ""}
         <div class="field"><label for="fEmail">E-mail</label><input id="fEmail" type="email" required autocomplete="email"></div>
         <div class="field"><label for="fPass">Heslo</label><input id="fPass" type="password" required minlength="8" autocomplete="${authMode === "login" ? "current-password" : "new-password"}">${authMode === "register" ? "<small>Aspoň 8 znaků</small>" : ""}</div>
+        ${authMode === "register" ? `<label class="switch" style="align-items:flex-start;margin-bottom:14px;font-weight:500;font-size:14px"><input type="checkbox" required style="margin-top:2px">
+          <span>Je mi aspoň 15 let, nebo mám souhlas rodiče. Souhlasím s <a href="#/pravidla" target="_blank">pravidly komunity</a> a beru na vědomí <a href="#/soukromi" target="_blank">zásady ochrany osobních údajů</a>.</span></label>` : ""}
         <button class="btn" style="width:100%">${authMode === "login" ? "Přihlásit se" : "Vytvořit účet"}</button>
       </form>
-      <p style="text-align:center;margin-top:16px">${authMode === "login" ? 'Nemáš účet? <a href="#" id="swAuth">Zaregistruj se</a><br><button class="link-btn" id="forgot" style="margin-top:8px">Zapomněl jsi heslo?</button>' : 'Už máš účet? <a href="#" id="swAuth">Přihlas se</a>'}</p></div>`;
+      <p style="text-align:center;margin-top:16px">${authMode === "login" ? 'Nemáš účet? <a href="#" id="swAuth">Zaregistruj se</a><br><button class="link-btn" id="forgot" style="margin-top:8px">Zapomněl jsi heslo?</button>' : 'Už máš účet? <a href="#" id="swAuth">Přihlas se</a>'}</p>${legalLinks()}</div>`;
     $("swAuth").onclick = e => { e.preventDefault(); authMode = authMode === "login" ? "register" : "login"; renderAccount(); };
     if ($("forgot")) $("forgot").onclick = async () => {
       const email = $("fEmail").value.trim();
@@ -2034,6 +2152,10 @@ function renderAccount(msg) {
         <button class="btn ghost" id="logout">Odhlásit se</button>
       </div>
       <div class="card" id="crewCard"><h2 class="section-title">Crew center Jáchym Air</h2><p class="muted">Načítám…</p></div>
+      <div class="card"><h2 class="section-title">Moje data</h2>
+        <p class="muted" style="margin-top:0">Stáhni si kopii všeho, co o tobě JAI Tracker ukládá: profil, lety, přátele, zprávy a reakce (soubor JSON).</p>
+        <button class="btn ghost" id="exportBtn">Stáhnout moje data</button>
+        <p style="margin:14px 0 0;font-size:14px"><a href="#/soukromi">Ochrana osobních údajů</a> · <a href="#/pravidla">Pravidla komunity</a></p></div>
       <div class="card" id="delCard"><h2 class="section-title">Smazání účtu</h2>
         <p class="muted" style="margin-top:0">Smaže se tvůj účet, profil, všechny lety, přátelé, zprávy a reakce. Nejde to vrátit.</p>
         <div class="field"><label for="delConfirm">Pro potvrzení napiš své uživatelské jméno</label><input id="delConfirm" autocomplete="off"></div>
@@ -2043,6 +2165,21 @@ function renderAccount(msg) {
         <button class="btn">Změnit heslo</button></form>
     </div>`;
   renderCrewCard();
+  $("exportBtn").onclick = async e => {
+    e.target.disabled = true; e.target.textContent = "Připravuji…";
+    const uid = me.user.id;
+    const q = (t, sel, f) => f(sb.from(t).select(sel)).then(r => r.data || []);
+    const [profile, flights, friendships, messages, reactions, photos] = await Promise.all([
+      q("profiles", "*", x => x.eq("id", uid)), q("flights", "*", x => x.eq("user_id", uid).order("landed_at")),
+      q("friendships", "*", x => x), q("messages", "*", x => x.order("created_at")),
+      q("flight_reactions", "*", x => x.eq("user_id", uid)), q("pilot_aircraft_photos", "*", x => x.eq("user_id", uid)),
+    ]);
+    const data = { exportovano: new Date().toISOString(), email: me.user.email, profil: profile[0] || null, lety: flights, pratelstvi: friendships, zpravy: messages, reakce: reactions, fotky_letadel: photos };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `jai-tracker-data-${me.profile?.username || "pilot"}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    e.target.disabled = false; e.target.textContent = "Stáhnout moje data";
+  };
   $("delBtn").onclick = async () => {
     if ($("delConfirm").value.trim() !== (me.profile?.username || "")) { renderAccount({ ok: false, text: "Pro smazání napiš přesně své uživatelské jméno." }); return; }
     if (!confirm("Opravdu smazat účet a všechna data? Tohle nejde vrátit.")) return;

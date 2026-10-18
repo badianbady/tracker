@@ -5,6 +5,7 @@ Okno zobrazuje web JAI Trackeru (mapa, profily, žebříčky) a k tomu panel tra
 Kdyby se web uvnitř okna nepodařilo zobrazit, spustí se jednoduché záložní okno.
 """
 
+import functools
 import os
 import subprocess
 import sys
@@ -35,9 +36,29 @@ def message_box(text, title="Jáchym Air Tracker"):
         pass
 
 
+def _trusted():
+    """Funkce aplikace smí volat jen náš web – ne cizí stránka, kdyby se do okna nějak dostala."""
+    try:
+        import webview
+        url = (webview.windows[0].get_current_url() or "") if webview.windows else ""
+    except Exception:
+        return True            # adresu nejde zjistit (např. při načítání) – aplikaci kvůli tomu nerozbíjet
+    return not url or url.startswith(core.web_url()) or not core.web_url()
+
+
+def guarded(fn):
+    @functools.wraps(fn)
+    def wrap(self, *a, **k):
+        if not _trusted():
+            return {"ok": False, "msg": "Nepovolená stránka."}
+        return fn(self, *a, **k)
+    return wrap
+
+
 class Api:
     """Funkce, které může web uvnitř aplikace volat přes window.pywebview.api."""
 
+    @guarded
     def get_state(self):
         with core.lock:
             s = {k: v for k, v in core.state.items() if k not in ("trail", "log", "plan", "last_flight", "crew")}
@@ -54,15 +75,18 @@ class Api:
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
+    @guarded
     def login(self, email, password):
         ok, msg = core.cloud.login(email, password)
         return {"ok": ok, "msg": msg}
 
+    @guarded
     def logout(self):
         core.cloud.logout()
         return True
 
     # ---- SimBrief ----
+    @guarded
     def load_simbrief(self, user=None):
         user = (user or core.state.get("simbrief_user") or "").strip()
         plan, err = core.fetch_simbrief(user)
@@ -75,37 +99,45 @@ class Api:
                     core.state["simbrief_user"] = user
         return {"ok": True}
 
+    @guarded
     def clear_plan(self):
         core.set_plan(None)
         return True
 
     # ---- Crew center ----
+    @guarded
     def crew_link(self, key):
         ok, msg = core.crew.link(key)
         return {"ok": ok, "msg": msg}
 
+    @guarded
     def crew_unlink(self):
         core.crew.unlink()
         return True
 
+    @guarded
     def crew_set_auto(self, auto):
         core.crew.set_auto(auto)
         return True
 
+    @guarded
     def crew_bid(self, flight_id, aircraft=None):
         if not core.crew.linked:
             return {"ok": False, "msg": "Nejdřív propoj crew center v záložce Tracker."}
         ok, msg = core.crew.add_bid(flight_id, aircraft)
         return {"ok": ok, "msg": msg}
 
+    @guarded
     def crew_unbid(self, flight_id):
         ok, msg = core.crew.remove_bid(flight_id)
         return {"ok": ok, "msg": msg}
 
+    @guarded
     def crew_refresh(self):
         core.crew.refresh_bids()
         return True
 
+    @guarded
     def crew_file_last(self):
         lf = core.state.get("last_flight")
         if not lf:
@@ -115,14 +147,17 @@ class Api:
         status = core.crew.file_flight(lf["flight"], lf.get("fuel_lbs"))
         return {"ok": "✔" in status, "msg": status}
 
+    @guarded
     def set_reg(self, reg):
         core.set_reg(reg)
         return True
 
+    @guarded
     def set_va(self, code):
         core.set_va(code)
         return True
 
+    @guarded
     def open_url(self, url):
         import webbrowser
         if str(url).startswith(("https://", "http://localhost", "http://127.0.0.1")):
@@ -130,6 +165,7 @@ class Api:
             return True
         return False
 
+    @guarded
     def copy_text(self, text):
         try:
             subprocess.run("clip", input=str(text).encode("utf-16-le"), check=True,
@@ -138,6 +174,7 @@ class Api:
         except Exception:
             return False
 
+    @guarded
     def do_update(self):
         info = core.state.get("update")
         if not info:
@@ -172,6 +209,7 @@ def run_webview():
         "Jáchym Air Tracker", f"{url}?app=1&v={int(time.time())}", js_api=Api(),
         width=1360, height=860, min_size=(960, 620), background_color="#F3F6F4",
     )
+    webview.settings["ALLOW_DOWNLOADS"] = True
     storage = os.path.join(core.DATA_DIR, "webview")
     os.makedirs(storage, exist_ok=True)
     webview.start(private_mode=False, storage_path=storage, icon=os.path.join(core.RES_DIR, "icon.ico"))
