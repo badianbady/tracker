@@ -52,13 +52,25 @@ RUNWAYS_URL = "https://raw.githubusercontent.com/davidmegginson/ourairports-data
 CREW_URL = "https://crew.jachymair.com"
 
 
-def web_url():
+CUSTOM_WEB_URL = "https://tracker.jachymair.com/"     # vlastní adresa webu
+
+
+def github_web_url():
     if not REPO or "/" not in REPO:
         return ""
     owner, name = REPO.split("/", 1)
     if name.lower() == f"{owner.lower()}.github.io":
         return f"https://{owner.lower()}.github.io/"
     return f"https://{owner.lower()}.github.io/{name}/"
+
+
+def web_url():
+    """Adresa webu, kterou aplikace otevírá."""
+    return CUSTOM_WEB_URL or github_web_url()
+
+
+def trusted_web_urls():
+    return [u for u in (CUSTOM_WEB_URL, github_web_url()) if u]
 
 AIRPORTS_URL = "https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv"
 

@@ -43,7 +43,8 @@ def _trusted():
         url = (webview.windows[0].get_current_url() or "") if webview.windows else ""
     except Exception:
         return True            # adresu nejde zjistit (např. při načítání) – aplikaci kvůli tomu nerozbíjet
-    return not url or url.startswith(core.web_url()) or not core.web_url()
+    allowed = core.trusted_web_urls()
+    return not url or not allowed or any(url.startswith(u) for u in allowed)
 
 
 def guarded(fn):
@@ -208,9 +209,23 @@ class Api:
         return True
 
 
+def pick_web_url():
+    """Vlastní adresa webu, pokud už funguje; jinak záložní adresa od GitHubu."""
+    import urllib.request
+    for u in core.trusted_web_urls():
+        try:
+            req = urllib.request.Request(u + "config.js", headers={"User-Agent": "JachymAirTracker"})
+            with urllib.request.urlopen(req, timeout=6) as r:
+                if r.status == 200:
+                    return u
+        except Exception:
+            continue
+    return core.web_url()
+
+
 def run_webview():
     import webview
-    url = core.web_url()
+    url = pick_web_url()
     if not url:
         raise RuntimeError("Adresa webu není nastavená")
     webview.create_window(

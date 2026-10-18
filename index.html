@@ -464,6 +464,7 @@ async function loadJai() {
 
 function trackerDownloadUrl() {
   if (CFG.TRACKER_URL) return CFG.TRACKER_URL;
+  if (CFG.GITHUB_REPO) return `https://github.com/${CFG.GITHUB_REPO}/releases/latest/download/JachymAirTracker.exe`;
   const h = location.hostname;
   if (h.endsWith(".github.io")) {
     const owner = h.split(".")[0];
