@@ -313,4 +313,9 @@ class App:
 def run_tk():
     root = tk.Tk()
     App(root)
+
+    def on_close():
+        core.on_exit()           # rozpracovaný let uložit, ne zahodit
+        root.destroy()
+    root.protocol("WM_DELETE_WINDOW", on_close)
     root.mainloop()

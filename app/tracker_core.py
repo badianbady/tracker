@@ -34,9 +34,12 @@ try:
     import build_info          # vytvoří ho GitHub při sestavení aplikace
     VERSION = build_info.VERSION
     REPO = build_info.REPO
+    CHANNEL = getattr(build_info, "CHANNEL", "stable")
 except ImportError:
     VERSION = "0.4.0-dev"
     REPO = ""
+    CHANNEL = "stable"
+BETA = CHANNEL == "beta"
 
 FROZEN = getattr(sys, "frozen", False)
 RES_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -67,6 +70,11 @@ def github_web_url():
 def web_url():
     """Adresa webu, kterou aplikace otevírá."""
     return CUSTOM_WEB_URL or github_web_url()
+
+
+def web_page():
+    """Stránka, kterou aplikace načte: testovací verze webu pro betu, jinak hlavní."""
+    return "beta.html" if BETA else ""
 
 
 def trusted_web_urls():
@@ -116,6 +124,7 @@ state = {
     "sb_plan": None,       # plán ze SimBriefu
     "flight_info": {},     # ručně zadané údaje o letu
     "squawk": None,
+    "live_landing": None,
     "reg_default": False,
     "reg": None,
     "ac_model": None,
@@ -447,6 +456,7 @@ class Cloud:
         body["ac_icao"] = ((s.get("plan") or {}).get("aircraft") or s.get("ac_model") or None)
         body["va"] = current_va(s)
         body["squawk"] = s.get("squawk")
+        body["landing"] = s.get("live_landing")
         body["takeoff_at"] = (s.get("dep") or {}).get("iso")
         if with_trail:
             body["trail"] = s["trail"]
@@ -906,6 +916,42 @@ class Crew:
 crew = Crew()
 
 
+def upload_flight(flight, fuel_used=None, file_crew=True, sync=False):
+    def send():
+        if file_crew and crew.linked and crew.auto:
+            flight["crew_status"] = crew.file_flight(flight, fuel_used)
+        ok, msg = cloud.send_flight(flight) if state["online"] else (False, "nepřihlášen")
+        if ok:
+            log("   Let uložen na web ✔")
+        else:
+            queue_flight(flight)
+            log(f"   Let se nepodařilo uložit ({msg}), zkusím to znovu později.")
+    if sync:
+        send()
+    else:
+        threading.Thread(target=send, daemon=True).start()
+
+
+RECORDER = None
+
+
+def flight_state():
+    return RECORDER.state_name() if RECORDER else "idle"
+
+
+def finish_flight(sync=False):
+    return RECORDER.finish_now(sync=sync) if RECORDER else "nothing"
+
+
+def on_exit():
+    """Při zavření aplikace: rozpracovaný let uložit (ne zahodit)."""
+    try:
+        if RECORDER and RECORDER.state_name() != "idle":
+            finish_flight(sync=True)
+    except Exception as e:
+        log("Let se při zavírání nepodařilo uložit:", e)
+
+
 def clean_flight(flight):
     """Hodnoty ohlídané tak, aby je databáze vždy přijala."""
     body = {k: v for k, v in flight.items() if k not in ("local_id", "hold_until")}
@@ -921,6 +967,8 @@ def clean_flight(flight):
             while len(pts) > 2900:
                 pts = pts[:1] + pts[1:-1:2] + pts[-1:]
             body[key] = pts
+    if body.get("incomplete") is None:
+        body.pop("incomplete", None)
     for key, n in (("flight_no", 10), ("rwy", 8), ("plan_arr", 8), ("plan_altn", 8), ("reg", 12), ("ac_icao", 12), ("va", 8), ("crew_status", 300)):
         if isinstance(body.get(key), str):
             body[key] = body[key][:n]
@@ -1093,6 +1141,13 @@ class FlightRecorder:
     def update(self, t, on_ground, vs_fpm, g, info):
         lat, lon = info.get("lat", 0), info.get("lon", 0)
         gs, hdg, alt = info.get("gs", 0), info.get("hdg", 0), info.get("alt", 0)
+        agl = info.get("agl")
+        # Při načítání letu hlásí MSFS chvíli „ve vzduchu“ i na stání. Za let se počítá jen opravdový pohyb:
+        # rychlost nad 30 kt nebo výška nad 100 ft nad zemí. Jinak se letadlo bere jako na zemi.
+        if not on_ground and gs < 30 and (agl is None or agl < 100) and (self.was_on_ground or self.was_on_ground is None):
+            on_ground = True
+        if not on_ground and agl is not None:
+            self.max_agl = max(getattr(self, "max_agl", None) or 0, agl)
         if self.was_on_ground is None:
             self.was_on_ground = on_ground
             if not on_ground:
@@ -1143,7 +1198,10 @@ class FlightRecorder:
             self.last_pos = (lat, lon)
         elif not self.was_on_ground:
             airborne = t - (self.air_since or t)
-            if airborne > 15 and t - self.last_landing_t > 10:
+            mx = getattr(self, "max_agl", None)
+            real_flight = mx is None or mx >= 50            # nejen poskočení / načítání letu
+            self.max_agl = None
+            if airborne > 15 and real_flight and t - self.last_landing_t > 10:
                 gmax = max([gg for tt, gg in self.recent_g if t - tt < 0.6] + [g])
                 self.pending = {"t": t, "fpm": -abs(self.last_air_vs), "g": gmax, "info": dict(info), "bounces": 0}
                 self.last_landing_t = t
@@ -1159,8 +1217,8 @@ class FlightRecorder:
 
     def _start(self, t, lat, lon, known):
         ap = nearest_airport(lat, lon) if known else None
-        self.takeoff = {"t": t, "iso": now_iso(), "icao": ap[0] if ap else None, "name": ap[1] if ap else None,
-                        "landed": False, "fuel": state.get("fuel_lbs")}
+        self.takeoff = {"t": t, "iso": now_iso(), "wall": time.time(), "icao": ap[0] if ap else None,
+                        "name": ap[1] if ap else None, "landed": False, "fuel": state.get("fuel_lbs")}
         self.dist = 0.0
         self.last_pos = (lat, lon)
         self.path = list(self.pre_path) if known else []
@@ -1172,9 +1230,20 @@ class FlightRecorder:
         if known:
             log(f"🛫 Vzlet{' z ' + ap[0] if ap else ''}")
 
-    def finalize(self, lat=None, lon=None):
-        """Uzavře dokončený let (po dojetí na stání, novém vzletu nebo odpojení simulátoru) a odešle ho."""
+    def state_name(self):
+        if self.post:
+            return "landed"
+        if self.takeoff and not self.takeoff.get("landed") and not self.was_on_ground:
+            return "flying"
+        if self.takeoff and not self.takeoff.get("landed"):
+            return "flying"          # na zemi po vzletu bez přistání (např. přerušený let)
+        return "idle"
+
+    def finalize(self, lat=None, lon=None, sync=False):
+        """Uzavře dokončený let (po dojetí na stání, tlačítkem, novém vzletu nebo odpojení simulátoru) a odešle ho."""
         post, self.post = self.post, None
+        with lock:
+            state["live_landing"] = None
         if not post:
             return
         flight = post["flight"]
@@ -1191,16 +1260,58 @@ class FlightRecorder:
         unqueue_flight(flight.get("local_id"))
         fuel_used = post["fuel_lbs"]
 
-        def send():
-            if crew.linked and crew.auto:
-                flight["crew_status"] = crew.file_flight(flight, fuel_used)
-            ok, msg = cloud.send_flight(flight) if state["online"] else (False, "nepřihlášen")
-            if ok:
-                log("   Let uložen na web ✔")
-            else:
-                queue_flight(flight)
-                log(f"   Let se nepodařilo uložit ({msg}), zkusím to znovu později.")
-        threading.Thread(target=send, daemon=True).start()
+        upload_flight(flight, fuel_used, file_crew=True, sync=sync)
+
+    def save_partial(self, lat=None, lon=None, sync=False):
+        """Let bez přistání (zavřená aplikace nebo simulátor uprostřed letu, tlačítko Ukončit let):
+        uloží, co se doletělo, jako nedokončený let."""
+        to = self.takeoff
+        if not to or to.get("landed"):
+            return False
+        to["landed"] = True
+        ap = nearest_airport(lat, lon) if (lat and lon and self.was_on_ground) else None
+        with lock:
+            plan = dict(state["plan"]) if state.get("plan") else None
+            callsign = state["callsign"]
+            state["dep"] = None
+        path = list(self.path)
+        if lat and lon:
+            path.append([round(lat, 5), round(lon, 5), int(state.get("alt") or 0)])
+        while len(path) > 2900:
+            path = path[:1] + path[1:-1:2] + path[-1:]
+        dur = round(max(0, time.time() - (to.get("wall") or time.time())) / 60, 1)
+        flight = {
+            "callsign": (plan or {}).get("callsign") or callsign, "aircraft": (state.get("aircraft") or "")[:80],
+            "dep_icao": to.get("icao"), "dep_name": to.get("name"),
+            "arr_icao": ap[0] if ap else None, "arr_name": ap[1] if ap else None,
+            "takeoff_at": to.get("iso"), "landed_at": now_iso(), "duration_min": dur,
+            "distance_nm": round(self.dist, 1), "path": path, "incomplete": True,
+            "plan_arr": plan and plan.get("arr"), "plan_altn": plan and plan.get("altn"),
+            "flight_no": plan and plan.get("flight_no"), "route": plan and (plan.get("route") or "")[:2000],
+            "sched_off": plan and plan.get("sched_off"), "sched_on": plan and plan.get("sched_on"),
+            "plan_fixes": plan and plan.get("fixes"), "reg": current_reg(state),
+            "ac_icao": ((plan or {}).get("aircraft") or state.get("ac_model") or None),
+            "va": current_va(state, dep=to.get("icao")),
+        }
+        self.path = []
+        self._publish([])
+        self.was_on_ground = None          # další vzorek začne nový záznam
+        self.pending = None
+        self.air_since = None
+        log("Let ukončen bez přistání – ukládám, co se doletělo.")
+        if self.upload:
+            upload_flight(flight, None, file_crew=False, sync=sync)
+        return True
+
+    def finish_now(self, sync=False):
+        """Tlačítko Uložit let / zavření aplikace: uloží let hned."""
+        lat, lon = state.get("lat"), state.get("lon")
+        if self.post:
+            self.finalize(lat, lon, sync=sync)
+            return "saved"
+        if self.save_partial(lat, lon, sync=sync):
+            return "partial"
+        return "nothing"
 
     def _finish(self, now_info=None):
         p, self.pending = self.pending, None
@@ -1286,6 +1397,10 @@ class FlightRecorder:
         if self.upload:
             queue_flight(dict(flight, hold_until=time.time() + 16 * 60))
         self.post = {"flight": flight, "fuel_lbs": fuel_used, "t": time.time()}
+        with lock:
+            state["live_landing"] = {k: flight.get(k) for k in ("td_lat", "td_lon", "fpm", "g", "score", "rwy", "rwy_dist_m",
+                                                                 "rwy_offset_m", "td_ias", "td_gs", "wind_dir", "wind_kt",
+                                                                 "headwind", "crosswind", "bounces", "arr_icao", "callsign")}
 def phase_of(on_ground, vs, agl, gs):
     if on_ground:
         return "Na zemi" if gs < 40 else "Rozjezd"
@@ -1344,7 +1459,9 @@ def sim_loop():
                 return td_req.value if td_req is not None else None
 
             if rec is None:
+                global RECORDER
                 rec = FlightRecorder(touchdown_reader=read_td)
+                RECORDER = rec
             else:
                 rec.touchdown_reader = read_td
             title, title_t = "", 0.0
@@ -1374,7 +1491,7 @@ def sim_loop():
                     hdg = math.degrees(hdg)
                 lat = aq.get("PLANE_LATITUDE")
                 lon = aq.get("PLANE_LONGITUDE")
-                if lat is None or lon is None or (abs(lat) < 0.01 and abs(lon) < 0.01) or lat == 0 or lon == 0:
+                if lat is None or lon is None or (abs(lat) < 1 and abs(lon) < 1) or lat == 0 or lon == 0:
                     time.sleep(0.1)       # simulátor se načítá nebo neposlal polohu – vzorek přeskočit
                     continue
                 if t - title_t > 10:
@@ -1414,7 +1531,7 @@ def sim_loop():
 
                 push(on_ground, alt, agl, ias, gs, vs, hdg, g, lat, lon, title)
                 rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "ias": ias,
-                                                 "alt": alt, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
+                                                 "alt": alt, "agl": agl, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
                 time.sleep(0.05)
         except Exception as e:
             if "Did not find" not in str(e):
@@ -1422,6 +1539,8 @@ def sim_loop():
                 waiting_logged = False
             if rec is not None and rec.post:
                 rec.finalize()
+            elif rec is not None and rec.state_name() == "flying":
+                rec.save_partial(state.get("lat"), state.get("lon"))
             time.sleep(5)
 
 
@@ -1430,7 +1549,9 @@ def demo_loop():
     with lock:
         state["demo"] = True
     log("DEMO režim: simuluji let, přistání přijde zhruba každé 2 minuty. Na web se nic neposílá.")
+    global RECORDER
     rec = FlightRecorder(upload=False)
+    RECORDER = rec
     start = time.time()
     alt = 1200.0
     target_fpm = -random.randint(60, 480)
@@ -1537,10 +1658,13 @@ def check_update():
     if not REPO:
         return
     try:
-        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
+        path = "releases?per_page=15" if BETA else "releases/latest"
+        req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/{path}",
                                      headers={"User-Agent": "JachymAirTracker", "Accept": "application/vnd.github+json"})
         with urllib.request.urlopen(req, timeout=15) as r:
             rel = json.loads(r.read())
+        if isinstance(rel, list):          # beta: nejnovější vydání včetně testovacích
+            rel = max((x for x in rel if not x.get("draft")), key=lambda x: parse_ver(x.get("tag_name")), default={})
         tag = rel.get("tag_name", "")
         if parse_ver(tag) <= parse_ver(VERSION):
             return

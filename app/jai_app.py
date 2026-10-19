@@ -74,6 +74,8 @@ class Api:
         s["version"] = core.VERSION
         s["va_now"] = core.current_va(core.state)
         s["reg_now"] = core.current_reg(core.state)
+        s["flight_state"] = core.flight_state()
+        s["beta"] = core.BETA
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -150,6 +152,11 @@ class Api:
         return {"ok": "✔" in status, "msg": status}
 
     @guarded
+    def finish_flight(self):
+        res = core.finish_flight(sync=False)
+        return {"ok": res != "nothing", "result": res}
+
+    @guarded
     def set_flight_info(self, info):
         core.set_flight_info(info or {})
         if isinstance(info, dict) and "reg" in info:
@@ -188,6 +195,8 @@ class Api:
         info = core.state.get("update")
         if not info:
             return False
+        if core.flight_state() == "flying":
+            return {"ok": False, "msg": "Aktualizovat půjde po přistání."}
 
         with core.lock:
             core.state["update_error"] = None
@@ -228,10 +237,14 @@ def run_webview():
     url = pick_web_url()
     if not url:
         raise RuntimeError("Adresa webu není nastavená")
-    webview.create_window(
-        "Jáchym Air Tracker", f"{url}?app=1&v={int(time.time())}", js_api=Api(),
+    window = webview.create_window(
+        "Jáchym Air Tracker" + (" (beta)" if core.BETA else ""), f"{url}{core.web_page()}?app=1&v={int(time.time())}", js_api=Api(),
         width=1360, height=860, min_size=(960, 620), background_color="#F3F6F4",
     )
+
+    def on_closing():
+        core.on_exit()           # rozpracovaný let uložit, ne zahodit
+    window.events.closing += on_closing
     webview.settings["ALLOW_DOWNLOADS"] = True
     storage = os.path.join(core.DATA_DIR, "webview")
     os.makedirs(storage, exist_ok=True)
