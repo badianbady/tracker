@@ -6,7 +6,11 @@ on:
       version:
         description: "Číslo nové verze (např. 0.4.0)"
         required: true
-        default: "0.5.0"
+        default: "1.0.1"
+      beta:
+        description: "Testovací verze (beta) – běžným uživatelům se nenabídne"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -15,9 +19,9 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -29,16 +33,18 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           REPO: ${{ github.repository }}
-        run: printf 'VERSION = "%s"\nREPO = "%s"\n' "$VERSION" "$REPO" > app/build_info.py
+          CHANNEL: ${{ inputs.beta && 'beta' || 'stable' }}
+        run: printf 'VERSION = "%s"\nREPO = "%s"\nCHANNEL = "%s"\n' "$VERSION" "$REPO" "$CHANNEL" > app/build_info.py
 
       - name: Sestavení .exe
         working-directory: app
-        run: pyinstaller --noconfirm --onefile --windowed --name JachymAirTracker --icon icon.ico --add-data "overlay.html;." --add-data "icon.ico;." --collect-all SimConnect --hidden-import build_info --hidden-import app_tk --collect-all webview jai_app.py
+        run: pyinstaller --noconfirm --onefile --windowed --name JachymAirTracker --icon icon.ico --add-data "overlay.html;." --add-data "icon.ico;." --collect-all SimConnect --hidden-import build_info --hidden-import app_tk --hidden-import tkinter --hidden-import _tkinter --collect-all webview --collect-all clr_loader --collect-all pythonnet jai_app.py
 
       - name: Vydání na GitHubu
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ inputs.version }}
-          name: Jáchym Air Tracker ${{ inputs.version }}
+          tag_name: v${{ inputs.version }}${{ inputs.beta && '-beta' || '' }}
+          name: Jáchym Air Tracker ${{ inputs.version }}${{ inputs.beta && ' (beta)' || '' }}
           files: app/dist/JachymAirTracker.exe
-          make_latest: true
+          prerelease: ${{ inputs.beta }}
+          make_latest: ${{ inputs.beta && 'false' || 'true' }}
