@@ -1153,6 +1153,9 @@ class FlightRecorder:
             if not on_ground:
                 self.air_since = t
                 self._start(t, lat, lon, known=False)
+                log("Tracker se připojil až za letu – vzlet a pojíždění chybí.")
+            elif gs > 3:
+                log("Tracker se připojil až během pojíždění – trasa začíná odsud.")
             return
 
         if on_ground:
@@ -1172,10 +1175,13 @@ class FlightRecorder:
             elif not self.pending:
                 # pojíždění před vzletem
                 if gs > 3:
+                    if not self.pre_path:
+                        log("Zaznamenávám pojíždění…")
                     self._maybe_point(t, lat, lon, 0, hdg, 5, 20, target=self.pre_path)
-                elif self.stopped_since and t - self.stopped_since > 600 and self.pre_path:
-                    self.pre_path = []          # dlouhé stání = začátek nového letu
+                elif self.stopped_since and t - self.stopped_since > 45 * 60 and self.pre_path:
+                    self.pre_path = []          # velmi dlouhé stání (přes 45 min) = začátek nového letu
                     self._publish([])
+                    log("Dlouhé stání – předchozí pojíždění zahozeno.")
 
         if not on_ground:
             if self.was_on_ground:
