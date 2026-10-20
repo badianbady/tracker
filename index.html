@@ -499,8 +499,18 @@ function initAppMode() {
 window.addEventListener("pywebviewready", initAppMode);
 if (new URLSearchParams(location.search).has("app")) setTimeout(initAppMode, 1500);
 
+// Starší verze aplikace s touto adresou webu nekomunikují – pozná se to podle chybějícího čísla verze.
+let appStale = false;
 async function pollApp() {
-  try { appState = await appApi.get_state(); } catch { return; }
+  try { appState = await appApi.get_state(); } catch { appState = { ok: false }; }
+  appStale = !appState || !appState.version;
+  if (appStale) {
+    const pill = $("appPill");
+    pill.classList.remove("ok"); pill.classList.add("upd");
+    $("appPillText").textContent = "Aktualizuj aplikaci";
+    if ($("view-tracker").classList.contains("on") && !$("staleCard")) renderTracker(true);
+    return;
+  }
   const s = appState, pill = $("appPill");
   pill.classList.toggle("ok", !!s.connected);
   pill.classList.toggle("upd", !!s.update);
@@ -511,6 +521,18 @@ async function pollApp() {
 function renderTracker(full) {
   const el = $("tracker"), s = appState;
   if (!appApi || !s) { el.innerHTML = '<div class="card">Tato stránka funguje jen v aplikaci Jáchym Air Tracker.</div>'; return; }
+  if (appStale) {
+    renderTracker.sig = null;
+    el.innerHTML = `<h1 class="page-title">Tracker</h1>
+      <div class="card" id="staleCard" style="border:2px solid var(--warn)">
+        <h2 class="section-title">Tvoje aplikace je zastaralá</h2>
+        <p>Tahle verze aplikace se neumí spojit s aktuálním webem, proto tu nevidíš stav letu ani nabídku aktualizace. Sledování letů v ní může fungovat jen částečně.</p>
+        <p><b>Jak to opravit:</b> zavři aplikaci, stáhni si novou verzi a starý soubor <code>JachymAirTracker.exe</code> jí nahraď. Přihlášení i nastavení zůstanou.</p>
+        <p><a class="btn" href="${esc(trackerDownloadUrl())}" target="_blank" rel="noopener">Stáhnout novou verzi</a></p>
+        <p class="muted" style="font-size:13px;margin:0">Když Windows ukáže modré okno, klikni na „Další informace“ a „Přesto spustit“.</p>
+      </div>`;
+    return;
+  }
   const sig = `${s.online}|${s.crew?.linked}|${!!s.plan}|${(s.crew?.bids || []).map(b => b.id).join(",")}`;
   if (!vaList.length && !renderTracker.vaWait) { renderTracker.vaWait = true; vaReady.then(() => renderTracker(true)); }
   if (full || !$("trNums") || sig !== renderTracker.sig) {
