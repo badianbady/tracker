@@ -304,6 +304,17 @@
   .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
   .incomplete { background: #FEF3C7; color: #78350F; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 999px; }
   .save-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .rot { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; display: grid; grid-template-columns: 1fr auto; gap: 10px 18px; align-items: start; }
+  .rot.mine { border: 2px solid var(--green); }
+  .rot.taken { opacity: .75; }
+  .rot-legs { display: flex; flex-direction: column; gap: 4px; font-variant-numeric: tabular-nums; }
+  .rot-leg { display: grid; grid-template-columns: 80px 1fr; gap: 10px; font-size: 15px; }
+  .rot-leg b { font-family: var(--display); }
+  .rot-meta { font-size: 13px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .rot-side { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .day-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .rot-list { display: flex; flex-direction: column; gap: 10px; }
+  @media (max-width: 640px) { .rot { grid-template-columns: 1fr; } .rot-side { align-items: flex-start; flex-direction: row; flex-wrap: wrap; } }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -382,6 +393,7 @@
     <a href="#/zebricek" data-r="zebricek">Žebříček</a>
     <a href="#/piloti" data-r="piloti">Piloti</a>
     <a href="#/novinky" data-r="novinky">Novinky</a>
+    <a href="#/rozpis" data-r="rozpis">Rozpis</a>
     <a href="#/fotky" data-r="fotky">Fotky</a>
     <a href="#/pratele" data-r="pratele" id="navFriends">Přátelé</a>
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
@@ -413,6 +425,7 @@
   <section class="view" id="view-novinky"><div class="page" id="novinky"></div></section>
   <section class="view" id="view-pratele"><div class="page" id="pratele"></div></section>
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
+  <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
   <section class="view" id="view-soukromi"><div class="page legal" id="soukromi"></div></section>
   <section class="view" id="view-pravidla"><div class="page legal" id="pravidla"></div></section>
@@ -750,7 +763,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -776,6 +789,7 @@ async function router() {
   if (view === "soukromi") renderPrivacy();
   if (view === "pravidla") renderRules();
   if (view === "fotky") renderGallery();
+  if (view === "rozpis") renderRoster(parts[1]);
 }
 window.addEventListener("hashchange", router);
 
@@ -2028,6 +2042,9 @@ async function renderAdmin(editId, msg) {
         <label class="switch" style="margin-bottom:14px"><input type="checkbox" id="evPin" ${e.pinned ? "checked" : ""}> Připnout (má přednost na hlavní stránce)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">${e.id ? "Uložit změny" : "Vytvořit"}</button>${e.id ? '<button type="button" class="btn ghost" id="evCancel">Zrušit úpravy</button>' : ""}</div>
       </form>
+      <div class="card" style="grid-column:1/-1"><h2 class="section-title">Rozpis rotací</h2>
+        <p class="muted" style="margin-top:0">Tracker poskládá z linek a jejich časů rotace: z Alžíru zpět do Alžíru a mezi minihuby s letadly z minihubů. Návrh si projdi, případně něco vyřaď, a zveřejni.</p>
+        <div id="admRoster"><p class="muted">Načítám…</p></div></div>
       <div class="card" style="grid-column:1/-1"><h2 class="section-title">Flotila – provozní údaje</h2>
         <p class="muted" style="margin-top:0">Stáří, kapacita a poznámky k letadlům. Použijí se v briefinzích a při výpočtu obsazenosti.</p>
         <div id="admFleet"><p class="muted">Načítám…</p></div></div>
@@ -2057,7 +2074,7 @@ async function renderAdmin(editId, msg) {
           <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-edit="${x.id}">Upravit</button><button class="link-btn danger" data-del="${x.id}">Smazat</button></div></div>`).join("")
           : '<p class="muted">Zatím nic. Vytvoř první let týdne!</p>'}
       </div></div>`;
-  renderAdminPhotos(); renderAdminReports(); renderAdminFleet(); renderAdminApNotes();
+  renderAdminPhotos(); renderAdminReports(); renderAdminFleet(); renderAdminApNotes(); renderAdminRoster();
   el.querySelectorAll("[data-delva]").forEach(b => b.onclick = async () => {
     if (!confirm("Smazat virtuálku?")) return;
     await sb.from("virtual_airlines").delete().eq("code", b.dataset.delva); await loadVAs(); renderAdmin();
@@ -2147,6 +2164,260 @@ function shrinkImage(file, maxW) {
     img.onerror = () => rej(new Error("tohle není obrázek")); img.src = url;
   });
 }
+/* ---------- čas podle českých hodin (rozpis je v českém čase) ---------- */
+function tzOffsetMin(date) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Prague", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+    .formatToParts(date).map(x => [x.type, x.value]));
+  return (Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - date.getTime()) / 60000;
+}
+function pragueToUtc(day, minutes) {
+  const [y, m, d] = day.split("-").map(Number), base = Date.UTC(y, m - 1, d, 0, minutes);
+  let t = base;
+  for (let i = 0; i < 2; i++) t = base - tzOffsetMin(new Date(t)) * 60000;
+  return new Date(t);
+}
+const pragueDay = date => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Prague" }).format(date);
+const hmPrague = d => new Date(d).toLocaleTimeString("cs-CZ", { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit" });
+const dayLabel = day => { const t = pragueDay(new Date()), tm = pragueDay(new Date(Date.now() + 864e5));
+  return day === t ? "Dnes" : day === tm ? "Zítra" : new Date(day + "T12:00:00Z").toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" }); };
+function parseHM(str) { const m = String(str || "").match(/(\d{1,2})\s*[:.h]?\s*(\d{2})/); if (!m) return null; const h = +m[1], mi = +m[2]; return h < 24 && mi < 60 ? h * 60 + mi : null; }
+
+/* ---------- základny, poloha pilota ---------- */
+let basesList = [];
+async function loadBases() { if (!sb) return; const { data } = await sb.from("bases").select("*").order("kind").order("name"); basesList = data || []; }
+const basesReady = new Promise(res => setTimeout(() => loadBases().then(res, res), 0));
+const baseName = icao => basesList.find(b => b.icao === icao)?.name || apByCode(icao)?.[1] || icao;
+async function myPosition() {
+  if (!me) return null;
+  const { data } = await sb.from("pilot_positions").select("*").eq("user_id", me.user.id).maybeSingle();
+  return data;
+}
+
+/* ---------- rozpis rotací pro piloty ---------- */
+let rosterDay = null, rosterBase = "mine";
+async function renderRoster(_param, msg) {
+  const el = $("rozpis");
+  el.innerHTML = '<h1 class="page-title">Rozpis</h1><p class="muted">Načítám…</p>';
+  await Promise.all([basesReady, airportsReady, routesReady]);
+  if (!fleetCache) await loadFleetDetails();
+  const pos = await myPosition();
+  const myBase = me?.profile?.base_icao || null;
+  const today = pragueDay(new Date());
+  const days = [...Array(7)].map((_, i) => pragueDay(new Date(Date.now() + i * 864e5)));
+  if (!rosterDay || !days.includes(rosterDay)) rosterDay = today;
+  const { data: rots, error } = await sb.from("rotations").select("*, profiles(username)").gte("service_day", today).lte("service_day", days[6])
+    .neq("status", "cancelled").order("std");
+  if (error) { el.innerHTML = `<h1 class="page-title">Rozpis</h1><div class="card">Rozpis zatím není připravený. (${esc(error.message)})</div>`; return; }
+  const mineList = (rots || []).filter(r => me && r.pilot_id === me.user.id && r.status === "taken");
+  const baseFilter = rosterBase === "mine" ? (myBase ? [myBase] : null) : rosterBase === "all" ? null : [rosterBase];
+  const pool = baseFilter ? basesList.find(b => b.icao === baseFilter[0])?.pool : null;
+  const dayRots = (rots || []).filter(r => r.service_day === rosterDay && (!baseFilter || r.base_icao === baseFilter[0] || (pool === "MINI" && r.pool === "MINI" && baseFilter[0] === r.legs[0]?.dep)));
+  const where = pos?.icao || myBase;
+  el.innerHTML = `<h1 class="page-title">Rozpis</h1>
+    <p class="lead">Rotace Jáchym Air podle rozpisu. Časy jsou v českém čase. Brzy přibudou briefingy a body za dochvilnost.</p>
+    ${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    ${me ? `<div class="grid2" style="margin-bottom:20px;align-items:start">
+      <div class="card"><h2 class="section-title">Moje základna a poloha</h2>
+        <div class="tr-row"><span>Základna</span><b>${myBase ? `${esc(myBase)} · ${esc(baseName(myBase))}` : "nevybraná"}</b></div>
+        <div class="tr-row"><span>Teď jsem</span><b>${pos ? `${esc(pos.icao)} · ${esc(baseName(pos.icao))}` : "neznámo – nastaví se po prvním letu"}</b></div>
+        <div class="row2" style="margin-top:12px">
+          <form id="baseForm" class="field" style="margin:0"><label for="baseSel">Změnit základnu</label>
+            <div style="display:flex;gap:6px"><select id="baseSel">${basesList.map(b => `<option value="${b.icao}" ${b.icao === myBase ? "selected" : ""}>${esc(b.name)} (${b.icao})</option>`).join("")}</select><button class="btn ghost" style="padding:8px 12px">Uložit</button></div>
+            <small>Jednou za 7 dní</small></form>
+          <form id="dhForm" class="field" style="margin:0"><label for="dhSel">Přeletět jako cestující</label>
+            <div style="display:flex;gap:6px"><select id="dhSel">${basesList.map(b => `<option value="${b.icao}">${esc(b.name)} (${b.icao})</option>`).join("")}</select><button class="btn ghost" style="padding:8px 12px">Přesunout</button></div>
+            <small>Jednou za 48 hodin</small></form>
+        </div></div>
+      <div class="card"><h2 class="section-title">Mám teď čas</h2>
+        <p class="muted" style="margin-top:0">Najdu volnou rotaci s odletem z místa, kde jsi${where ? ` (${esc(where)})` : ""}, v příštích 4 hodinách.</p>
+        <button class="btn" id="nowBtn" ${where ? "" : "disabled"}>Najít rotaci</button><div id="nowRes" style="margin-top:12px"></div></div>
+    </div>` : '<div class="card" style="margin-bottom:20px">Pro braní rotací se <a href="#/ucet">přihlas</a>.</div>'}
+    ${mineList.length ? `<h2 class="section-title">Moje rotace</h2><div class="rot-list" style="margin-bottom:24px">${mineList.map(r => rotCard(r)).join("")}</div>` : ""}
+    <h2 class="section-title">Rozpis podle dnů</h2>
+    <div class="day-tabs">${days.map(d => `<button class="tab ${d === rosterDay ? "on" : ""}" data-day="${d}">${dayLabel(d)}</button>`).join("")}
+      <select id="baseFilter" style="margin-left:auto;padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--text)">
+        <option value="mine" ${rosterBase === "mine" ? "selected" : ""}>Moje základna</option><option value="all" ${rosterBase === "all" ? "selected" : ""}>Všechny základny</option>
+        ${basesList.map(b => `<option value="${b.icao}" ${rosterBase === b.icao ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</select></div>
+    <div class="rot-list">${dayRots.length ? dayRots.map(r => rotCard(r)).join("") : `<div class="card">${baseFilter && !myBase && rosterBase === "mine" ? "Nejdřív si vyber základnu, nebo přepni na Všechny základny." : "Na tenhle den tu zatím nejsou žádné rotace."}</div>`}</div>`;
+  el.querySelectorAll("[data-day]").forEach(b => b.onclick = () => { rosterDay = b.dataset.day; renderRoster(); });
+  if ($("baseFilter")) $("baseFilter").onchange = e => { rosterBase = e.target.value; renderRoster(); };
+  if ($("baseForm")) $("baseForm").onsubmit = async e => {
+    e.preventDefault();
+    const { error } = await sb.from("profiles").update({ base_icao: $("baseSel").value }).eq("id", me.user.id);
+    await loadMe(); renderRoster(null, error ? { ok: false, text: error.message.replace(/^.*?: /, "") } : { ok: true, text: "Základna uložena." });
+  };
+  if ($("dhForm")) $("dhForm").onsubmit = async e => {
+    e.preventDefault();
+    const icao = $("dhSel").value;
+    if (pos?.icao === icao) { renderRoster(null, { ok: false, text: "Tam už jsi." }); return; }
+    if (!confirm(`Přeletět jako cestující do ${baseName(icao)}? Další přesun půjde až za 48 hodin.`)) return;
+    const { error } = await sb.from("pilot_positions").upsert({ user_id: me.user.id, icao });
+    renderRoster(null, error ? { ok: false, text: error.message } : { ok: true, text: `Jsi v ${baseName(icao)}. Hezký let jako cestující! 🧳` });
+  };
+  if ($("nowBtn")) $("nowBtn").onclick = () => {
+    const now = Date.now();
+    const cand = (rots || []).filter(r => r.status === "open" && r.legs[0]?.dep === where && new Date(r.std) > now - 15 * 60000 && new Date(r.std) < now + 4 * 3600e3);
+    $("nowRes").innerHTML = cand.length ? `<div class="rot-list">${cand.slice(0, 3).map(r => rotCard(r)).join("")}</div>`
+      : `<p class="muted" style="margin:0">Z ${esc(where)} teď v příštích 4 hodinách nic neletí. Zkus jiný den, nebo se přesuň jako cestující.</p>`;
+    bindRotButtons($("nowRes"));
+  };
+  bindRotButtons(el);
+}
+function rotCard(r) {
+  const mine = me && r.pilot_id === me.user.id, legs = r.legs || [];
+  const block = Math.round((new Date(r.sta) - new Date(r.std)) / 60000);
+  const fd = (fleetCache || []).find(f => f.registration === r.reg);
+  return `<div class="rot ${mine ? "mine" : ""} ${r.status === "taken" && !mine ? "taken" : ""}">
+    <div><div class="rot-meta" style="margin-bottom:6px"><b style="color:var(--text)">${dayLabel(r.service_day)}</b><span>${esc(r.ac_type || "")}${r.reg ? " · " + esc(r.reg) : ""}</span>
+      ${fd?.training_only ? '<span class="va-chip">výcvik palubní posádky</span>' : ""}<span>${legs.length} ${legs.length === 1 ? "let" : legs.length < 5 ? "lety" : "letů"} · ${fmtDur(block)} h</span></div>
+      <div class="rot-legs">${legs.map(l => `<div class="rot-leg"><b><a href="#/linka/${encodeURIComponent(l.route_id)}">${esc(l.flight_no)}</a></b>
+        <span>${esc(l.dep)} <b>${hmPrague(l.std)}</b> → ${esc(l.arr)} <b>${hmPrague(l.sta)}</b>${l.load_factor != null ? ` <span class="muted" style="font-size:13px">· obs. ~${Math.round(l.load_factor)} %</span>` : ""}</span></div>`).join("")}</div></div>
+    <div class="rot-side">${r.status === "open" ? (me ? `<button class="btn" data-take="${r.id}">Vzít rotaci</button>` : "")
+      : mine ? `<span class="badge">Tvoje rotace</span><button class="link-btn danger" data-giveback="${r.id}">Vrátit</button>${appApi ? `<button class="btn ghost" data-bidrot="${r.id}" style="padding:7px 12px">Rezervovat v crew centru</button>` : ""}`
+      : `<span class="muted" style="font-size:13px">Letí ${esc(r.profiles?.username || "někdo")}</span>`}</div></div>`;
+}
+let rotCacheById = new Map();
+function bindRotButtons(root) {
+  root.querySelectorAll("[data-take]").forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    const { error } = await sb.from("rotations").update({ pilot_id: me.user.id }).eq("id", +b.dataset.take);
+    renderRoster(null, error ? { ok: false, text: error.message.replace(/^.*?: /, "") } : { ok: true, text: `Rotace je tvoje! ${appApi ? "Lety si můžeš rovnou rezervovat v crew centru." : ""}` });
+  });
+  root.querySelectorAll("[data-giveback]").forEach(b => b.onclick = async () => {
+    if (!confirm("Vrátit rotaci do volného rozpisu?")) return;
+    const { error } = await sb.from("rotations").update({ pilot_id: null }).eq("id", +b.dataset.giveback);
+    renderRoster(null, error ? { ok: false, text: error.message } : { ok: true, text: "Rotace vrácena." });
+  });
+  root.querySelectorAll("[data-bidrot]").forEach(b => b.onclick = async () => {
+    b.disabled = true; b.textContent = "Rezervuji…";
+    const { data: r } = await sb.from("rotations").select("legs, reg").eq("id", +b.dataset.bidrot).maybeSingle();
+    const ac = (jaiFleet || []).find(a => (a.registration || "").toUpperCase() === (r?.reg || "").toUpperCase());
+    let ok = 0, last = "";
+    for (const l of r?.legs || []) { const res = await appApi.crew_bid(l.route_id, ac ? { id: ac.id, reg: ac.registration, icao: ac.icao } : null); if (res.ok) ok++; else last = res.msg; }
+    b.textContent = ok ? `Rezervováno ${ok} ✔` : "Nepovedlo se"; if (!ok && last) alert(last);
+  });
+}
+
+/* ---------- správa: generátor rozpisu ---------- */
+let fleetCache = null;
+async function loadFleetDetails() { const { data } = await sb.from("fleet_details").select("*"); fleetCache = data || []; return fleetCache; }
+const normType = t => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+function routeFitsType(rt, acType) {
+  const t = normType(acType); if (!rt.subfleets?.length) return true;
+  return rt.subfleets.some(sf => { const a = normType(sf.type), b = normType(sf.name); return a === t || a.includes(t) || t.includes(a.slice(0, 4)) || b.includes(t); });
+}
+async function generateRoster(startDay, nDays, maxLegs, maxDutyH) {
+  await Promise.all([basesReady, routesReady]);
+  const fleet = await loadFleetDetails();
+  const { data: notesRows } = await sb.from("airport_notes").select("icao, turnaround_min");
+  const turn = icao => (notesRows || []).find(n => n.icao === icao)?.turnaround_min || 40;
+  const timed = jaiRoutes.map(rt => {
+    const dep = parseHM(rt.dpt_time); if (dep == null) return null;
+    let arr = parseHM(rt.arr_time); if (arr == null && rt.flight_time_min) arr = dep + rt.flight_time_min; if (arr == null) return null;
+    if (arr <= dep) arr += 1440;
+    return { rt, dep, arr };
+  }).filter(Boolean);
+  const out = [];
+  for (let d = 0; d < nDays; d++) {
+    const day = pragueDay(new Date(new Date(startDay + "T12:00:00Z").getTime() + d * 864e5));
+    for (const pool of ["DAAG", "MINI"]) {
+      const baseSet = new Set(basesList.filter(b => b.pool === pool).map(b => b.icao));
+      const planes = fleet.filter(f => f.pool === pool);
+      const types = [...new Set(planes.map(p => p.ac_type).filter(Boolean))];
+      const busy = new Map(planes.map(p => [p.registration, -1]));
+      const used = new Set();
+      const starts = timed.filter(x => baseSet.has(x.rt.dep)).sort((a, b) => a.dep - b.dep);
+      for (const first of starts) {
+        if (used.has(first.rt.id)) continue;
+        let best = null;
+        for (const t of types.filter(t => routeFitsType(first.rt, t))) {
+          const stack = [[first]];
+          while (stack.length) {
+            const chain = stack.pop(), last = chain[chain.length - 1];
+            const ok = pool === "DAAG" ? last.rt.arr === chain[0].rt.dep : baseSet.has(last.rt.arr);
+            if (chain.length > 1 && ok && (last.arr - chain[0].dep) + 90 <= maxDutyH * 60) { if (!best || best.chain.length === 1 || chain.length < best.chain.length) best = { chain, type: t }; continue; }
+            // minihuby: samotný přelet mezi minihuby jen jako záloha, když nejde složit delší rotaci
+            if (chain.length === 1 && pool === "MINI" && ok && !best) best = { chain, type: t };
+            if (chain.length >= maxLegs) continue;
+            for (const nx of timed) {
+              if (nx.rt.dep !== last.rt.arr || used.has(nx.rt.id) || chain.some(c => c.rt.id === nx.rt.id)) continue;
+              if (nx.dep < last.arr % 1440 + turn(last.rt.arr) && !(last.arr >= 1440)) continue;
+              if (last.arr >= 1440 && nx.dep + 1440 < last.arr + turn(last.rt.arr)) continue;
+              if (!routeFitsType(nx.rt, t)) continue;
+              stack.push([...chain, nx]);
+            }
+          }
+          if (best) break;
+        }
+        if (!best) continue;
+        const startMin = best.chain[0].dep, endMin = best.chain[best.chain.length - 1].arr + (best.chain[best.chain.length - 1].dep < startMin ? 1440 : 0);
+        const plane = planes.filter(p => normType(p.ac_type) === normType(best.type)).find(p => busy.get(p.registration) <= startMin - 30);
+        if (!plane) continue;
+        busy.set(plane.registration, endMin);
+        best.chain.forEach(c => used.add(c.rt.id));
+        let dayOff = 0, prev = -1;
+        const legs = best.chain.map(c => {
+          if (c.dep < prev) dayOff += 1440;
+          prev = c.dep;
+          const std = pragueToUtc(day, c.dep + dayOff), sta = pragueToUtc(day, c.arr + dayOff);
+          return { route_id: c.rt.id, flight_no: fltNo(c.rt), dep: c.rt.dep, arr: c.rt.arr, std: std.toISOString(), sta: sta.toISOString(), load_factor: c.rt.load_factor, lf_var: c.rt.load_factor_variance };
+        });
+        out.push({ service_day: day, base_icao: best.chain[0].rt.dep, pool, reg: plane.registration, ac_type: plane.ac_type, legs, std: legs[0].std, sta: legs[legs.length - 1].sta });
+      }
+    }
+  }
+  return out;
+}
+let rosterPreview = [];
+async function renderAdminRoster(msg) {
+  const box = $("admRoster"); if (!box) return;
+  const today = pragueDay(new Date()), tomorrow = pragueDay(new Date(Date.now() + 864e5));
+  const { data: upcoming, error } = await sb.from("rotations").select("id, service_day, base_icao, reg, legs, status, profiles(username)").gte("service_day", today).order("std").limit(300);
+  if (error) { box.innerHTML = `<p class="muted">Nejdřív spusť úpravu databáze č. 16. (${esc(error.message)})</p>`; return; }
+  box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    <form id="genForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+      <div class="field" style="margin:0"><label for="genFrom">Od</label><input id="genFrom" type="date" value="${tomorrow}"></div>
+      <div class="field" style="margin:0"><label for="genDays">Dní</label><input id="genDays" type="number" min="1" max="14" value="7" style="width:80px"></div>
+      <div class="field" style="margin:0"><label for="genLegs">Max. letů v rotaci</label><input id="genLegs" type="number" min="2" max="6" value="4" style="width:90px"></div>
+      <div class="field" style="margin:0"><label for="genDuty">Max. služba (h)</label><input id="genDuty" type="number" min="4" max="14" value="10" style="width:90px"></div>
+      <button class="btn">Vygenerovat návrh</button></form>
+    <div id="genPreview" style="margin-top:14px"></div>
+    <h3 class="section-title" style="margin-top:22px;font-size:20px">Zveřejněný rozpis (${(upcoming || []).length})</h3>
+    ${(upcoming || []).length ? `<div style="max-height:360px;overflow:auto">${upcoming.map(r => `<div class="adm-row"><div><span class="ev-kind">${dayLabel(r.service_day)} · ${esc(r.reg || "")}</span><br>
+      <b>${r.legs.map(l => esc(l.dep)).join(" → ")} → ${esc(r.legs[r.legs.length - 1].arr)}</b> <span class="muted">${hmPrague(r.legs[0].std)}–${hmPrague(r.legs[r.legs.length - 1].sta)}</span>
+      ${r.status === "taken" ? ` <span class="badge">${esc(r.profiles?.username || "obsazeno")}</span>` : ""}</div>
+      <button class="link-btn danger" data-delrot="${r.id}">Smazat</button></div>`).join("")}</div>
+      <button class="btn ghost" id="clearOpen" style="margin-top:10px">Smazat všechny volné budoucí rotace</button>` : '<p class="muted">Zatím nic.</p>'}`;
+  $("genForm").onsubmit = async e => {
+    e.preventDefault();
+    $("genPreview").innerHTML = '<p class="muted">Skládám rotace…</p>';
+    rosterPreview = await generateRoster($("genFrom").value, Math.min(14, +$("genDays").value || 7), +$("genLegs").value || 4, +$("genDuty").value || 10);
+    if (!rosterPreview.length) { $("genPreview").innerHTML = '<div class="msg err">Nepodařilo se složit žádnou rotaci. Zkontroluj, že mají linky v crew centru vyplněné časy odletu a příletu, letadla ve Flotile mají typ a skupinu (DAAG/MINI) a že jsi synchronizoval linky.</div>'; return; }
+    const byDay = {}; rosterPreview.forEach(r => byDay[r.service_day] = (byDay[r.service_day] || 0) + 1);
+    $("genPreview").innerHTML = `<div class="card" style="background:var(--bg)"><b>Návrh: ${rosterPreview.length} rotací</b> <span class="muted">(${Object.entries(byDay).map(([d, n]) => `${dayLabel(d)} ${n}`).join(", ")})</span>
+      <div style="max-height:300px;overflow:auto;margin:10px 0">${rosterPreview.map((r, i) => `<div class="adm-row"><div><span class="ev-kind">${dayLabel(r.service_day)} · ${esc(r.reg)} (${esc(r.ac_type)})</span><br>
+        <b>${r.legs.map(l => esc(l.flight_no)).join(", ")}</b> · ${r.legs.map(l => esc(l.dep)).join(" → ")} → ${esc(r.legs[r.legs.length - 1].arr)}
+        <span class="muted">${hmPrague(r.std)}–${hmPrague(r.sta)}</span></div><button class="link-btn danger" data-rmprev="${i}">Vyřadit</button></div>`).join("")}</div>
+      <button class="btn" id="pubRoster">Zveřejnit rozpis</button></div>`;
+    $("genPreview").querySelectorAll("[data-rmprev]").forEach(b => b.onclick = () => { rosterPreview.splice(+b.dataset.rmprev, 1); b.closest(".adm-row").remove(); });
+    $("pubRoster").onclick = async () => {
+      $("pubRoster").disabled = true;
+      for (let i = 0; i < rosterPreview.length; i += 200) {
+        const { error } = await sb.from("rotations").insert(rosterPreview.slice(i, i + 200));
+        if (error) { renderAdminRoster({ ok: false, text: error.message }); return; }
+      }
+      const n = rosterPreview.length; rosterPreview = [];
+      renderAdminRoster({ ok: true, text: `Zveřejněno ${n} rotací. Piloti je najdou v Rozpisu.` });
+    };
+  };
+  box.querySelectorAll("[data-delrot]").forEach(b => b.onclick = async () => { await sb.from("rotations").delete().eq("id", +b.dataset.delrot); renderAdminRoster(); });
+  if ($("clearOpen")) $("clearOpen").onclick = async () => {
+    if (!confirm("Smazat všechny volné (neobsazené) budoucí rotace?")) return;
+    const { error } = await sb.from("rotations").delete().eq("status", "open").gte("service_day", today);
+    renderAdminRoster(error ? { ok: false, text: error.message } : { ok: true, text: "Volné rotace smazány." });
+  };
+}
+
 /* ---------- správa: flotila a poznámky k letištím ---------- */
 const ageText = d => { if (!d) return "–"; const m = Math.max(0, Math.round((Date.now() - new Date(d)) / (30.44 * 864e5)));
   return m < 12 ? `${m} měs.` : `${Math.floor(m / 12)} ${Math.floor(m / 12) < 5 ? "roky" : "let"}${m % 12 ? ` ${m % 12} měs.` : ""}`.replace(/^1 roky/, "1 rok"); };
@@ -2157,6 +2428,7 @@ async function renderAdminFleet(msg) {
   const row = f => `<tr data-reg="${esc(f.registration)}">
     <td><b>${esc(f.registration)}</b></td>
     <td><input class="fl-type" value="${esc(f.ac_type || "")}" maxlength="12" style="width:70px"></td>
+    <td><select class="fl-pool"><option value="DAAG" ${f.pool !== "MINI" ? "selected" : ""}>Alžír</option><option value="MINI" ${f.pool === "MINI" ? "selected" : ""}>Minihuby</option></select></td>
     <td><input class="fl-del" type="date" value="${esc(f.delivered || "")}"> <span class="muted" style="font-size:12px">${ageText(f.delivered)}</span></td>
     <td><input class="fl-seats" type="number" min="0" max="900" value="${f.seats_total ?? ""}" style="width:70px"></td>
     <td><input class="fl-prem" type="number" min="0" max="900" value="${f.seats_premium ?? 0}" style="width:70px"></td>
@@ -2164,7 +2436,7 @@ async function renderAdminFleet(msg) {
     <td style="text-align:center"><input class="fl-train" type="checkbox" ${f.training_only ? "checked" : ""} aria-label="Jen výcvikové lety"></td>
     <td style="white-space:nowrap"><button class="link-btn fl-save">Uložit</button> <button class="link-btn danger fl-rm">Smazat</button></td></tr>`;
   box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
-    <div class="table-wrap"><table><thead><tr><th>Registrace</th><th>Typ</th><th>Ve službě od</th><th>Míst celkem</th><th>Z toho premium</th><th>Poznámka</th><th>Výcvik</th><th></th></tr></thead>
+    <div class="table-wrap"><table><thead><tr><th>Registrace</th><th>Typ</th><th>Skupina</th><th>Ve službě od</th><th>Míst celkem</th><th>Z toho premium</th><th>Poznámka</th><th>Výcvik</th><th></th></tr></thead>
     <tbody>${(data || []).map(row).join("")}</tbody></table></div>
     <form id="flAdd" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:12px">
       <div class="field" style="margin:0"><label for="flNewReg">Přidat letadlo (registrace)</label><input id="flNewReg" maxlength="12" placeholder="např. 7T-JAK" required></div>
@@ -2176,7 +2448,7 @@ async function renderAdminFleet(msg) {
       const seats = v(".fl-seats").value === "" ? null : +v(".fl-seats").value, prem = +v(".fl-prem").value || 0;
       if (seats != null && prem > seats) { renderAdminFleet({ ok: false, text: `${reg}: premium míst nemůže být víc než celkem.` }); return; }
       const { error } = await sb.from("fleet_details").update({ ac_type: v(".fl-type").value.trim().toUpperCase() || null, delivered: v(".fl-del").value || null,
-        seats_total: seats, seats_premium: prem, notes: v(".fl-notes").value.trim() || null, training_only: v(".fl-train").checked, updated_at: new Date().toISOString() }).eq("registration", reg);
+        seats_total: seats, seats_premium: prem, notes: v(".fl-notes").value.trim() || null, pool: v(".fl-pool").value, training_only: v(".fl-train").checked, updated_at: new Date().toISOString() }).eq("registration", reg);
       renderAdminFleet(error ? { ok: false, text: error.message } : { ok: true, text: `${reg} uloženo.` });
     };
     v(".fl-rm").onclick = async () => { if (!confirm(`Smazat ${reg} z provozních údajů?`)) return; await sb.from("fleet_details").delete().eq("registration", reg); renderAdminFleet(); };
