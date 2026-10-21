@@ -1335,8 +1335,9 @@ function renderRoutePanel() {
       <div class="mid"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="transform:rotate(90deg)"><path d="${PLANE}"/></svg></div>
       <div class="r"><div class="ap">${esc(rt.arr)}</div><div class="apn">${esc(b?.[1] || "")}</div>${rt.arr_time ? `<div class="fp-times"><div><span class="muted">Přílet</span><b>${esc(rt.arr_time)}</b></div></div>` : ""}</div>
     </div>
-    <div class="fp-sec"><div class="fp-stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="fp-sec"><div class="fp-stats" style="grid-template-columns:repeat(auto-fit,minmax(70px,1fr))">
       <div><b>${rt.distance_nm ? nf.format(Math.round(rt.distance_nm)) : "–"}</b><span>nm</span></div>
+      ${rt.load_factor != null ? `<div><b>${Math.round(rt.load_factor)} %</b><span>Obsazenost${rt.load_factor_variance ? ` ± ${Math.round(rt.load_factor_variance)} %` : ""}</span></div>` : ""}
       <div><b>${rt.flight_time_min ? fmtDur(rt.flight_time_min) : "–"}</b><span>Doba letu</span></div>
       <div><b>${esc(rt.alt || "–")}</b><span>Alternativa</span></div></div></div>
     ${rt.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(rt.route)}</div></div>` : ""}
@@ -2027,6 +2028,12 @@ async function renderAdmin(editId, msg) {
         <label class="switch" style="margin-bottom:14px"><input type="checkbox" id="evPin" ${e.pinned ? "checked" : ""}> Připnout (má přednost na hlavní stránce)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn">${e.id ? "Uložit změny" : "Vytvořit"}</button>${e.id ? '<button type="button" class="btn ghost" id="evCancel">Zrušit úpravy</button>' : ""}</div>
       </form>
+      <div class="card" style="grid-column:1/-1"><h2 class="section-title">Flotila – provozní údaje</h2>
+        <p class="muted" style="margin-top:0">Stáří, kapacita a poznámky k letadlům. Použijí se v briefinzích a při výpočtu obsazenosti.</p>
+        <div id="admFleet"><p class="muted">Načítám…</p></div></div>
+      <div class="card" style="grid-column:1/-1"><h2 class="section-title">Poznámky k letištím</h2>
+        <p class="muted" style="margin-top:0">Místní standardy, parkování, zvláštnosti a doba obratu. Objeví se v briefinzích letů z a na dané letiště.</p>
+        <div id="admApNotes"><p class="muted">Načítám…</p></div></div>
       <div class="card" style="grid-column:1/-1"><h2 class="section-title">Nahlášení</h2><div id="admReports"><p class="muted">Načítám…</p></div></div>
       <div class="card" style="grid-column:1/-1"><h2 class="section-title">Fotky letadel Jáchym Air</h2>
         <p class="muted" style="margin-top:0">Fotka se ukáže v detailu letu u letadla s danou registrací (má přednost před Planespotters). Ideálně na šířku, max. 5 MB.</p>
@@ -2050,7 +2057,7 @@ async function renderAdmin(editId, msg) {
           <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-edit="${x.id}">Upravit</button><button class="link-btn danger" data-del="${x.id}">Smazat</button></div></div>`).join("")
           : '<p class="muted">Zatím nic. Vytvoř první let týdne!</p>'}
       </div></div>`;
-  renderAdminPhotos(); renderAdminReports();
+  renderAdminPhotos(); renderAdminReports(); renderAdminFleet(); renderAdminApNotes();
   el.querySelectorAll("[data-delva]").forEach(b => b.onclick = async () => {
     if (!confirm("Smazat virtuálku?")) return;
     await sb.from("virtual_airlines").delete().eq("code", b.dataset.delva); await loadVAs(); renderAdmin();
@@ -2140,6 +2147,75 @@ function shrinkImage(file, maxW) {
     img.onerror = () => rej(new Error("tohle není obrázek")); img.src = url;
   });
 }
+/* ---------- správa: flotila a poznámky k letištím ---------- */
+const ageText = d => { if (!d) return "–"; const m = Math.max(0, Math.round((Date.now() - new Date(d)) / (30.44 * 864e5)));
+  return m < 12 ? `${m} měs.` : `${Math.floor(m / 12)} ${Math.floor(m / 12) < 5 ? "roky" : "let"}${m % 12 ? ` ${m % 12} měs.` : ""}`.replace(/^1 roky/, "1 rok"); };
+async function renderAdminFleet(msg) {
+  const box = $("admFleet"); if (!box) return;
+  const { data, error } = await sb.from("fleet_details").select("*").order("ac_type").order("registration");
+  if (error) { box.innerHTML = `<p class="muted">Nejdřív spusť úpravu databáze č. 15. (${esc(error.message)})</p>`; return; }
+  const row = f => `<tr data-reg="${esc(f.registration)}">
+    <td><b>${esc(f.registration)}</b></td>
+    <td><input class="fl-type" value="${esc(f.ac_type || "")}" maxlength="12" style="width:70px"></td>
+    <td><input class="fl-del" type="date" value="${esc(f.delivered || "")}"> <span class="muted" style="font-size:12px">${ageText(f.delivered)}</span></td>
+    <td><input class="fl-seats" type="number" min="0" max="900" value="${f.seats_total ?? ""}" style="width:70px"></td>
+    <td><input class="fl-prem" type="number" min="0" max="900" value="${f.seats_premium ?? 0}" style="width:70px"></td>
+    <td><input class="fl-notes" value="${esc(f.notes || "")}" maxlength="1000" style="width:100%;min-width:180px"></td>
+    <td style="text-align:center"><input class="fl-train" type="checkbox" ${f.training_only ? "checked" : ""} aria-label="Jen výcvikové lety"></td>
+    <td style="white-space:nowrap"><button class="link-btn fl-save">Uložit</button> <button class="link-btn danger fl-rm">Smazat</button></td></tr>`;
+  box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    <div class="table-wrap"><table><thead><tr><th>Registrace</th><th>Typ</th><th>Ve službě od</th><th>Míst celkem</th><th>Z toho premium</th><th>Poznámka</th><th>Výcvik</th><th></th></tr></thead>
+    <tbody>${(data || []).map(row).join("")}</tbody></table></div>
+    <form id="flAdd" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:12px">
+      <div class="field" style="margin:0"><label for="flNewReg">Přidat letadlo (registrace)</label><input id="flNewReg" maxlength="12" placeholder="např. 7T-JAK" required></div>
+      <div class="field" style="margin:0"><label for="flNewType">Typ</label><input id="flNewType" maxlength="12" placeholder="A359" style="width:90px"></div>
+      <button class="btn">Přidat</button></form>`;
+  box.querySelectorAll("tr[data-reg]").forEach(tr => {
+    const reg = tr.dataset.reg, v = c => tr.querySelector(c);
+    v(".fl-save").onclick = async () => {
+      const seats = v(".fl-seats").value === "" ? null : +v(".fl-seats").value, prem = +v(".fl-prem").value || 0;
+      if (seats != null && prem > seats) { renderAdminFleet({ ok: false, text: `${reg}: premium míst nemůže být víc než celkem.` }); return; }
+      const { error } = await sb.from("fleet_details").update({ ac_type: v(".fl-type").value.trim().toUpperCase() || null, delivered: v(".fl-del").value || null,
+        seats_total: seats, seats_premium: prem, notes: v(".fl-notes").value.trim() || null, training_only: v(".fl-train").checked, updated_at: new Date().toISOString() }).eq("registration", reg);
+      renderAdminFleet(error ? { ok: false, text: error.message } : { ok: true, text: `${reg} uloženo.` });
+    };
+    v(".fl-rm").onclick = async () => { if (!confirm(`Smazat ${reg} z provozních údajů?`)) return; await sb.from("fleet_details").delete().eq("registration", reg); renderAdminFleet(); };
+  });
+  $("flAdd").onsubmit = async e => {
+    e.preventDefault();
+    const reg = $("flNewReg").value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+    const { error } = await sb.from("fleet_details").insert({ registration: reg, ac_type: $("flNewType").value.trim().toUpperCase() || null });
+    renderAdminFleet(error ? { ok: false, text: error.code === "23505" ? "Tohle letadlo už v seznamu je." : error.message } : { ok: true, text: `${reg} přidáno – doplň údaje a ulož.` });
+  };
+}
+async function renderAdminApNotes(msg, editIcao) {
+  const box = $("admApNotes"); if (!box) return;
+  const { data, error } = await sb.from("airport_notes").select("*").order("icao");
+  if (error) { box.innerHTML = `<p class="muted">Nejdřív spusť úpravu databáze č. 15. (${esc(error.message)})</p>`; return; }
+  await airportsReady;
+  const e = (data || []).find(x => x.icao === editIcao) || {};
+  box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    <div class="grid2" style="align-items:start">
+      <form id="apnForm"><div class="row2">
+        <div class="field"><label for="apnIcao">Letiště (ICAO)</label><input id="apnIcao" maxlength="4" required value="${esc(e.icao || "")}" placeholder="LIRN"></div>
+        <div class="field"><label for="apnTurn">Doba obratu (min)</label><input id="apnTurn" type="number" min="10" max="600" value="${e.turnaround_min ?? ""}" placeholder="45"></div></div>
+        <div class="field"><label for="apnNotes">Poznámky pro piloty</label><textarea id="apnNotes" maxlength="2000" placeholder="např. Parkování nosem ven na apronu B, pozor na úzké pojezdové dráhy…">${esc(e.notes || "")}</textarea></div>
+        <button class="btn">${e.icao ? "Uložit změny" : "Uložit poznámku"}</button></form>
+      <div>${(data || []).length ? data.map(n => `<div class="adm-row"><div><b>${esc(n.icao)}</b> <span class="muted">${esc(apByCode(n.icao)?.[1] || "")}</span>
+        ${n.turnaround_min ? `<span class="va-chip">obrat ${n.turnaround_min} min</span>` : ""}<div class="muted" style="font-size:13px">${esc((n.notes || "").slice(0, 140))}${(n.notes || "").length > 140 ? "…" : ""}</div></div>
+        <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-apedit="${esc(n.icao)}">Upravit</button><button class="link-btn danger" data-apdel="${esc(n.icao)}">Smazat</button></div></div>`).join("")
+        : '<p class="muted" style="margin:0">Zatím žádné poznámky.</p>'}</div></div>`;
+  box.querySelectorAll("[data-apedit]").forEach(b => b.onclick = () => renderAdminApNotes(null, b.dataset.apedit));
+  box.querySelectorAll("[data-apdel]").forEach(b => b.onclick = async () => { if (!confirm("Smazat poznámku?")) return; await sb.from("airport_notes").delete().eq("icao", b.dataset.apdel); renderAdminApNotes(); });
+  $("apnForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const icao = $("apnIcao").value.trim().toUpperCase();
+    const row = { icao, notes: $("apnNotes").value.trim() || null, turnaround_min: $("apnTurn").value ? +$("apnTurn").value : null, updated_at: new Date().toISOString() };
+    const { error } = await sb.from("airport_notes").upsert(row);
+    renderAdminApNotes(error ? { ok: false, text: error.message } : { ok: true, text: `Poznámka k ${icao} uložena.` });
+  };
+}
+
 async function renderAdminReports() {
   const box = $("admReports"); if (!box) return;
   const { data: reps } = await sb.from("reports").select("*").order("created_at", { ascending: false }).limit(50);
