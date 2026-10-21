@@ -393,7 +393,7 @@
     <a href="#/zebricek" data-r="zebricek">Žebříček</a>
     <a href="#/piloti" data-r="piloti">Piloti</a>
     <a href="#/novinky" data-r="novinky">Novinky</a>
-    <a href="#/rozpis" data-r="rozpis">Rozpis</a>
+    <a href="#/rozpis" data-r="rozpis" id="navRoster" style="display:none">Rozpis</a>
     <a href="#/fotky" data-r="fotky">Fotky</a>
     <a href="#/pratele" data-r="pratele" id="navFriends">Přátelé</a>
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
@@ -2197,6 +2197,7 @@ async function myPosition() {
 let rosterDay = null, rosterBase = "mine";
 async function renderRoster(_param, msg) {
   const el = $("rozpis");
+  if (!ROSTER_PUBLIC && !me?.profile?.is_admin) { el.innerHTML = '<h1 class="page-title">Rozpis</h1><div class="card">Rozpis rotací připravujeme. Brzy tu bude! ✈️</div>'; return; }
   el.innerHTML = '<h1 class="page-title">Rozpis</h1><p class="muted">Načítám…</p>';
   await Promise.all([basesReady, airportsReady, routesReady]);
   if (!fleetCache) await loadFleetDetails();
@@ -2220,6 +2221,7 @@ async function renderRoster(_param, msg) {
       <div class="card"><h2 class="section-title">Moje základna a poloha</h2>
         <div class="tr-row"><span>Základna</span><b>${myBase ? `${esc(myBase)} · ${esc(baseName(myBase))}` : "nevybraná"}</b></div>
         <div class="tr-row"><span>Teď jsem</span><b>${pos ? `${esc(pos.icao)} · ${esc(baseName(pos.icao))}` : "neznámo – nastaví se po prvním letu"}</b></div>
+        ${basesList.length ? "" : '<div class="msg err" style="margin-top:12px">Seznam základen se nenačetl. Je potřeba spustit úpravu databáze č. 16.</div>'}
         <div class="row2" style="margin-top:12px">
           <form id="baseForm" class="field" style="margin:0"><label for="baseSel">Změnit základnu</label>
             <div style="display:flex;gap:6px"><select id="baseSel">${basesList.map(b => `<option value="${b.icao}" ${b.icao === myBase ? "selected" : ""}>${esc(b.name)} (${b.icao})</option>`).join("")}</select><button class="btn ghost" style="padding:8px 12px">Uložit</button></div>
@@ -2623,8 +2625,11 @@ async function loadMe() {
   updateNav();
   loadFriends().then(updateBadges);
 }
+// Rozpis je zatím ve vývoji – vidí ho jen správce. Až bude hotový, přepni na true.
+const ROSTER_PUBLIC = false;
 function updateNav() {
   $("navAdmin").style.display = me?.profile?.is_admin ? "" : "none";
+  $("navRoster").style.display = ROSTER_PUBLIC || me?.profile?.is_admin ? "" : "none";
   const a = $("navAccount");
   a.innerHTML = me?.profile ? `${avatar(me.profile, jaiSet.has(me.user.id), "mini-av")}${esc(me.profile.username)}` : "Přihlásit";
 }
