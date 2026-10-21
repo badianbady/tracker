@@ -262,6 +262,10 @@
   .react-bar { display: flex; gap: 6px; flex-wrap: wrap; }
   .react-btn { border: 1px solid var(--line); background: var(--surface); color: var(--text); border-radius: 999px; padding: 4px 10px; cursor: pointer; font: inherit; font-size: 15px; display: inline-flex; gap: 5px; align-items: center; }
   .react-btn b { font-size: 13px; }
+  .react-who { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .lightbox .lb-in { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; max-height: 100%; cursor: default; }
+  .lightbox .lb-in img { max-height: calc(100vh - 140px); }
+  .lightbox .lb-react { background: var(--surface); color: var(--text); border-radius: 12px; padding: 8px 12px; max-width: 640px; }
   .react-btn.mine { border-color: var(--green); background: var(--green-soft); }
   .va-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); font-weight: 700; font-size: 12px; padding: 1px 8px; border-radius: 999px; }
   .fr-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
@@ -500,10 +504,19 @@ window.addEventListener("pywebviewready", initAppMode);
 if (new URLSearchParams(location.search).has("app")) setTimeout(initAppMode, 1500);
 
 // Starší verze aplikace s touto adresou webu nekomunikují – pozná se to podle chybějícího čísla verze.
-let appStale = false;
+let appStale = false, appFails = 0;
 async function pollApp() {
-  try { appState = await appApi.get_state(); } catch { appState = { ok: false }; }
-  appStale = !appState || !appState.version;
+  let st = null;
+  try { st = await appApi.get_state(); } catch { st = null; }
+  if (st && st.version) { appState = st; appFails = 0; appStale = false; }
+  else {
+    // jednorázový výpadek (vytížený počítač, simulátor se „zadýchá“) ignorovat – až opakované selhání je zastaralá aplikace
+    appFails++;
+    const refused = st && st.ok === false && /Nepovolen/.test(st.msg || "");
+    if (!(appFails >= 6 || (refused && appFails >= 3) || (!appState && appFails >= 3))) return;
+    appState = st || appState || { ok: false };
+    appStale = true;
+  }
   if (appStale) {
     const pill = $("appPill");
     pill.classList.remove("ok"); pill.classList.add("upd");
@@ -1527,13 +1540,13 @@ function renderFlightPanel() {
     ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
     ${d.profiles?.stream_url ? `<div class="fp-sec"><a class="stream-btn" href="${esc(d.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}
     ${!live && d.crew_status ? `<div class="fp-sec muted" style="font-size:13px">Crew center: ${esc(d.crew_status)}</div>` : ""}
-    ${!live ? `<div class="fp-sec"><h4>Fotky z letu</h4><div id="fpPhotos"><p class="muted" style="margin:0">Načítám…</p></div></div>` : ""}
-    ${!live ? `<div class="fp-sec"><h4>Reakce</h4><div id="fpReact" class="react-bar"></div></div>` : ""}
+    <div class="fp-sec"><h4>Fotky z letu</h4><div id="fpPhotos"><p class="muted" style="margin:0">Načítám…</p></div></div>
+    ${!live ? `<div class="fp-sec"><h4>Reakce</h4><div id="fpReact"></div></div>` : ""}
     ${!live && me && (me.user.id === d.user_id || me.profile?.is_admin) ? `<div class="fp-sec"><button class="link-btn danger" id="fpDelete">Smazat tento let</button></div>` : ""}`;
   $("fpBack").onclick = closeFocus;
   friendButton($("fpFriend"), d.user_id, d.profiles?.username);
   if (!live) renderReactions($("fpReact"), d.id);
-  if (!live) renderFlightPhotos($("fpPhotos"), d);
+  renderFlightPhotos($("fpPhotos"), d, live);
   if ($("fpDelete")) $("fpDelete").onclick = async () => {
     if (!confirm("Opravdu smazat tento let? Nejde to vrátit.")) return;
     const { error } = await sb.from("flights").delete().eq("id", d.id);
@@ -1778,22 +1791,33 @@ function heartbeat() {
 }
 
 /* ---------- fotky z letů ---------- */
-function lightbox(url) {
-  const d = document.createElement("div"); d.className = "lightbox"; d.innerHTML = `<img src="${esc(url)}" alt="Fotka z letu">`;
-  d.onclick = () => d.remove(); document.body.appendChild(d);
+function lightbox(url, photoId) {
+  const d = document.createElement("div"); d.className = "lightbox";
+  d.innerHTML = `<div class="lb-in"><img src="${esc(url)}" alt="Fotka z letu">${photoId ? '<div class="lb-react" id="lbReact"></div>' : ""}</div>`;
+  d.onclick = e => { if (!e.target.closest(".lb-react")) d.remove(); };
+  document.body.appendChild(d);
+  if (photoId) renderReactions($("lbReact"), photoId, "photo");
 }
-async function renderFlightPhotos(el, f) {
+const photoListCache = new Map();
+async function renderFlightPhotos(el, f, live = false) {
   if (!el) return;
-  const { data } = await sb.from("flight_photos").select("id, url, user_id").eq("flight_id", f.id).order("created_at");
-  const list = data || [], own = me && me.user.id === f.user_id, admin = me?.profile?.is_admin;
-  el.innerHTML = (list.length ? `<div class="ph-strip">${list.map(p => `<a href="${esc(p.url)}" data-lb="${esc(p.url)}" style="background-image:url('${esc(p.url)}')">${own || admin ? `<button class="del" data-delfp="${p.id}" title="Smazat">✕</button>` : ""}</a>`).join("")}</div>`
-      : `<p class="muted" style="margin:0">${own ? "Zatím žádné fotky. Přidej screenshoty z letu!" : "Pilot k letu zatím nepřidal fotky."}</p>`)
+  const key = live ? "u:" + f.user_id : "f:" + f.id;
+  let cached = photoListCache.get(key);
+  if (!cached || Date.now() - cached.t > (live ? 20000 : 5000)) {
+    const q = sb.from("flight_photos").select("id, url, user_id").order("created_at");
+    const { data } = live ? await q.eq("user_id", f.user_id).is("flight_id", null) : await q.eq("flight_id", f.id);
+    cached = { t: Date.now(), list: data || [] }; photoListCache.set(key, cached);
+  }
+  if (!el.isConnected) return;
+  const list = cached.list, own = me && me.user.id === f.user_id, admin = me?.profile?.is_admin;
+  el.innerHTML = (list.length ? `<div class="ph-strip">${list.map(p => `<a href="${esc(p.url)}" data-lb="${esc(p.url)}" data-pid="${p.id}" style="background-image:url('${esc(p.url)}')">${own || admin ? `<button class="del" data-delfp="${p.id}" title="Smazat">✕</button>` : ""}</a>`).join("")}</div>`
+      : `<p class="muted" style="margin:0">${own ? (live ? "Přidej screenshoty přímo během letu, po uložení letu se k němu připojí." : "Zatím žádné fotky. Přidej screenshoty z letu!") : "Pilot k letu zatím nepřidal fotky."}</p>`)
     + (own && list.length < 12 ? `<label class="link-btn" style="cursor:pointer;display:inline-block;margin-top:8px">📷 Přidat fotky<input type="file" id="fpAdd" accept="image/png,image/jpeg,image/webp" multiple style="display:none"></label>` : "");
-  el.querySelectorAll("[data-lb]").forEach(a => a.onclick = e => { if (e.target.closest("[data-delfp]")) return; e.preventDefault(); lightbox(a.dataset.lb); });
+  el.querySelectorAll("[data-lb]").forEach(a => a.onclick = e => { if (e.target.closest("[data-delfp]")) return; e.preventDefault(); lightbox(a.dataset.lb, +a.dataset.pid); });
   el.querySelectorAll("[data-delfp]").forEach(b => b.onclick = async e => {
     e.preventDefault(); e.stopPropagation();
     if (!confirm("Smazat fotku?")) return;
-    await sb.from("flight_photos").delete().eq("id", +b.dataset.delfp); renderFlightPhotos(el, f);
+    await sb.from("flight_photos").delete().eq("id", +b.dataset.delfp); photoListCache.delete(key); renderFlightPhotos(el, f, live);
   });
   if ($("fpAdd")) $("fpAdd").onchange = async e => {
     const files = [...e.target.files].slice(0, 12 - list.length);
@@ -1801,43 +1825,52 @@ async function renderFlightPhotos(el, f) {
     for (const file of files) {
       try {
         const blob = await shrinkImage(file, 1920);
-        const path = `${me.user.id}/${f.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
+        const path = `${me.user.id}/${live ? "zivy" : f.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
         const { error } = await sb.storage.from("flightphotos").upload(path, blob, { contentType: "image/jpeg", upsert: false });
         if (error) throw error;
         const url = sb.storage.from("flightphotos").getPublicUrl(path).data.publicUrl;
-        const { error: e2 } = await sb.from("flight_photos").insert({ flight_id: f.id, url });
+        const { error: e2 } = await sb.from("flight_photos").insert({ flight_id: live ? null : f.id, url });
         if (e2) throw e2;
       } catch (err) { alert("Fotku se nepodařilo nahrát: " + (err.message || err)); break; }
     }
-    renderFlightPhotos(el, f);
+    photoListCache.delete(key); renderFlightPhotos(el, f, live);
   };
 }
 async function renderGallery() {
   const el = $("fotky");
   el.innerHTML = '<h1 class="page-title">Fotky z letů</h1><p class="lead">Screenshoty pilotů z jejich letů. Svoje přidáš v detailu letu na svém profilu.</p><div id="galGrid"><p class="muted">Načítám…</p></div>';
-  const { data } = await sb.from("flight_photos").select("id, url, flight_id, user_id, created_at, flights(dep_icao, arr_icao, callsign), profiles(username)")
+  const { data } = await sb.from("flight_photos").select("id, url, flight_id, user_id, created_at, flights(dep_icao, arr_icao, callsign), profiles!flight_photos_user_id_fkey(username)")
     .order("created_at", { ascending: false }).limit(60);
-  $("galGrid").innerHTML = data?.length ? `<div class="gal">${data.map(p => `<div class="item"><a class="ph" href="${esc(p.url)}" data-lb="${esc(p.url)}" style="background-image:url('${esc(p.url)}')"></a>
-      <div class="in"><a href="#/let/${p.flight_id}"><b>${esc(p.flights?.callsign || "")}</b> ${esc(p.flights?.dep_icao || "?")} → ${esc(p.flights?.arr_icao || "?")}</a>
+  $("galGrid").innerHTML = data?.length ? `<div class="gal">${data.map(p => `<div class="item"><a class="ph" href="${esc(p.url)}" data-lb="${esc(p.url)}" data-pid="${p.id}" style="background-image:url('${esc(p.url)}')"></a>
+      <div class="in">${p.flight_id ? `<a href="#/let/${p.flight_id}"><b>${esc(p.flights?.callsign || "")}</b> ${esc(p.flights?.dep_icao || "?")} → ${esc(p.flights?.arr_icao || "?")}</a>` : `<a href="#/let/live/${esc(p.user_id)}"><b>Právě letí</b></a>`}
       <div class="muted">${esc(p.profiles?.username || "")} · ${fmtDate(p.created_at)}</div></div></div>`).join("")}</div>`
     : '<div class="card">Zatím tu nejsou žádné fotky. Buď první: otevři svůj let a přidej screenshoty!</div>';
-  $("galGrid").querySelectorAll("[data-lb]").forEach(a => a.onclick = e => { e.preventDefault(); lightbox(a.dataset.lb); });
+  $("galGrid").querySelectorAll("[data-lb]").forEach(a => a.onclick = e => { e.preventDefault(); lightbox(a.dataset.lb, +a.dataset.pid); });
 }
 
 /* ---------- reakce na lety ---------- */
 const EMOJIS = ["👍", "🔥", "🧈", "👏", "😮", "😂"];
-async function renderReactions(el, fid) {
+async function renderReactions(el, id, kind = "flight") {
   if (!el) return;
-  const { data } = await sb.from("flight_reactions").select("emoji, user_id").eq("flight_id", fid);
-  const counts = {}, mine = new Set();
-  (data || []).forEach(r => { counts[r.emoji] = (counts[r.emoji] || 0) + 1; if (r.user_id === me?.user?.id) mine.add(r.emoji); });
-  el.innerHTML = EMOJIS.map(e => `<button class="react-btn ${mine.has(e) ? "mine" : ""}" data-e="${e}" aria-pressed="${mine.has(e)}">${e}${counts[e] ? `<b>${counts[e]}</b>` : ""}</button>`).join("");
-  el.querySelectorAll("[data-e]").forEach(b => b.onclick = async () => {
+  const table = kind === "photo" ? "photo_reactions" : "flight_reactions", col = kind === "photo" ? "photo_id" : "flight_id";
+  const { data } = await sb.from(table).select("emoji, user_id, profiles(username)").eq(col, id).order("created_at");
+  const counts = {}, names = {}, mine = new Set();
+  (data || []).forEach(r => {
+    counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+    (names[r.emoji] = names[r.emoji] || []).push(r.profiles?.username || "?");
+    if (r.user_id === me?.user?.id) mine.add(r.emoji);
+  });
+  const who = EMOJIS.filter(e => names[e]).map(e => `${e} ${names[e].map(esc).join(", ")}`).join(" · ");
+  el.innerHTML = `<div class="react-bar">${EMOJIS.map(e => `<button class="react-btn ${mine.has(e) ? "mine" : ""}" data-e="${e}" aria-pressed="${mine.has(e)}"
+      title="${esc((names[e] || []).join(", ") || "Buď první")}">${e}${counts[e] ? `<b>${counts[e]}</b>` : ""}</button>`).join("")}</div>
+    ${who ? `<div class="react-who">${who}</div>` : ""}`;
+  el.querySelectorAll("[data-e]").forEach(b => b.onclick = async ev => {
+    ev.stopPropagation();
     if (!me) { location.hash = "#/ucet"; return; }
     const e = b.dataset.e;
-    if (mine.has(e)) await sb.from("flight_reactions").delete().eq("flight_id", fid).eq("user_id", me.user.id).eq("emoji", e);
-    else await sb.from("flight_reactions").insert({ flight_id: fid, emoji: e });
-    renderReactions(el, fid);
+    if (mine.has(e)) await sb.from(table).delete().eq(col, id).eq("user_id", me.user.id).eq("emoji", e);
+    else await sb.from(table).insert({ [col]: id, emoji: e });
+    renderReactions(el, id, kind);
   });
 }
 
