@@ -2327,6 +2327,7 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
   const { data: notesRows } = await sb.from("airport_notes").select("icao, turnaround_min");
   const turn = icao => (notesRows || []).find(n => n.icao === icao)?.turnaround_min || 25;   // výchozí obrat 25 min
   const MIN_REST = 10 * 60;                     // odpočinek při přespání
+  const capOf = t => { const ps = fleet.filter(f => f.ac_type === t && f.seats_total); return ps.length ? ps.reduce((a, f) => a + f.seats_total, 0) / ps.length : null; };
   const timed = jaiRoutes.map(rt => {
     const dep = parseHM(rt.dpt_time); if (dep == null) return null;
     let arr = parseHM(rt.arr_time); if (arr == null && rt.flight_time_min) arr = dep + rt.flight_time_min; if (arr == null) return null;
@@ -2355,9 +2356,18 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
         const first = { ...s0, day: d, depAbs: d * 1440 + s0.dep, arrAbs: d * 1440 + s0.arr, dutyStart: d * 1440 + s0.dep };
         const typeUse = generateRoster._typeUse || (generateRoster._typeUse = new Map());
         const freePlane = (t, at) => planes.find(p => normType(p.ac_type) === normType(t) && busy.get(p.registration) <= at - 30);
+        // výběr typu: náhoda s vahou – vysoká obsazenost linky = větší šance na větší letadlo a naopak; méně využité typy mají přednost
+        const lf = first.rt.load_factor != null ? +first.rt.load_factor : 75;
+        const caps = types.map(capOf).filter(Boolean), midCap = caps.length ? caps.reduce((a, b) => a + b) / caps.length : 180;
+        const weight = t => {
+          const rel = ((capOf(t) || midCap) - midCap) / midCap;              // −0.3 = menší, +0.3 = větší než průměr
+          const pref = Math.exp(4 * rel * ((lf - 75) / 25));                  // obsazenost nad 75 % táhne k větším, pod k menším
+          const use = (typeUse.get(t) || 0) / Math.max(1, planes.filter(p => p.ac_type === t).length);
+          return pref / (1 + use);
+        };
+        const key = new Map(types.map(t => [t, Math.pow(Math.random(), 1 / Math.max(0.01, weight(t)))]));
         const fitTypes = types.filter(t => routeFitsType(first.rt, t))
-          .sort((a, b) => (!!freePlane(b, first.depAbs) - !!freePlane(a, first.depAbs))
-            || ((typeUse.get(a) || 0) / planes.filter(p => p.ac_type === a).length) - ((typeUse.get(b) || 0) / planes.filter(p => p.ac_type === b).length));
+          .sort((a, b) => (!!freePlane(b, first.depAbs) - !!freePlane(a, first.depAbs)) || key.get(b) - key.get(a));
         if (d === 0 && !fitTypes.length) stats.noType++;
         let best = null, plane = null, anyChain = false;
         const score = c => { const days = Math.floor(c[c.length - 1].arrAbs / 1440) - d; return days * 100 + c.length; };
@@ -2495,6 +2505,8 @@ async function renderAdminFleet(msg) {
   box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
     <div class="table-wrap"><table><thead><tr><th>Registrace</th><th>Typ</th><th>Skupina</th><th>Ve službě od</th><th>Míst celkem</th><th>Z toho premium</th><th>Poznámka</th><th>Výcvik</th><th></th></tr></thead>
     <tbody>${(data || []).map(row).join("")}</tbody></table></div>
+    <div style="margin-top:12px"><button class="btn ghost" id="flImport" type="button">Doplnit letadla z crew centra</button>
+      <span class="muted" style="font-size:13px;margin-left:8px">Přidá letadla, která jsou v crew centru, ale tady chybí. Pak u nich doplň kapacitu a skupinu.</span></div>
     <form id="flAdd" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:12px">
       <div class="field" style="margin:0"><label for="flNewReg">Přidat letadlo (registrace)</label><input id="flNewReg" maxlength="12" placeholder="např. 7T-JAK" required></div>
       <div class="field" style="margin:0"><label for="flNewType">Typ</label><input id="flNewType" maxlength="12" placeholder="A359" style="width:90px"></div>
@@ -2510,6 +2522,20 @@ async function renderAdminFleet(msg) {
     };
     v(".fl-rm").onclick = async () => { if (!confirm(`Smazat ${reg} z provozních údajů?`)) return; await sb.from("fleet_details").delete().eq("registration", reg); renderAdminFleet(); };
   });
+  $("flImport").onclick = async () => {
+    await routesReady;
+    const have = new Set((data || []).map(f => normType(f.registration)));
+    const add = [], seen = new Set();
+    for (const a of jaiFleet || []) {
+      if (!a.registration || have.has(normType(a.registration)) || seen.has(normType(a.registration))) continue;
+      seen.add(normType(a.registration));
+      const t = typeAliases(a.icao || a.subfleet_type || "")[0] || null;
+      add.push({ registration: a.registration.toUpperCase(), ac_type: t, pool: "DAAG" });
+    }
+    if (!add.length) { renderAdminFleet({ ok: true, text: "Všechna letadla z crew centra už ve Flotile jsou. (Pokud nějaké chybí, synchronizuj linky.)" }); return; }
+    const { error } = await sb.from("fleet_details").insert(add);
+    renderAdminFleet(error ? { ok: false, text: error.message } : { ok: true, text: `Přidáno ${add.length} letadel: ${add.map(a => a.registration).join(", ")}. Doplň u nich kapacitu, skupinu a datum.` });
+  };
   $("flAdd").onsubmit = async e => {
     e.preventDefault();
     const reg = $("flNewReg").value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
