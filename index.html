@@ -2306,9 +2306,19 @@ function bindRotButtons(root) {
 let fleetCache = null;
 async function loadFleetDetails() { const { data } = await sb.from("fleet_details").select("*"); fleetCache = data || []; return fleetCache; }
 const normType = t => String(t || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+// běžné zápisy stejného typu (crew center je může mít pojmenované jinak než Flotila)
+const TYPE_ALIASES = {
+  A319: ["A319"], A320: ["A320", "A20N", "A320NEO"], A321: ["A321", "A21N", "A321NEO"],
+  A359: ["A359", "A350", "A350900"], A35K: ["A35K", "A3501000"], A332: ["A332", "A330200"], A333: ["A333", "A330300"],
+  B738: ["B738", "B737800", "7378", "737800"], B38M: ["B38M", "B737MAX8", "737MAX8", "MAX8", "7M8", "B7378MAX"],
+  B739: ["B739", "B737900"], B39M: ["B39M", "B737MAX9", "MAX9"], B789: ["B789", "B787900", "7879"], B788: ["B788", "B787800"],
+};
+function typeAliases(t) { t = normType(t); for (const [k, v] of Object.entries(TYPE_ALIASES)) if (k === t || v.includes(t)) return [k, ...v]; return [t]; }
 function routeFitsType(rt, acType) {
-  const t = normType(acType); if (!rt.subfleets?.length) return true;
-  return rt.subfleets.some(sf => { const a = normType(sf.type), b = normType(sf.name); return a === t || a.includes(t) || t.includes(a.slice(0, 4)) || b.includes(t); });
+  if (!rt.subfleets?.length) return true;
+  const al = typeAliases(acType);
+  return rt.subfleets.some(sf => { const a = normType(sf.type), b = normType(sf.name);
+    return al.some(x => a === x || (a.length >= 4 && (a.includes(x) || x.includes(a))) || b.includes(x)); });
 }
 async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = false) {
   const maxRotDays = allowNight ? 3 : 1;
@@ -2330,6 +2340,7 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
   timed.forEach(x => { if (!fromAirport.has(x.rt.dep)) fromAirport.set(x.rt.dep, []); fromAirport.get(x.rt.dep).push(x); });
   const stats = { total: jaiRoutes.length, noTime: jaiRoutes.length - timed.length, noType: 0, noReturn: 0, noPlane: 0 };
   const out = [], usedCount = new Map();
+  generateRoster._typeUse = new Map();
   for (const pool of ["DAAG", "MINI"]) {
     const baseSet = new Set(basesList.filter(b => b.pool === pool).map(b => b.icao));
     const planes = fleet.filter(f => f.pool === pool);
@@ -2342,18 +2353,23 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
       for (const s0 of starts) {
         if (usedDay.has(s0.rt.id + "@" + d)) continue;
         const first = { ...s0, day: d, depAbs: d * 1440 + s0.dep, arrAbs: d * 1440 + s0.arr, dutyStart: d * 1440 + s0.dep };
-        const fitTypes = types.filter(t => routeFitsType(first.rt, t));
+        const typeUse = generateRoster._typeUse || (generateRoster._typeUse = new Map());
+        const freePlane = (t, at) => planes.find(p => normType(p.ac_type) === normType(t) && busy.get(p.registration) <= at - 30);
+        const fitTypes = types.filter(t => routeFitsType(first.rt, t))
+          .sort((a, b) => (!!freePlane(b, first.depAbs) - !!freePlane(a, first.depAbs))
+            || ((typeUse.get(a) || 0) / planes.filter(p => p.ac_type === a).length) - ((typeUse.get(b) || 0) / planes.filter(p => p.ac_type === b).length));
         if (d === 0 && !fitTypes.length) stats.noType++;
-        let best = null;
+        let best = null, plane = null, anyChain = false;
         const score = c => { const days = Math.floor(c[c.length - 1].arrAbs / 1440) - d; return days * 100 + c.length; };
         for (const t of fitTypes) {
+          let bestT = null;
           const stack = [[first]];
           let guard = 0;
           while (stack.length && guard++ < 4000) {
             const chain = stack.pop(), last = chain[chain.length - 1];
             const home = pool === "DAAG" ? last.rt.arr === chain[0].rt.dep : baseSet.has(last.rt.arr);
-            if (chain.length > 1 && home) { if (!best || best.chain.length === 1 || score(chain) < score(best.chain)) best = { chain, type: t }; continue; }
-            if (chain.length === 1 && pool === "MINI" && home && !best) best = { chain, type: t };
+            if (chain.length > 1 && home) { if (!bestT || bestT.chain.length === 1 || score(chain) < score(bestT.chain)) bestT = { chain, type: t }; continue; }
+            if (chain.length === 1 && pool === "MINI" && home && !bestT) bestT = { chain, type: t };
             if (chain.length >= maxLegs) continue;
             for (const nx of fromAirport.get(last.rt.arr) || []) {
               if (chain.some(c => c.rt.id === nx.rt.id)) continue;
@@ -2373,13 +2389,15 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
               }
             }
           }
-          if (best) break;
+          if (!bestT) continue;
+          anyChain = true;
+          const p = freePlane(t, first.depAbs);
+          if (p) { best = bestT; plane = p; break; }        // typ s volným letadlem – jinak zkusit další vhodný typ
         }
-        if (!best) { if (d === 0 && fitTypes.length) stats.noReturn++; continue; }
-        const startAbs = best.chain[0].depAbs, endAbs = best.chain[best.chain.length - 1].arrAbs;
-        const plane = planes.filter(p => normType(p.ac_type) === normType(best.type)).find(p => busy.get(p.registration) <= startAbs - 30);
-        if (!plane) { if (d === 0) stats.noPlane++; continue; }
+        if (!best) { if (d === 0) { if (anyChain) stats.noPlane++; else if (fitTypes.length) stats.noReturn++; } continue; }
+        const endAbs = best.chain[best.chain.length - 1].arrAbs;
         busy.set(plane.registration, endAbs);
+        typeUse.set(best.type, (typeUse.get(best.type) || 0) + 1);
         best.chain.forEach(c => { usedDay.add(c.rt.id + "@" + c.day); usedCount.set(c.rt.id, (usedCount.get(c.rt.id) || 0) + 1); });
         const legs = best.chain.map(c => ({ route_id: c.rt.id, flight_no: fltNo(c.rt), dep: c.rt.dep, arr: c.rt.arr,
           std: pragueToUtc(startDay, c.depAbs).toISOString(), sta: pragueToUtc(startDay, c.arrAbs).toISOString(),
