@@ -2364,6 +2364,74 @@ async function fetchWx(icaos) {
   ]);
   return { metar: Array.isArray(m) ? m : [], taf: Array.isArray(t) ? t : [] };
 }
+// ---------- předpověď TAF pro konkrétní čas ----------
+const visSm = v => { if (v == null) return null; const t = String(v); return t.includes("+") ? 10 : parseFloat(t); };
+function wxCat(p) {
+  const ceil = Math.min(...(p.clouds || []).filter(c => ["BKN", "OVC", "OVX", "VV"].includes(c.cover) && c.base != null).map(c => c.base), 99999);
+  const vis = visSm(p.visib) ?? 10;
+  if (ceil < 500 || vis < 1) return "LIFR"; if (ceil < 1000 || vis < 3) return "IFR"; if (ceil <= 3000 || vis <= 5) return "MVFR"; return "VFR";
+}
+function tafAt(t, atMs) {
+  const f = Array.isArray(t?.fcsts) ? t.fcsts : [];
+  if (!f.length) return null;
+  const at = atMs / 1000, inP = x => x.timeFrom <= at && at < (x.timeTo || Infinity);
+  const validTo = Math.max(...f.map(x => x.timeTo || 0));
+  const bases = f.filter(x => !x.fcstChange || ["FM", "BECMG"].includes(x.fcstChange));
+  let base = null;
+  for (const x of bases) if (x.timeFrom <= at && (!base || x.timeFrom >= base.timeFrom)) base = x;
+  const changes = f.filter(x => ["TEMPO", "PROB"].includes(x.fcstChange) || (x.probability && x.fcstChange !== "FM")).filter(inP);
+  if (!base || at > validTo) return { outOfRange: true, validTo: validTo * 1000, validFrom: Math.min(...f.map(x => x.timeFrom)) * 1000 };
+  return { base, changes };
+}
+const WX_WORDS = { RA: "déšť", DZ: "mrholení", SN: "sníh", SG: "sněhová zrna", GR: "kroupy", GS: "drobné kroupy", PL: "zmrzlý déšť", TS: "bouřka", SH: "přeháňky",
+  FG: "mlha", BR: "kouřmo", HZ: "zákal", FU: "kouř", DU: "prach", SA: "písek", FZ: "mrznoucí", VC: "v okolí" };
+function wxWords(str) {
+  if (!str) return "";
+  return String(str).split(/\s+/).map(tok => { const int = tok.startsWith("+") ? "silný " : tok.startsWith("-") ? "slabý " : "";
+    const words = (tok.replace(/^[+-]/, "").match(/.{2}/g) || []).map(c => WX_WORDS[c] || c); return int + words.join(" "); }).join(", ");
+}
+function periodText(p) {
+  const parts = [];
+  if (p.wspd != null) parts.push(p.wspd === 0 ? "bezvětří" : `vítr ${p.wdir === "VRB" ? "proměnlivý" : String(p.wdir ?? "").padStart(3, "0") + "°"} ${p.wspd} kt${p.wgst ? `, nárazy ${p.wgst} kt` : ""}`);
+  const v = visSm(p.visib); if (v != null) parts.push(v >= 6 ? "dohlednost 10 km a více" : `dohlednost ${fmt1(v * 1.609)} km`);
+  if (p.wxString) parts.push(wxWords(p.wxString));
+  const cl = (p.clouds || []).filter(c => c.cover && c.cover !== "NSC" && c.cover !== "SKC" && c.cover !== "CLR");
+  parts.push(cl.length ? cl.map(c => `${COVER_TXT[c.cover] || c.cover}${c.base != null ? ` ${nf.format(c.base)} ft` : ""}`).join(", ") : "bez významné oblačnosti");
+  return parts.join(" · ");
+}
+function forecastHtml(icao, atIso, label, wx) {
+  const t = wx.taf.find(x => x.icaoId === icao), m = wx.metar.find(x => x.icaoId === icao);
+  const at = new Date(atIso).getTime(), soon = at - Date.now() < 90 * 60000;
+  const fc = tafAt(t, at);
+  let main = "";
+  if (soon && m) {
+    const cat = m.fltCat || wxCat(m);
+    main = `<div style="display:flex;gap:8px;align-items:center;margin:4px 0">${wxIcon(m, true)}<span class="cat-chip cat-${esc(cat)}">${esc(cat)}</span><span class="muted" style="font-size:13px">aktuální počasí</span></div>
+      <div style="font-size:14px">${esc(periodText(m))}${m.temp != null ? ` · ${Math.round(m.temp)} °C` : ""}</div>`;
+  } else if (fc && !fc.outOfRange) {
+    const cat = wxCat(fc.base);
+    main = `<div style="display:flex;gap:8px;align-items:center;margin:4px 0">${wxIcon(fc.base, true)}<span class="cat-chip cat-${cat}">${cat}</span><span class="muted" style="font-size:13px">předpověď na ${label} ${hmPrague(atIso)}</span></div>
+      <div style="font-size:14px">${esc(periodText(fc.base))}</div>
+      ${fc.changes.map(c => `<div style="font-size:13px;margin-top:3px"><b>${c.probability ? `S pravděpodobností ${c.probability} %` : "Přechodně"}:</b> ${esc(periodText(c))}</div>`).join("")}`;
+  } else if (fc?.outOfRange) {
+    main = `<div class="muted" style="font-size:13px">Předpověď na ${label} ${hmPrague(atIso)} zatím není – TAF platí do ${new Date(fc.validTo).toLocaleString("cs-CZ", { timeZone: "Europe/Prague", weekday: "short", hour: "2-digit", minute: "2-digit" })}.
+      ${m ? `Teď: ${esc(periodText(m))}.` : ""}</div>`;
+  } else if (m) {
+    main = `<div style="font-size:14px"><span class="muted">Teď:</span> ${esc(periodText(m))}</div><div class="muted" style="font-size:12px">Předpověď TAF pro toto letiště není k dispozici.</div>`;
+  } else main = '<div class="muted" style="font-size:13px">Počasí pro toto letiště není k dispozici (letiště nemá meteostanici).</div>';
+  return `<div style="margin-bottom:14px"><b>${esc(icao)}</b> <span class="muted">${esc(apByCode(icao)?.[1] || "")}</span>${main}</div>`;
+}
+// počasí, kterým se řídí poznámky dispečinku: předpověď na čas příletu, u blízkých letů aktuální stav
+function wxForRemarks(wx, icao, atIso) {
+  const at = new Date(atIso).getTime(), m = wx.metar.find(x => x.icaoId === icao);
+  if (at - Date.now() < 90 * 60000) return m || null;
+  const fc = tafAt(wx.taf.find(x => x.icaoId === icao), at);
+  if (!fc || fc.outOfRange) return null;
+  const worst = [fc.base, ...fc.changes];
+  return { ...fc.base, fltCat: worst.map(wxCat).sort((a, b) => ["VFR", "MVFR", "IFR", "LIFR"].indexOf(b) - ["VFR", "MVFR", "IFR", "LIFR"].indexOf(a))[0],
+    wgst: Math.max(...worst.map(x => x.wgst || 0)) || null, wspd: Math.max(...worst.map(x => x.wspd || 0)), wxString: worst.map(x => x.wxString || "").join(" ") };
+}
+
 function remarksFor(leg, next, prev, pax, fd, wx, notes, rnd) {
   const pick = arr => arr[Math.floor(rnd() * arr.length)];
   const out = [];
@@ -2382,10 +2450,10 @@ function remarksFor(leg, next, prev, pax, fd, wx, notes, rnd) {
   const age = fd?.delivered ? (Date.now() - new Date(fd.delivered)) / (365.25 * 864e5) : null;
   if (age != null && age < 1.2) out.push(pick(["Prakticky nové letadlo – užij si ho!", "Letadlo je ve flotile teprve krátce, stav je výborný."]));
   if (age != null && age > 20) out.push("Starší letadlo – technici doporučují důkladnou předletovou prohlídku.");
-  const mA = wx.metar.find(m => m.icaoId === leg.arr);
-  if (mA?.wgst >= 25 || mA?.wspd >= 20) out.push(`V ${esc(leg.arr)} fouká silný vítr (${mA.wspd} kt${mA.wgst ? `, nárazy ${mA.wgst} kt` : ""}) – připrav se na turbulentní přiblížení.`);
-  if (mA?.fltCat === "IFR" || mA?.fltCat === "LIFR") out.push(`V cíli jsou nyní podmínky ${mA.fltCat} – počítej s přístrojovým přiblížením a zkontroluj alternativu.`);
-  if (/TS/.test(mA?.wxString || "")) out.push(`V ${esc(leg.arr)} hlásí bouřky – sleduj vývoj a měj plán B.`);
+  const mA = wxForRemarks(wx, leg.arr, leg.sta);
+  if (mA?.wgst >= 25 || mA?.wspd >= 20) out.push(`V ${esc(leg.arr)} ${new Date(leg.sta) - Date.now() > 90 * 60000 ? "se v čase příletu čeká" : "fouká"} silný vítr (${mA.wspd} kt${mA.wgst ? `, nárazy ${mA.wgst} kt` : ""}) – připrav se na turbulentní přiblížení.`);
+  if (mA?.fltCat === "IFR" || mA?.fltCat === "LIFR") out.push(`V cíli ${new Date(leg.sta) - Date.now() > 90 * 60000 ? "se v čase příletu čekají" : "jsou nyní"} podmínky ${mA.fltCat} – počítej s přístrojovým přiblížením a zkontroluj alternativu.`);
+  if (/TS/.test(mA?.wxString || "")) out.push(`V ${esc(leg.arr)} ${new Date(leg.sta) - Date.now() > 90 * 60000 ? "předpověď počítá s bouřkami" : "hlásí bouřky"} – sleduj vývoj a měj plán B.`);
   if (notes.some(n => n.icao === leg.arr && n.notes)) out.push(`Přečti si poznámky k letišti ${esc(leg.arr)} níže.`);
   if (!out.length) out.push(pick(["Standardní provoz, žádná zvláštní upozornění. Hezký let!", "Klidný den v provozu. Přejeme pohodový let."]));
   return out;
@@ -2442,8 +2510,9 @@ async function renderBriefing(rotId, legIdx) {
         <dt>Konfigurace</dt><dd>${pax.prem ? `${pax.prem} premium + ${pax.seats - pax.prem} economy` : `${pax.seats} economy`}</dd>
         ${fd?.notes ? `<dt>Poznámka</dt><dd>${esc(fd.notes)}</dd>` : ""}${fd?.training_only ? "<dt>Provoz</dt><dd>výcvik palubní posádky</dd>" : ""}</dl>
         ${legs[0]?.ferry_from && i === 0 ? `<p class="muted" style="font-size:13px;margin:8px 0 0">Letadlo bude přistaveno z ${esc(legs[0].ferry_from)}.</p>` : ""}</div>
-      <div class="card brief-box"><h3>Počasí</h3>${wxBlock(leg.dep)}${wxBlock(leg.arr)}${altn ? wxBlock(altn) : ""}
-        <p class="muted" style="font-size:12px;margin:0">METAR je aktuální pozorování, TAF předpověď. U letů v dalších dnech sleduj aktualizace.</p></div>
+      <div class="card brief-box"><h3>Počasí na tvůj let</h3>
+        ${forecastHtml(leg.dep, leg.std, "odlet", wx)}${forecastHtml(leg.arr, leg.sta, "přílet", wx)}${altn ? forecastHtml(altn, leg.sta, "přílet", wx) : ""}
+        <details><summary class="muted" style="cursor:pointer;font-size:13px">Zobrazit původní zprávy (METAR a TAF)</summary>${wxBlock(leg.dep)}${wxBlock(leg.arr)}${altn ? wxBlock(altn) : ""}</details></div>
       ${noteBlock(leg.dep) + noteBlock(leg.arr) ? `<div class="card brief-box"><h3>Poznámky k letištím</h3>${noteBlock(leg.dep)}${noteBlock(leg.arr)}</div>` : ""}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="${esc(sbUrl)}" target="_blank" rel="noopener">Naplánovat v SimBriefu</a>
