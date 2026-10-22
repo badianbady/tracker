@@ -1563,7 +1563,10 @@ function renderFlightPanel() {
         <div><b>${nf.format(d.r.alt || 0)}</b><span>Výška ft</span></div><div><b>${d.r.gs || 0}</b><span>GS kt</span></div>
         <div><b>${(d.r.vs > 0 ? "+" : "") + nf.format(d.r.vs || 0)}</b><span>V/S fpm</span></div><div><b>${String(d.r.hdg ?? 0).padStart(3, "0")}°</b><span>Kurz</span></div></div>
         <div class="muted" style="text-align:center;margin-top:8px">${esc(d.r.phase || "")}${d.altn ? ` · alternativa ${esc(d.altn)}` : ""}</div></div>`
-      : `${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
+      : `${d.points != null ? `<div class="fp-sec"><h4>Body za let: ${nf.format(d.points)}</h4>
+          <div class="muted" style="font-size:14px">${Object.entries(d.points_detail || {}).map(([k, v]) => `${{ let: "let z rotace", dochvilnost: "dochvilnost", pristani: "přistání", spokojenost: "spokojenost cestujících", jina_varianta_typu: "jiný typ z rodiny", volny_let: "volný let" }[k] || k}: <b>${typeof v === "number" && v > 0 ? "+" : ""}${esc(String(v))}</b>`).join(" · ")}</div>
+          ${d.rotation_id ? `<div style="font-size:14px;margin-top:4px">Let z rotace · ${d.delay_min != null ? (d.delay_min <= 0 ? "včas" : `zpoždění ${d.delay_min} min`) : ""}${d.pax_sat != null ? ` · spokojenost cestujících ${d.pax_sat} %` : ""} · <a href="#/briefing/${d.rotation_id}/${d.leg_idx || 0}">briefing</a></div>` : ""}</div>` : ""}
+        ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
     ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
@@ -1606,11 +1609,21 @@ async function renderLeaderboard() {
   const el = $("zebricek");
   el.innerHTML = `<h1 class="page-title">Žebříček přistání</h1>
     <p class="lead">Nejměkčí přistání komunity. Známka 0–10 vychází z rychlosti dosednutí a přetížení.</p>
-    <div class="tabs"><button class="tab ${lbTab === "week" ? "on" : ""}" data-t="week">Tento týden</button><button class="tab ${lbTab === "all" ? "on" : ""}" data-t="all">Celkově</button></div>
+    <div class="tabs"><button class="tab ${lbTab === "week" ? "on" : ""}" data-t="week">Tento týden</button><button class="tab ${lbTab === "all" ? "on" : ""}" data-t="all">Celkově</button>
+      ${ROSTER_PUBLIC || me?.profile?.is_admin ? `<button class="tab ${lbTab === "points" ? "on" : ""}" data-t="points">Body (30 dní)</button>` : ""}</div>
     <div id="lbTable"><p class="muted">Načítám…</p></div>
     <h2 class="section-title" style="margin-top:36px">Nejvíc nalétáno</h2>
     <div id="lbHours"><p class="muted">Načítám…</p></div>`;
   el.querySelectorAll(".tab").forEach(b => b.onclick = () => { lbTab = b.dataset.t; renderLeaderboard(); });
+  if (lbTab === "points") {
+    const { data } = await sb.from("pilot_career").select("*").gt("points_30d", 0).order("points_30d", { ascending: false }).limit(25);
+    $("lbTable").innerHTML = data?.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Pilot</th><th>Body (30 dní)</th><th>Rotace</th><th>Dochvilnost</th><th>Spokojenost</th></tr></thead><tbody>
+      ${data.map((c, i) => `<tr><td>${i + 1}</td><td><a href="#/pilot/${encodeURIComponent(c.username)}">${esc(c.username)}</a></td><td><b>${nf.format(c.points_30d)}</b></td><td>${c.rotations_done}</td>
+        <td>${c.rotation_legs ? Math.round(c.on_time_legs / c.rotation_legs * 100) + " %" : "–"}</td><td>${c.avg_pax_sat != null ? c.avg_pax_sat + " %" : "–"}</td></tr>`).join("")}</tbody></table></div>`
+      : '<div class="card">Zatím nikdo nezískal body. Vezmi si rotaci v Rozpisu!</div>';
+    $("lbHours").closest && ($("lbHours").innerHTML = "");
+    return;
+  }
 
   let q = sb.from("flights").select("id, user_id, aircraft, dep_icao, arr_icao, landed_at, fpm, g, score, profiles!flights_user_id_fkey(username, avatar_url)").not("score", "is", null)
     .order("score", { ascending: false }).order("fpm", { ascending: false }).limit(25);
@@ -1632,6 +1645,18 @@ async function renderLeaderboard() {
 }
 
 /* ---------- piloti ---------- */
+async function renderCareerBox(username) {
+  const box = $("careerBox"); if (!box) return;
+  const { data: c } = await sb.from("pilot_career").select("*").eq("username", username).maybeSingle();
+  if (!c || (!c.points && !c.rotation_legs)) { box.innerHTML = ""; return; }
+  const punct = c.rotation_legs ? Math.round(c.on_time_legs / c.rotation_legs * 100) : null;
+  box.innerHTML = `<h2 class="section-title">Kariéra u Jáchym Air</h2><div class="stats">
+    <div class="stat"><b>${nf.format(c.points)}</b><span>Body celkem</span></div>
+    <div class="stat"><b>${nf.format(c.points_30d)}</b><span>Body za 30 dní</span></div>
+    <div class="stat"><b>${c.rotations_done}</b><span>Dokončených rotací</span></div>
+    <div class="stat"><b>${punct != null ? punct + " %" : "–"}</b><span>Dochvilnost</span></div>
+    <div class="stat"><b>${c.avg_pax_sat != null ? c.avg_pax_sat + " %" : "–"}</b><span>Spokojenost cestujících</span></div></div>`;
+}
 async function renderPilots() {
   const el = $("piloti");
   el.innerHTML = `<h1 class="page-title">Piloti</h1><p class="lead">Všichni, kdo létají s trackerem.</p><div id="pilotsGrid"><p class="muted">Načítám…</p></div>`;
@@ -1648,6 +1673,7 @@ async function renderPilot(username) {
   el.innerHTML = '<p class="muted">Načítám…</p>';
   const { data: p } = await sb.from("pilot_stats").select("*").eq("username", username).maybeSingle();
   if (!p) { el.innerHTML = '<div class="card">Pilot nenalezen.</div>'; return; }
+  setTimeout(() => renderCareerBox(username), 0);
   const hours = p.minutes / 60, rk = rankOf(hours);
   const { data: prof } = await sb.from("profiles").select("stream_url").eq("id", p.id).maybeSingle();
   const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score, rwy, incomplete").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
@@ -1664,6 +1690,7 @@ async function renderPilot(username) {
       <div class="stat"><b>${p.avg_score != null ? fmt1(p.avg_score) : "–"}</b><span>Průměrné přistání</span></div>
       <div class="stat"><b>${p.best_score != null ? fmt1(p.best_score) : "–"}</b><span>Nejlepší přistání</span></div>
     </div>
+    <div id="careerBox"></div>
     <h2 class="section-title">Historie letů</h2>
     ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a otevře se jeho detail na mapě.</p>' : ""}
     ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' :
@@ -2228,6 +2255,11 @@ async function renderRoster(_param, msg) {
     .neq("status", "cancelled").order("std");
   if (error) { el.innerHTML = `<h1 class="page-title">Rozpis</h1><div class="card">Rozpis zatím není připravený. (${esc(error.message)})</div>`; return; }
   const mineList = (rots || []).filter(r => me && r.pilot_id === me.user.id && r.status === "taken");
+  rotFlown = new Map();
+  if (mineList.length) {
+    const { data: fl } = await sb.from("flights").select("rotation_id, leg_idx, points").in("rotation_id", mineList.map(r => r.id));
+    (fl || []).forEach(f => { if (!rotFlown.has(f.rotation_id)) rotFlown.set(f.rotation_id, new Map()); rotFlown.get(f.rotation_id).set(f.leg_idx, f.points); });
+  }
   const baseFilter = rosterBase === "mine" ? (myBase ? [myBase] : null) : rosterBase === "all" ? null : [rosterBase];
   const pool = baseFilter ? basesList.find(b => b.icao === baseFilter[0])?.pool : null;
   const dayRots = (rots || []).filter(r => r.service_day === rosterDay && (!baseFilter || r.base_icao === baseFilter[0] || (pool === "MINI" && r.pool === "MINI" && baseFilter[0] === r.legs[0]?.dep)));
@@ -2295,13 +2327,13 @@ function rotCard(r) {
       ${fd?.training_only ? '<span class="va-chip">výcvik palubní posádky</span>' : ""}${r.reg && oosAt(r.reg, r.std) ? '<span class="va-chip" style="background:#FEE2E2;color:#991B1B">letadlo v údržbě</span>' : ""}${(fleetStatus?.df.get(r.reg) || []).length ? `<span class="va-chip">${fleetStatus.df.get(r.reg).length}× MEL</span>` : ""}${legs[0]?.ferry_from ? `<span class="va-chip">letadlo přistaveno z ${esc(legs[0].ferry_from)}</span>` : ""}<span>${legs.length} ${legs.length === 1 ? "let" : legs.length < 5 ? "lety" : "letů"}</span>
       ${(() => { const nd = new Set(legs.map(l => pragueDay(new Date(l.std)))).size; const stops = legs.filter(l => l.night_before).map(l => l.night_before);
         return nd > 1 ? `<span class="va-chip">${nd} ${nd < 5 ? "dny" : "dní"}${stops.length ? " · přespání v " + stops.map(esc).join(", ") : ""}</span>` : `<span>${fmtDur(block)} h</span>`; })()}</div>
-      <div class="rot-legs">${legs.map(l => `<div class="rot-leg"><b><a href="#/linka/${encodeURIComponent(l.route_id)}">${esc(l.flight_no)}</a></b>
+      <div class="rot-legs">${legs.map((l, li) => `<div class="rot-leg"><b>${rotFlown.get(r.id)?.has(li) ? `<span title="Odletěno, ${rotFlown.get(r.id).get(li)} bodů">✅</span> ` : ""}<a href="#/linka/${encodeURIComponent(l.route_id)}">${esc(l.flight_no)}</a></b>
         <span>${pragueDay(new Date(l.std)) !== r.service_day ? `<span class="muted" style="font-size:13px">${dayLabel(pragueDay(new Date(l.std)))} </span>` : ""}${esc(l.dep)} <b>${hmPrague(l.std)}</b> → ${esc(l.arr)} <b>${hmPrague(l.sta)}</b>${l.load_factor != null ? ` <span class="muted" style="font-size:13px">· obs. ~${Math.round(l.load_factor)} %</span>` : ""}</span></div>`).join("")}</div></div>
     <div class="rot-side"><a class="btn ghost" href="#/briefing/${r.id}" style="padding:7px 14px">Briefing</a>${r.status === "open" ? (me ? `<button class="btn" data-take="${r.id}">Vzít rotaci</button>` : "")
       : mine ? `<span class="badge">Tvoje rotace</span><button class="link-btn danger" data-giveback="${r.id}">Vrátit</button>${appApi ? `<button class="btn ghost" data-bidrot="${r.id}" style="padding:7px 12px">Rezervovat v crew centru</button>` : ""}`
       : `<span class="muted" style="font-size:13px">Letí ${esc(r.profiles?.username || "někdo")}</span>`}</div></div>`;
 }
-let rotCacheById = new Map();
+let rotCacheById = new Map(), rotFlown = new Map();
 function bindRotButtons(root) {
   root.querySelectorAll("[data-take]").forEach(b => b.onclick = async () => {
     b.disabled = true;
