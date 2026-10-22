@@ -315,6 +315,18 @@
   .day-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
   .rot-list { display: flex; flex-direction: column; gap: 10px; }
   @media (max-width: 640px) { .rot { grid-template-columns: 1fr; } .rot-side { align-items: flex-start; flex-direction: row; flex-wrap: wrap; } }
+  .brief-head { background: var(--green); color: #fff; border-radius: 16px; padding: 20px 24px; margin-bottom: 16px; }
+  .brief-head .k { opacity: .85; font-weight: 700; font-size: 14px; }
+  .brief-route { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-family: var(--display); font-weight: 800; font-size: 40px; line-height: 1; margin-top: 8px; }
+  .brief-route small { display: block; font: 500 14px var(--body); opacity: .9; margin-top: 4px; }
+  .brief-times { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; font-size: 15px; }
+  .brief-times b { font-family: var(--display); font-size: 20px; }
+  .brief-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .brief-box h3 { font-size: 20px; margin-bottom: 8px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 15px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .remarks { margin: 0; padding-left: 20px; line-height: 1.6; }
+  .wx-raw { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--bg); padding: 8px 10px; border-radius: 8px; margin: 6px 0 10px; word-break: break-word; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -426,6 +438,7 @@
   <section class="view" id="view-pratele"><div class="page" id="pratele"></div></section>
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
   <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
+  <section class="view" id="view-briefing"><div class="page" id="briefing"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
   <section class="view" id="view-soukromi"><div class="page legal" id="soukromi"></div></section>
   <section class="view" id="view-pravidla"><div class="page legal" id="pravidla"></div></section>
@@ -763,13 +776,13 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
   const view = r === "let" || r === "linka" ? "map" : r === "nove-heslo" ? "noveheslo" : views.includes(r) ? r : "map";
   views.forEach(v => $("view-" + v).classList.toggle("on", v === view));
-  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.r === (view === "pilot" ? "piloti" : view === "chat" ? "pratele" : view)));
+  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("active", a.dataset.r === (view === "pilot" ? "piloti" : view === "chat" ? "pratele" : view === "briefing" ? "rozpis" : view)));
   if (notConfigured) { showNotConfigured(view); return; }
   if (view === "map") {
     initMap(); setTimeout(() => map.invalidateSize(), 50);
@@ -790,6 +803,7 @@ async function router() {
   if (view === "pravidla") renderRules();
   if (view === "fotky") renderGallery();
   if (view === "rozpis") renderRoster(parts[1]);
+  if (view === "briefing") renderBriefing(+parts[1], +(parts[2] || 0));
 }
 window.addEventListener("hashchange", router);
 
@@ -2276,7 +2290,7 @@ function rotCard(r) {
         return nd > 1 ? `<span class="va-chip">${nd} ${nd < 5 ? "dny" : "dní"}${stops.length ? " · přespání v " + stops.map(esc).join(", ") : ""}</span>` : `<span>${fmtDur(block)} h</span>`; })()}</div>
       <div class="rot-legs">${legs.map(l => `<div class="rot-leg"><b><a href="#/linka/${encodeURIComponent(l.route_id)}">${esc(l.flight_no)}</a></b>
         <span>${pragueDay(new Date(l.std)) !== r.service_day ? `<span class="muted" style="font-size:13px">${dayLabel(pragueDay(new Date(l.std)))} </span>` : ""}${esc(l.dep)} <b>${hmPrague(l.std)}</b> → ${esc(l.arr)} <b>${hmPrague(l.sta)}</b>${l.load_factor != null ? ` <span class="muted" style="font-size:13px">· obs. ~${Math.round(l.load_factor)} %</span>` : ""}</span></div>`).join("")}</div></div>
-    <div class="rot-side">${r.status === "open" ? (me ? `<button class="btn" data-take="${r.id}">Vzít rotaci</button>` : "")
+    <div class="rot-side"><a class="btn ghost" href="#/briefing/${r.id}" style="padding:7px 14px">Briefing</a>${r.status === "open" ? (me ? `<button class="btn" data-take="${r.id}">Vzít rotaci</button>` : "")
       : mine ? `<span class="badge">Tvoje rotace</span><button class="link-btn danger" data-giveback="${r.id}">Vrátit</button>${appApi ? `<button class="btn ghost" data-bidrot="${r.id}" style="padding:7px 12px">Rezervovat v crew centru</button>` : ""}`
       : `<span class="muted" style="font-size:13px">Letí ${esc(r.profiles?.username || "někdo")}</span>`}</div></div>`;
 }
@@ -2300,6 +2314,141 @@ function bindRotButtons(root) {
     for (const l of r?.legs || []) { const res = await appApi.crew_bid(l.route_id, ac ? { id: ac.id, reg: ac.registration, icao: ac.icao } : null); if (res.ok) ok++; else last = res.msg; }
     b.textContent = ok ? `Rezervováno ${ok} ✔` : "Nepovedlo se"; if (!ok && last) alert(last);
   });
+}
+
+/* ---------- briefing ---------- */
+// náhoda se semínkem: stejný let = stejný briefing při každém otevření
+function seededRand(seed) {
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) { h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return () => { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
+}
+function easter(y) { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3),
+  h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1; return new Date(Date.UTC(y, month - 1, day)); }
+function dayContext(dayStr) {
+  const d = new Date(dayStr + "T12:00:00Z"), y = d.getUTCFullYear(), md = dayStr.slice(5), dow = d.getUTCDay();
+  const fixed = { "01-01": "Nový rok", "05-01": "Svátek práce", "05-08": "Den vítězství", "07-05": "Cyril a Metoděj", "07-06": "Mistr Jan Hus", "09-28": "Den české státnosti",
+    "10-28": "Vznik Československa", "11-17": "Den boje za svobodu", "12-24": "Štědrý den", "12-25": "1. svátek vánoční", "12-26": "2. svátek vánoční" };
+  const e = easter(y), iso = x => x.toISOString().slice(0, 10);
+  const easterDays = { [iso(new Date(e.getTime() - 2 * 864e5))]: "Velký pátek", [iso(new Date(e.getTime() + 864e5))]: "Velikonoční pondělí" };
+  const holiday = fixed[md] || easterDays[dayStr] || null;
+  const summer = md >= "07-01" && md <= "08-31", xmas = md >= "12-20" || md <= "01-04";
+  let f = 1, why = [];
+  if (dow === 5 || dow === 0) { f += 0.06; why.push(dow === 5 ? "páteční provoz" : "nedělní návraty"); }
+  if (dow === 2 || dow === 3) { f -= 0.06; why.push("slabší střed týdne"); }
+  if (holiday) { f += 0.08; why.push("svátek: " + holiday); }
+  if (summer) { f += 0.08; why.push("letní prázdniny"); }
+  if (xmas) { f += 0.08; why.push("vánoční prázdniny"); }
+  return { factor: f, why, holiday };
+}
+function paxFor(leg, fd, dayStr, rnd) {
+  const seats = fd?.seats_total || 180, prem = Math.min(fd?.seats_premium || 0, seats);
+  const lf = (leg.load_factor != null ? +leg.load_factor : 78) / 100, v = (leg.lf_var != null ? +leg.lf_var : 8) / 100;
+  const ctx = dayContext(dayStr);
+  const eff = Math.max(0.25, Math.min(1, (lf + (rnd() * 2 - 1) * v) * ctx.factor));
+  const total = Math.min(seats, Math.round(seats * eff));
+  const premPax = prem ? Math.min(prem, Math.round(prem * Math.min(1, eff + 0.05))) : 0;
+  const infants = Math.round(total * (0.01 + rnd() * 0.015));
+  const bags = Math.round(total * (0.75 + rnd() * 0.25));
+  const cargo = Math.round((seats * (2 + rnd() * 8)) / 10) * 10;          // kg nákladu v podpalubí
+  return { seats, prem, total, premPax, econPax: total - premPax, infants, bags, bagKg: bags * 16, cargo, payload: total * 84 + bags * 16 + cargo, eff, ctx };
+}
+async function fetchWx(icaos) {
+  const ids = [...new Set(icaos.filter(x => /^[A-Z0-9]{4}$/.test(x || "")))].join(",");
+  if (!ids) return { metar: [], taf: [] };
+  const h = { headers: { apikey: CFG.SUPABASE_KEY } };
+  const [m, t] = await Promise.all([
+    fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?ids=${ids}`, h).then(r => r.ok ? r.json() : []).catch(() => []),
+    fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?taf=${ids}`, h).then(r => r.ok ? r.json() : []).catch(() => []),
+  ]);
+  return { metar: Array.isArray(m) ? m : [], taf: Array.isArray(t) ? t : [] };
+}
+function remarksFor(leg, next, prev, pax, fd, wx, notes, rnd) {
+  const pick = arr => arr[Math.floor(rnd() * arr.length)];
+  const out = [];
+  if (pax.eff >= 0.95) out.push(pick(["Let je téměř vyprodaný – počítej s delším nástupem a plnými zavazadlovými prostory.", "Plný let. Handling hlásí vysoký počet zavazadel, nakládka může trvat déle.", "Kapacita prakticky vyčerpaná – připrav se na pomalejší boarding."]));
+  else if (pax.eff <= 0.5) out.push(pick(["Slabší obsazenost, nástup by měl proběhnout rychle.", "Poloprázdný let – ideální příležitost odletět včas."]));
+  if (pax.ctx.holiday) out.push(`Dnes je ${pax.ctx.holiday} – zvýšený provoz na letištích.`);
+  const depMin = +hmPrague(leg.std).slice(0, 2) * 60 + +hmPrague(leg.std).slice(3);
+  if (depMin < 6 * 60) out.push(pick(["Brzký ranní odlet – posádka se hlásí v předstihu, počítej s nočním provozem na letišti.", "Ranní vlna: první let dne, letadlo bude studené – nech si čas na přípravu kabiny."]));
+  if (next) { const gap = Math.round((new Date(next.std) - new Date(leg.sta)) / 60000);
+    if (gap <= 35) out.push(`Krátký obrat v ${esc(leg.arr)}: jen ${gap} minut do dalšího letu ${esc(next.flight_no)}. Drž se rozpisu.`);
+    else out.push(`Obrat v ${esc(leg.arr)}: ${gap} minut, pak ${esc(next.flight_no)} do ${esc(next.arr)}.`); }
+  const dur = Math.round((new Date(leg.sta) - new Date(leg.std)) / 60000);
+  if (dur >= 240) out.push(pick(["Dlouhý sektor – zkontroluj zásobu jídla a vody pro posádku.", "Delší let – plánuj palivo s rezervou a zkontroluj alternativy po trati."]));
+  if (fd?.notes && /EIS/i.test(fd.notes)) out.push("Letadlo má starší EIS displeje – počítej s klasickým uspořádáním přístrojů.");
+  if (fd?.training_only) out.push("Výcvikový let palubní posádky – na palubě je instruktor kabiny, postupy proveď podle standardů.");
+  const age = fd?.delivered ? (Date.now() - new Date(fd.delivered)) / (365.25 * 864e5) : null;
+  if (age != null && age < 1.2) out.push(pick(["Prakticky nové letadlo – užij si ho!", "Letadlo je ve flotile teprve krátce, stav je výborný."]));
+  if (age != null && age > 20) out.push("Starší letadlo – technici doporučují důkladnou předletovou prohlídku.");
+  const mA = wx.metar.find(m => m.icaoId === leg.arr);
+  if (mA?.wgst >= 25 || mA?.wspd >= 20) out.push(`V ${esc(leg.arr)} fouká silný vítr (${mA.wspd} kt${mA.wgst ? `, nárazy ${mA.wgst} kt` : ""}) – připrav se na turbulentní přiblížení.`);
+  if (mA?.fltCat === "IFR" || mA?.fltCat === "LIFR") out.push(`V cíli jsou nyní podmínky ${mA.fltCat} – počítej s přístrojovým přiblížením a zkontroluj alternativu.`);
+  if (/TS/.test(mA?.wxString || "")) out.push(`V ${esc(leg.arr)} hlásí bouřky – sleduj vývoj a měj plán B.`);
+  if (notes.some(n => n.icao === leg.arr && n.notes)) out.push(`Přečti si poznámky k letišti ${esc(leg.arr)} níže.`);
+  if (!out.length) out.push(pick(["Standardní provoz, žádná zvláštní upozornění. Hezký let!", "Klidný den v provozu. Přejeme pohodový let."]));
+  return out;
+}
+async function renderBriefing(rotId, legIdx) {
+  const el = $("briefing");
+  if (!ROSTER_PUBLIC && !me?.profile?.is_admin) { el.innerHTML = '<div class="card">Rozpis rotací připravujeme.</div>'; return; }
+  el.innerHTML = '<p class="muted">Připravuji briefing…</p>';
+  await Promise.all([basesReady, airportsReady, routesReady]);
+  if (!fleetCache) await loadFleetDetails();
+  const { data: r } = await sb.from("rotations").select("*, profiles(username)").eq("id", rotId).maybeSingle();
+  if (!r) { el.innerHTML = '<div class="card">Rotace nenalezena.</div>'; return; }
+  const legs = r.legs || [], i = Math.min(Math.max(0, legIdx), legs.length - 1), leg = legs[i];
+  const rt = jaiRoutes.find(x => x.id === leg.route_id) || {};
+  const fd = (fleetCache || []).find(f => f.registration === r.reg);
+  const legDay = pragueDay(new Date(leg.std));
+  const rnd = seededRand(`${r.id}/${i}/${leg.route_id}`);
+  const pax = paxFor(leg, fd, legDay, rnd);
+  const altn = rt.alt || null;
+  const [wx, { data: notes }] = await Promise.all([fetchWx([leg.dep, leg.arr, altn]), sb.from("airport_notes").select("*").in("icao", [leg.dep, leg.arr].filter(Boolean))]);
+  const rem = remarksFor(leg, legs[i + 1], legs[i - 1], pax, fd, wx, notes || [], rnd);
+  const dur = Math.round((new Date(leg.sta) - new Date(leg.std)) / 60000);
+  const utc = d => new Date(d).toISOString().slice(11, 16) + "Z";
+  const age = fd?.delivered ? ageText(fd.delivered) : "–";
+  const depAp = apByCode(leg.dep), arrAp = apByCode(leg.arr);
+  const std = new Date(leg.std);
+  const sbUrl = "https://dispatch.simbrief.com/options/custom?" + new URLSearchParams({ airline: rt.airline_icao || "JAI", fltnum: rt.flight_number || String(leg.flight_no).replace(/^\D+/, ""),
+    orig: leg.dep, dest: leg.arr, ...(altn ? { altn } : {}), type: r.ac_type || "", ...(r.reg ? { reg: r.reg } : {}), pax: String(pax.total),
+    date: std.toISOString().slice(0, 10), deph: String(std.getUTCHours()), depm: String(std.getUTCMinutes()) }).toString();
+  const wxBlock = icao => { if (!icao) return ""; const m = wx.metar.find(x => x.icaoId === icao), t = wx.taf.find(x => x.icaoId === icao);
+    return `<div style="margin-bottom:12px"><b>${esc(icao)}</b> <span class="muted">${esc(apByCode(icao)?.[1] || "")}</span>
+      ${m ? `<div class="wx-raw">${esc(m.rawOb)}</div>` : '<div class="muted" style="font-size:13px">METAR není k dispozici.</div>'}
+      ${t ? `<div class="wx-raw">${esc(t.rawTAF || "")}</div>` : '<div class="muted" style="font-size:13px">TAF není k dispozici.</div>'}</div>`; };
+  const noteBlock = icao => { const n = (notes || []).find(x => x.icao === icao); if (!n) return "";
+    return `<div style="margin-bottom:10px"><b>${esc(icao)}</b>${n.turnaround_min ? ` <span class="va-chip">obrat ${n.turnaround_min} min</span>` : ""}<div class="ev-text">${richText(n.notes || "")}</div></div>`; };
+  el.innerHTML = `<p><a href="#/rozpis">← Rozpis</a></p>
+    ${legs.length > 1 ? `<div class="day-tabs">${legs.map((l, k) => `<a class="tab ${k === i ? "on" : ""}" href="#/briefing/${r.id}/${k}" style="text-decoration:none">${esc(l.flight_no)} ${esc(l.dep)}–${esc(l.arr)}</a>`).join("")}</div>` : ""}
+    <div class="brief-head"><div class="k">BRIEFING · ${esc(leg.flight_no)} · ${dayLabel(legDay)}${r.profiles?.username && r.status === "taken" ? ` · pilot ${esc(r.profiles.username)}` : ""}</div>
+      <div class="brief-route"><div>${esc(leg.dep)}<small>${esc(depAp?.[1] || "")}</small></div><span>→</span><div>${esc(leg.arr)}<small>${esc(arrAp?.[1] || "")}</small></div></div>
+      <div class="brief-times"><div>Odlet <b>${hmPrague(leg.std)}</b> <span style="opacity:.8">(${utc(leg.std)})</span></div><div>Přílet <b>${hmPrague(leg.sta)}</b> <span style="opacity:.8">(${utc(leg.sta)})</span></div>
+        <div>Blok <b>${fmtDur(dur)}</b></div>${altn ? `<div>Alternativa <b>${esc(altn)}</b></div>` : ""}</div></div>
+    <div class="brief-grid">
+      <div class="card brief-box"><h3>Slovo od dispečinku</h3><ul class="remarks">${rem.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      <div class="card brief-box"><h3>Cestující a náklad</h3><dl class="kv">
+        <dt>Cestující</dt><dd>${pax.total} / ${pax.seats} (${Math.round(pax.total / pax.seats * 100)} %)</dd>
+        ${pax.prem ? `<dt>Premium economy</dt><dd>${pax.premPax} / ${pax.prem}</dd><dt>Economy</dt><dd>${pax.econPax} / ${pax.seats - pax.prem}</dd>` : ""}
+        <dt>Z toho kojenci</dt><dd>${pax.infants}</dd>
+        <dt>Zavazadla</dt><dd>${pax.bags} ks · ${nf.format(pax.bagKg)} kg</dd>
+        <dt>Náklad</dt><dd>${nf.format(pax.cargo)} kg</dd>
+        <dt>Odhad payloadu</dt><dd>${nf.format(pax.payload)} kg</dd></dl>
+        ${pax.ctx.why.length ? `<p class="muted" style="font-size:13px;margin:8px 0 0">Vliv na obsazenost: ${esc(pax.ctx.why.join(", "))}</p>` : ""}</div>
+      <div class="card brief-box"><h3>Letadlo</h3><dl class="kv">
+        <dt>Registrace</dt><dd>${esc(r.reg || "–")}</dd><dt>Typ</dt><dd>${esc(r.ac_type || "–")}</dd><dt>Stáří</dt><dd>${age}</dd>
+        <dt>Konfigurace</dt><dd>${pax.prem ? `${pax.prem} premium + ${pax.seats - pax.prem} economy` : `${pax.seats} economy`}</dd>
+        ${fd?.notes ? `<dt>Poznámka</dt><dd>${esc(fd.notes)}</dd>` : ""}${fd?.training_only ? "<dt>Provoz</dt><dd>výcvik palubní posádky</dd>" : ""}</dl>
+        ${legs[0]?.ferry_from && i === 0 ? `<p class="muted" style="font-size:13px;margin:8px 0 0">Letadlo bude přistaveno z ${esc(legs[0].ferry_from)}.</p>` : ""}</div>
+      <div class="card brief-box"><h3>Počasí</h3>${wxBlock(leg.dep)}${wxBlock(leg.arr)}${altn ? wxBlock(altn) : ""}
+        <p class="muted" style="font-size:12px;margin:0">METAR je aktuální pozorování, TAF předpověď. U letů v dalších dnech sleduj aktualizace.</p></div>
+      ${noteBlock(leg.dep) + noteBlock(leg.arr) ? `<div class="card brief-box"><h3>Poznámky k letištím</h3>${noteBlock(leg.dep)}${noteBlock(leg.arr)}</div>` : ""}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px"><a class="btn" href="${esc(sbUrl)}" target="_blank" rel="noopener">Naplánovat v SimBriefu</a>
+      <a class="btn ghost" href="#/linka/${encodeURIComponent(leg.route_id)}">Linka na mapě</a></div>
+    <p class="muted" style="font-size:13px">SimBrief dostane trasu, letadlo, čas odletu a počet cestujících. Zkontroluj údaje před vygenerováním plánu.</p>`;
 }
 
 /* ---------- správa: generátor rozpisu ---------- */
