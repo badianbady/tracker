@@ -1650,7 +1650,9 @@ async function renderCareerBox(username) {
   const { data: c } = await sb.from("pilot_career").select("*").eq("username", username).maybeSingle();
   if (!c || (!c.points && !c.rotation_legs)) { box.innerHTML = ""; return; }
   const punct = c.rotation_legs ? Math.round(c.on_time_legs / c.rotation_legs * 100) : null;
-  box.innerHTML = `<h2 class="section-title">Kariéra u Jáchym Air</h2><div class="stats">
+  let rankName = "";
+  try { rankName = (await careerOf(c.user_id)).rank.cur.name; } catch { }
+  box.innerHTML = `<h2 class="section-title">Kariéra u Jáchym Air ${rankName ? `<span class="badge" style="font-size:14px;vertical-align:middle">${esc(rankName)}</span>` : ""}</h2><div class="stats">
     <div class="stat"><b>${nf.format(c.points)}</b><span>Body celkem</span></div>
     <div class="stat"><b>${nf.format(c.points_30d)}</b><span>Body za 30 dní</span></div>
     <div class="stat"><b>${c.rotations_done}</b><span>Dokončených rotací</span></div>
@@ -2284,6 +2286,7 @@ async function renderRoster(_param, msg) {
         <p class="muted" style="margin-top:0">Najdu volnou rotaci s odletem z místa, kde jsi${where ? ` (${esc(where)})` : ""}, v příštích 4 hodinách.</p>
         <button class="btn" id="nowBtn" ${where ? "" : "disabled"}>Najít rotaci</button><div id="nowRes" style="margin-top:12px"></div></div>
     </div>` : '<div class="card" style="margin-bottom:20px">Pro braní rotací se <a href="#/ucet">přihlas</a>.</div>'}
+    ${me ? '<div id="myCareer" style="margin-bottom:20px"></div>' : ""}
     ${mineList.length ? `<h2 class="section-title">Moje rotace</h2><div class="rot-list" style="margin-bottom:24px">${mineList.map(r => rotCard(r)).join("")}</div>` : ""}
     <details class="card" style="margin-bottom:20px"><summary style="cursor:pointer"><b>Stav flotily</b> <span class="muted">· ${(fleetCache || []).filter(f => oosAt(f.registration, new Date().toISOString())).length} mimo provoz · ${[...(fleetStatus?.df.values() || [])].reduce((a, l) => a + l.length, 0)} odložených závad</span></summary>
       <div class="brief-grid" style="margin-top:12px">${(fleetCache || []).slice().sort((a, b) => (a.ac_type || "").localeCompare(b.ac_type || "") || a.registration.localeCompare(b.registration)).map(f => `<div style="border:1px solid var(--line);border-radius:12px;padding:10px 12px">
@@ -2317,6 +2320,15 @@ async function renderRoster(_param, msg) {
     bindRotButtons($("nowRes"));
   };
   bindRotButtons(el);
+  if (me && $("myCareer")) careerOf(me.user.id).then(c => {
+    $("myCareer").innerHTML = careerCardHtml(c, true);
+    if ($("raiseBtn")) $("raiseBtn").onclick = async () => {
+      if (!confirm("Požádat personální oddělení o zvýšení platu? Další žádost půjde až za 30 dní.")) return;
+      const { error } = await sb.from("salary_raises").insert({});
+      if (error) alert(error.message.replace(/^.*?: /, ""));
+      renderRoster();
+    };
+  }).catch(() => { $("myCareer").innerHTML = ""; });
 }
 function rotCard(r) {
   const mine = me && r.pilot_id === me.user.id, legs = r.legs || [];
@@ -2379,6 +2391,165 @@ function statusHtml(reg, compact) {
     <div style="font-size:14px">Technický stav <b>${cond} %</b> · do A-check <b>${left} h</b></div>${bar}
     ${df.length ? `<div style="font-size:14px"><b>Odložené závady:</b><ul style="margin:4px 0 0;padding-left:18px">${df.map(d => `<li><b>${esc(d.title)}</b> <span class="muted" style="font-size:12px">(${MEL_TXT[d.category] || ""}, do ${new Date(d.due_at).toLocaleDateString("cs-CZ")})</span>${!compact && d.effect ? `<br><span class="muted" style="font-size:13px">${esc(d.effect)}</span>` : ""}</li>`).join("")}</ul></div>`
       : '<div class="muted" style="font-size:13px">Bez odložených závad.</div>'}`;
+}
+
+/* ---------- jména posádek podle národností ---------- */
+// m = mužská křestní, f = ženská, s = příjmení (u CZ/SK/PL dvojice [muž, žena])
+const NAMES = {
+  dz: { m: ["Karim", "Yacine", "Amine", "Riad", "Mehdi", "Sofiane", "Nabil", "Walid", "Farid", "Hichem", "Bilal", "Rachid", "Djamel", "Anis", "Mourad", "Samir", "Yanis", "Islam", "Abdelkader", "Fares", "Lotfi", "Massinissa", "Aksel"],
+        f: ["Amina", "Yasmine", "Lina", "Sarah", "Meriem", "Nesrine", "Imane", "Kahina", "Lamia", "Nour", "Rania", "Souad", "Feriel", "Ines", "Dounia", "Asma", "Hiba", "Selma", "Thiziri", "Malak", "Lydia"],
+        s: ["Benali", "Bouzid", "Haddad", "Mebarki", "Belkacem", "Saadi", "Brahimi", "Cherif", "Hamidi", "Boudiaf", "Mansouri", "Rahmani", "Zerrouki", "Khelifi", "Ait Ahmed", "Larbi", "Benmansour", "Ouali", "Amrani", "Taleb", "Djebbar", "Hadjadj", "Bensalem", "Kaci", "Meziane"] },
+  ma: { m: ["Youssef", "Hamza", "Othmane", "Ayoub", "Mehdi", "Ilyas", "Zakaria", "Adil", "Hicham", "Reda", "Soufiane", "Anass"],
+        f: ["Salma", "Fatima Zahra", "Kawtar", "Hajar", "Imane", "Ghita", "Zineb", "Oumaima", "Khadija", "Nisrine", "Sanae"],
+        s: ["El Amrani", "Bennani", "Alaoui", "Tazi", "El Idrissi", "Berrada", "Chraibi", "Fassi", "Lahlou", "Benjelloun", "El Mansouri", "Ouazzani", "Kettani"] },
+  tn: { m: ["Aymen", "Wassim", "Skander", "Seif", "Firas", "Oussama", "Mohamed Ali", "Hatem", "Nizar", "Mehdi"],
+        f: ["Rim", "Mariem", "Syrine", "Yosra", "Emna", "Olfa", "Ines", "Sana", "Nadia", "Hela"],
+        s: ["Ben Salah", "Trabelsi", "Gharbi", "Jaziri", "Chaabane", "Mejri", "Ayari", "Bouazizi", "Hammami", "Ben Youssef", "Dridi", "Jebali"] },
+  fr: { m: ["Lucas", "Hugo", "Thomas", "Julien", "Nicolas", "Antoine", "Maxime", "Pierre", "Romain", "Mathieu", "Guillaume", "Baptiste", "Clément", "Alexandre"],
+        f: ["Camille", "Léa", "Manon", "Chloé", "Emma", "Juliette", "Sophie", "Pauline", "Marion", "Claire", "Élodie", "Margaux", "Inès"],
+        s: ["Martin", "Bernard", "Dubois", "Moreau", "Laurent", "Lefebvre", "Girard", "Roux", "Fontaine", "Mercier", "Bonnet", "Lambert", "Faure", "Rousseau", "Blanc", "Chevalier", "Garnier"] },
+  es: { m: ["Javier", "Carlos", "Pablo", "Alejandro", "Diego", "Sergio", "Álvaro", "Raúl", "Miguel", "Daniel", "Iván", "Rubén"],
+        f: ["Lucía", "Marta", "Paula", "Elena", "Carmen", "Laura", "Sara", "Andrea", "Claudia", "Irene", "Nerea", "Alba"],
+        s: ["García", "Fernández", "López", "Martínez", "Sánchez", "Pérez", "Gómez", "Ruiz", "Díaz", "Moreno", "Navarro", "Romero", "Torres", "Ortega", "Castillo"] },
+  it: { m: ["Luca", "Marco", "Matteo", "Alessandro", "Lorenzo", "Andrea", "Davide", "Simone", "Federico", "Giorgio", "Riccardo"],
+        f: ["Giulia", "Francesca", "Chiara", "Sara", "Martina", "Alessia", "Valentina", "Elisa", "Federica", "Sofia"],
+        s: ["Rossi", "Russo", "Ferrari", "Esposito", "Bianchi", "Romano", "Colombo", "Ricci", "Marino", "Greco", "Bruno", "Gallo", "Conti", "De Luca"] },
+  pt: { m: ["João", "Tiago", "Rui", "Miguel", "Pedro", "André", "Diogo", "Nuno", "Ricardo", "Bruno"],
+        f: ["Inês", "Beatriz", "Mariana", "Ana", "Catarina", "Sofia", "Rita", "Joana", "Leonor", "Marta"],
+        s: ["Silva", "Santos", "Ferreira", "Pereira", "Oliveira", "Costa", "Rodrigues", "Martins", "Sousa", "Fernandes", "Gonçalves", "Almeida"] },
+  en: { m: ["James", "Oliver", "Harry", "Jack", "George", "Thomas", "William", "Daniel", "Matthew", "Ryan", "Callum", "Liam"],
+        f: ["Emily", "Charlotte", "Olivia", "Sophie", "Jessica", "Hannah", "Amelia", "Grace", "Lucy", "Chloe", "Megan"],
+        s: ["Smith", "Jones", "Taylor", "Brown", "Wilson", "Evans", "Thomas", "Johnson", "Roberts", "Walker", "Wright", "Hughes", "Clarke", "Hall"] },
+  cz: { m: ["Jakub", "Tomáš", "Jan", "Martin", "Lukáš", "Ondřej", "Petr", "David", "Filip", "Vojtěch", "Adam", "Michal", "Matěj", "Daniel"],
+        f: ["Tereza", "Eliška", "Kateřina", "Lucie", "Anna", "Veronika", "Barbora", "Klára", "Petra", "Adéla", "Markéta", "Nikola"],
+        s: [["Novák", "Nováková"], ["Svoboda", "Svobodová"], ["Dvořák", "Dvořáková"], ["Černý", "Černá"], ["Procházka", "Procházková"], ["Kučera", "Kučerová"], ["Veselý", "Veselá"],
+            ["Horák", "Horáková"], ["Němec", "Němcová"], ["Marek", "Marková"], ["Pokorný", "Pokorná"], ["Král", "Králová"], ["Růžička", "Růžičková"], ["Beneš", "Benešová"], ["Fiala", "Fialová"], ["Šťastný", "Šťastná"]] },
+  sk: { m: ["Marek", "Peter", "Michal", "Tomáš", "Lukáš", "Martin", "Jakub", "Matej", "Juraj", "Adam", "Samuel", "Patrik"],
+        f: ["Zuzana", "Lucia", "Katarína", "Simona", "Monika", "Veronika", "Natália", "Kristína", "Barbora", "Petra", "Ivana"],
+        s: [["Horváth", "Horváthová"], ["Kováč", "Kováčová"], ["Varga", "Vargová"], ["Tóth", "Tóthová"], ["Nagy", "Nagyová"], ["Baláž", "Balážová"], ["Szabó", "Szabóová"],
+            ["Molnár", "Molnárová"], ["Lukáč", "Lukáčová"], ["Polák", "Poláková"], ["Kollár", "Kollárová"], ["Hudák", "Hudáková"], ["Oravec", "Oravcová"]] },
+  pl: { m: ["Jakub", "Kacper", "Mateusz", "Piotr", "Michał", "Paweł", "Tomasz", "Krzysztof", "Łukasz", "Bartosz", "Szymon", "Wojciech"],
+        f: ["Anna", "Zuzanna", "Julia", "Maja", "Natalia", "Katarzyna", "Agnieszka", "Magdalena", "Aleksandra", "Weronika", "Karolina"],
+        s: [["Nowak", "Nowak"], ["Kowalski", "Kowalska"], ["Wiśniewski", "Wiśniewska"], ["Wójcik", "Wójcik"], ["Kowalczyk", "Kowalczyk"], ["Kamiński", "Kamińska"], ["Lewandowski", "Lewandowska"],
+            ["Zieliński", "Zielińska"], ["Szymański", "Szymańska"], ["Woźniak", "Woźniak"], ["Dąbrowski", "Dąbrowska"], ["Mazur", "Mazur"], ["Krawczyk", "Krawczyk"]] },
+  dk: { m: ["Mads", "Rasmus", "Jonas", "Mikkel", "Frederik", "Anders", "Søren", "Emil", "Kasper", "Magnus", "Nikolaj"],
+        f: ["Sofie", "Ida", "Freja", "Emma", "Mathilde", "Line", "Camilla", "Signe", "Maja", "Laura", "Astrid"],
+        s: ["Jensen", "Nielsen", "Hansen", "Pedersen", "Andersen", "Christensen", "Larsen", "Sørensen", "Rasmussen", "Jørgensen", "Madsen", "Kristensen", "Olsen"] },
+  de: { m: ["Lukas", "Jonas", "Leon", "Felix", "Maximilian", "Tobias", "Florian", "Sebastian", "Philipp", "Moritz", "Jan", "Niklas", "Stefan"],
+        f: ["Anna", "Lena", "Laura", "Julia", "Sarah", "Lea", "Hannah", "Katharina", "Johanna", "Marie", "Sophie", "Franziska"],
+        s: ["Müller", "Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann", "Koch", "Richter", "Klein", "Wolf", "Schröder", "Neumann", "Zimmermann"] },
+  // méně obvyklá jména odjinud
+  rare: { m: ["Aleksi", "Bjørn", "Dimitrios", "Kenji", "Tiago", "Oisín", "Mihai", "Arjun", "Emre", "Lars", "Vuk", "Kofi", "Rafael", "Hamid", "Tariq", "Ivo"],
+          f: ["Aino", "Ingrid", "Eleni", "Yuki", "Ioana", "Priya", "Zeynep", "Siobhan", "Ana Lucía", "Ewa", "Mirela", "Amara", "Leila", "Saga"],
+          s: ["Virtanen", "Lindqvist", "Papadopoulos", "Tanaka", "Popescu", "Sharma", "Yılmaz", "O'Connor", "Van Dijk", "Kovačević", "Mensah", "Haugen", "Nemeth", "Karimi", "Rossiter"] },
+};
+// mix národností podle základny (váhy)
+const CREW_MIX = {
+  DAAG: { dz: 36, fr: 14, es: 10, ma: 10, tn: 8, it: 8, pt: 6, en: 6, rare: 2 },
+  LZIB: { sk: 78, cz: 10, de: 4, pl: 3, rare: 5 }, LKPD: { cz: 80, sk: 10, de: 3, pl: 2, rare: 5 },
+  EPKT: { pl: 82, cz: 5, sk: 4, de: 4, rare: 5 }, EKBI: { dk: 80, de: 8, en: 4, rare: 8 },
+  EDDN: { de: 85, cz: 3, pl: 3, it: 2, rare: 7 }, EDDS: { de: 85, it: 4, fr: 3, rare: 8 }, EDDC: { de: 82, cz: 6, pl: 5, rare: 7 },
+};
+const CABIN_COUNT = { A319: 3, A320: 4, A20N: 4, A321: 5, A21N: 5, B738: 4, B38M: 4, B739: 5, A359: 9, A35K: 10 };
+function crewPerson(rnd, base, gender) {
+  const mix = CREW_MIX[base] || CREW_MIX.DAAG, total = Object.values(mix).reduce((a, b) => a + b, 0);
+  let x = rnd() * total, nat = "rare";
+  for (const [k, w] of Object.entries(mix)) { if ((x -= w) < 0) { nat = k; break; } }
+  const N = NAMES[nat], g = gender || (rnd() < 0.5 ? "m" : "f");
+  const first = N[g][Math.floor(rnd() * N[g].length)], sur = N.s[Math.floor(rnd() * N.s.length)];
+  return { name: `${first} ${Array.isArray(sur) ? sur[g === "f" ? 1 : 0] : sur}`, nat, g };
+}
+const FLAGS = { dz: "🇩🇿", ma: "🇲🇦", tn: "🇹🇳", fr: "🇫🇷", es: "🇪🇸", it: "🇮🇹", pt: "🇵🇹", en: "🇬🇧", cz: "🇨🇿", sk: "🇸🇰", pl: "🇵🇱", dk: "🇩🇰", de: "🇩🇪", rare: "🌍" };
+
+/* ---------- kariéra: hodnosti a plat ---------- */
+const CAREER_RANKS = [
+  { code: "FO", name: "First Officer", h: 0, p: 0, base: 3200, rate: 45 },
+  { code: "SFO", name: "Senior First Officer", h: 25, p: 1500, base: 4200, rate: 50 },
+  { code: "CPT", name: "Kapitán", h: 75, p: 5000, land: 6.5, base: 6800, rate: 60 },
+  { code: "SCPT", name: "Senior kapitán", h: 200, p: 15000, land: 7, base: 8200, rate: 65 },
+  { code: "TRI", name: "Training kapitán", h: 400, p: 30000, land: 7, punct: 80, base: 9600, rate: 70 },
+];
+const isCaptain = r => ["CPT", "SCPT", "TRI"].includes(r.code);
+function rankFor(c) {
+  let cur = CAREER_RANKS[0];
+  for (const r of CAREER_RANKS) if (c.hours >= r.h && c.points >= r.p && (!r.land || (c.avgLanding ?? 0) >= r.land) && (!r.punct || (c.punct ?? 0) >= r.punct)) cur = r;
+  const next = CAREER_RANKS[CAREER_RANKS.indexOf(cur) + 1] || null;
+  return { cur, next };
+}
+async function careerOf(userId) {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const [{ data: st }, { data: c }, { data: fl }, { data: raises }] = await Promise.all([
+    sb.from("pilot_stats").select("*").eq("id", userId).maybeSingle(),
+    sb.from("pilot_career").select("*").eq("user_id", userId).maybeSingle(),
+    sb.from("flights").select("duration_min").eq("user_id", userId).gte("landed_at", since),
+    sb.from("salary_raises").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+  ]);
+  const data = { hours: (st?.minutes || 0) / 60, points: c?.points || 0, points30: c?.points_30d || 0, avgLanding: st?.avg_score,
+    punct: c?.rotation_legs ? Math.round(c.on_time_legs / c.rotation_legs * 100) : null, sat: c?.avg_pax_sat, rotations: c?.rotations_done || 0,
+    hours30: (fl || []).reduce((a, f) => a + (f.duration_min || 0), 0) / 60, raises: raises || [] };
+  data.rank = rankFor(data);
+  const raisePct = data.raises.reduce((a, r) => a + Number(r.pct || 0), 0);
+  const r = data.rank.cur;
+  data.salary = { base: Math.round(r.base * (1 + raisePct / 100)), flying: Math.round(data.hours30 * r.rate), bonus: Math.round(data.points30 * 0.5), raisePct };
+  data.salary.total = data.salary.base + data.salary.flying + data.salary.bonus;
+  return data;
+}
+const eur = n => nf.format(n) + " €";
+function careerCardHtml(c, own) {
+  const { cur, next } = c.rank;
+  const prog = next ? Math.min(100, Math.round(Math.min(c.hours / Math.max(1, next.h), c.points / Math.max(1, next.p)) * 100)) : 100;
+  const need = next ? [c.hours < next.h ? `${Math.ceil(next.h - c.hours)} h letu` : null, c.points < next.p ? `${nf.format(next.p - c.points)} bodů` : null,
+    next.land && (c.avgLanding ?? 0) < next.land ? `průměrné přistání ${fmt1(next.land)}+` : null, next.punct && (c.punct ?? 0) < next.punct ? `dochvilnost ${next.punct} %+` : null].filter(Boolean) : [];
+  const last = c.raises[0];
+  const canAsk = !last || Date.now() - new Date(last.created_at) > 30 * 864e5;
+  return `<div class="card"><h2 class="section-title">Moje kariéra</h2>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="badge" style="font-size:15px;padding:4px 12px">${esc(cur.name)}</span>
+      ${next ? `<span class="muted" style="font-size:14px">další: <b>${esc(next.name)}</b></span>` : '<span class="muted">nejvyšší hodnost 🏆</span>'}</div>
+    ${next ? `<div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:10px 0 6px"><div style="height:100%;width:${prog}%;background:var(--green)"></div></div>
+      <div class="muted" style="font-size:13px">Zbývá: ${need.length ? esc(need.join(", ")) : "už jen chvilka"}</div>` : ""}
+    ${own ? `<h3 style="margin:16px 0 6px;font-size:18px">Výplatní páska (posledních 30 dní)</h3><dl class="kv">
+      <dt>Základní plat</dt><dd>${eur(c.salary.base)}${c.salary.raisePct ? ` <span class="muted">(+${fmt1(c.salary.raisePct)} %)</span>` : ""}</dd>
+      <dt>Letové příplatky</dt><dd>${eur(c.salary.flying)} <span class="muted">(${fmt1(c.hours30)} h)</span></dd>
+      <dt>Výkonnostní bonus</dt><dd>${eur(c.salary.bonus)} <span class="muted">(${nf.format(c.points30)} b)</span></dd>
+      <dt><b>Celkem</b></dt><dd><b>${eur(c.salary.total)}</b></dd></dl>
+      <p class="muted" style="font-size:12px;margin:6px 0 10px">Plat je jen pro zábavu, skutečné peníze to nejsou 😄</p>
+      ${last ? `<div class="msg ${Number(last.pct) > 0 ? "ok" : "err"}" style="margin:0 0 10px"><b>Personální oddělení, ${new Date(last.created_at).toLocaleDateString("cs-CZ")}:</b> ${esc(last.message || "")}</div>` : ""}
+      <button class="btn ghost" id="raiseBtn" ${canAsk ? "" : "disabled"}>${canAsk ? "Požádat o zvýšení platu" : `Další žádost od ${new Date(new Date(last.created_at).getTime() + 30 * 864e5).toLocaleDateString("cs-CZ")}`}</button>` : ""}</div>`;
+}
+
+/* ---------- posádka a nečekané situace v briefingu ---------- */
+function crewFor(r, pilotRank, pilotName) {
+  const rnd = seededRand("crew/" + r.id), base = r.base_icao || r.legs?.[0]?.dep || "DAAG";
+  const captainHuman = pilotRank && isCaptain(pilotRank);
+  const other = crewPerson(rnd, base);
+  const cockpit = captainHuman
+    ? [{ role: "Kapitán", name: pilotName || "ty", you: true }, { role: "První důstojník", ...other }]
+    : [{ role: "Kapitán", ...other }, { role: "První důstojník", name: pilotName || "ty", you: true }];
+  const n = CABIN_COUNT[normType(r.ac_type)] || 4, fd = (fleetCache || []).find(f => f.registration === r.reg);
+  const cabin = [{ role: "Vedoucí kabiny (purser)", ...crewPerson(rnd, base) }];
+  for (let k = 1; k < n; k++) cabin.push({ role: "Palubní průvodčí", ...crewPerson(rnd, base) });
+  if (fd?.training_only) cabin.push({ role: "Instruktor kabiny", ...crewPerson(rnd, base) });
+  return { cockpit, cabin };
+}
+function eventFor(r, i, leg, wx, rnd) {
+  if (rnd() > 0.4) return null;                                 // zhruba každý třetí let má něco navíc
+  const m = wx.metar.find(x => x.icaoId === leg.dep), cold = m?.temp != null && m.temp <= 3;
+  const pick = a => a[Math.floor(rnd() * a.length)];
+  const list = [
+    { t: "VIP na palubě", d: "V první řadě poletí známá osobnost. Palubní průvodčí ji usadí jako poslední, prosíme o diskrétnost a hladké přistání. 😉" },
+    { t: "Nemocný cestující", d: "Cestující hlásil před nástupem zdravotní potíže, lékař ho pustil na palubu. Pokud se stav zhorší, zvaž přistání na alternativě." },
+    { t: "Zpožděný catering", d: "Catering dorazí o něco později. Počítej s možným zdržením při odletu, nespěchej na úkor bezpečnosti." },
+    { t: "Ptáci na letišti", d: `Na letišti ${esc(leg.dep)} je hlášena zvýšená aktivita ptáků. Při vzletu buď ve střehu.` },
+    { t: "Cestující na vozíku", d: "Na palubu nastoupí dva cestující s omezenou pohyblivostí. Nástup začne o pár minut dřív." },
+    { t: "Pes v kabině", d: "Na palubě je asistenční pes. Posádka o něm ví, je to dobrý kluk. 🐕" },
+    { t: "Školní výlet", d: "Na palubě je skupina školáků. Čekej hlučnější kabinu a spoustu otázek na kapitána po přistání." },
+    { t: "Návazné lety", d: `Několik cestujících má v ${esc(leg.arr)} krátký přestup. Každá minuta se počítá.` },
+    { t: "Opožděné tankování", d: "Cisterna s palivem má zpoždění. Zkontroluj, že máš palivo podle plánu, než odjedeš od gate." },
+    { t: "Kontrola z úřadu", d: "Na palubě poletí inspektor letového provozu na tzv. ramp check. Drž se standardních postupů do puntíku." },
+  ];
+  if (cold) list.push({ t: "Odmrazování", d: `V ${esc(leg.dep)} je kolem nuly. Počítej s odmrazováním před odletem a ověř holdover time.` });
+  if (i === 0) list.push({ t: "Nemoc v posádce", d: "Jedna z palubních průvodčích onemocněla, za ni nastupuje kolegyně ze zálohy. Seznam posádky je už aktualizovaný." });
+  return pick(list);
 }
 
 /* ---------- briefing ---------- */
@@ -2544,6 +2715,11 @@ async function renderBriefing(rotId, legIdx) {
   const altn = rt.alt || null;
   const [wx, { data: notes }] = await Promise.all([fetchWx([leg.dep, leg.arr, altn]), sb.from("airport_notes").select("*").in("icao", [leg.dep, leg.arr].filter(Boolean))]);
   const rem = remarksFor(leg, legs[i + 1], legs[i - 1], pax, fd, wx, notes || [], rnd);
+  const ev = eventFor(r, i, leg, wx, seededRand(`ev/${r.id}/${i}`));
+  const crewUser = r.pilot_id || me?.user?.id;
+  let pilotRank = CAREER_RANKS[0], pilotName = r.pilot_id ? r.profiles?.username : me?.profile?.username;
+  if (crewUser) { try { pilotRank = (await careerOf(crewUser)).rank.cur; } catch { } }
+  const crew = crewFor(r, pilotRank, pilotName);
   const dur = Math.round((new Date(leg.sta) - new Date(leg.std)) / 60000);
   const utc = d => new Date(d).toISOString().slice(11, 16) + "Z";
   const age = fd?.delivered ? ageText(fd.delivered) : "–";
@@ -2565,7 +2741,14 @@ async function renderBriefing(rotId, legIdx) {
       <div class="brief-times"><div>Odlet <b>${hmPrague(leg.std)}</b> <span style="opacity:.8">(${utc(leg.std)})</span></div><div>Přílet <b>${hmPrague(leg.sta)}</b> <span style="opacity:.8">(${utc(leg.sta)})</span></div>
         <div>Blok <b>${fmtDur(dur)}</b></div>${altn ? `<div>Alternativa <b>${esc(altn)}</b></div>` : ""}</div></div>
     <div class="brief-grid">
-      <div class="card brief-box"><h3>Slovo od dispečinku</h3><ul class="remarks">${rem.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      <div class="card brief-box"><h3>Slovo od dispečinku</h3>
+        ${ev ? `<div class="msg" style="background:#FEF3C7;color:#78350F;margin:0 0 10px"><b>⚡ ${esc(ev.t)}:</b> ${ev.d}</div>` : ""}
+        <ul class="remarks">${rem.map(x => `<li>${x}</li>`).join("")}</ul></div>
+      <div class="card brief-box"><h3>Posádka</h3>
+        <div style="font-size:14px">${crew.cockpit.map(c => `<div><span class="muted">${esc(c.role)}:</span> <b>${esc(c.name)}</b>${c.you ? ` <span class="badge">${esc(pilotRank.name)}</span>` : ` ${FLAGS[c.nat] || ""}`}</div>`).join("")}</div>
+        <div style="font-size:14px;margin-top:8px">${crew.cabin.map((c, k) => {
+          const swapped = ev?.t === "Nemoc v posádce" && k === crew.cabin.length - 1;
+          return `<div><span class="muted">${esc(c.role)}:</span> ${esc(swapped ? crewPerson(seededRand("sub/" + r.id), r.base_icao, "f").name : c.name)} ${FLAGS[c.nat] || ""}${swapped ? ' <span class="va-chip">záloha</span>' : ""}</div>`; }).join("")}</div></div>
       <div class="card brief-box"><h3>Cestující a náklad</h3><dl class="kv">
         <dt>Cestující</dt><dd>${pax.total} / ${pax.seats} (${Math.round(pax.total / pax.seats * 100)} %)</dd>
         ${pax.prem ? `<dt>Premium economy</dt><dd>${pax.premPax} / ${pax.prem}</dd><dt>Economy</dt><dd>${pax.econPax} / ${pax.seats - pax.prem}</dd>` : ""}
