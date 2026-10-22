@@ -2310,11 +2310,12 @@ function routeFitsType(rt, acType) {
   const t = normType(acType); if (!rt.subfleets?.length) return true;
   return rt.subfleets.some(sf => { const a = normType(sf.type), b = normType(sf.name); return a === t || a.includes(t) || t.includes(a.slice(0, 4)) || b.includes(t); });
 }
-async function generateRoster(startDay, nDays, maxLegs, maxDutyH, maxRotDays = 3) {
+async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = false) {
+  const maxRotDays = allowNight ? 3 : 1;
   await Promise.all([basesReady, routesReady]);
   const fleet = await loadFleetDetails();
   const { data: notesRows } = await sb.from("airport_notes").select("icao, turnaround_min");
-  const turn = icao => (notesRows || []).find(n => n.icao === icao)?.turnaround_min || 40;
+  const turn = icao => (notesRows || []).find(n => n.icao === icao)?.turnaround_min || 25;   // výchozí obrat 25 min
   const MIN_REST = 10 * 60;                     // odpočinek při přespání
   const timed = jaiRoutes.map(rt => {
     const dep = parseHM(rt.dpt_time); if (dep == null) return null;
@@ -2364,6 +2365,7 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, maxRotDays = 3
                 const gap = depAbs - last.arrAbs;
                 if (gap < turn(last.rt.arr)) continue;
                 const rest = gap >= MIN_REST;
+                if (rest && !allowNight) continue;
                 if (!rest && gap > 6 * 60) continue;                         // dlouhé čekání bez přespání nedává smysl
                 const dutyStart = rest ? depAbs : last.dutyStart;
                 if ((arrAbs - dutyStart) + 90 > maxDutyH * 60) continue;       // služba za jeden den
@@ -2407,6 +2409,7 @@ async function renderAdminRoster(msg) {
       <div class="field" style="margin:0"><label for="genDays">Dní</label><input id="genDays" type="number" min="1" max="14" value="7" style="width:80px"></div>
       <div class="field" style="margin:0"><label for="genLegs">Max. letů v rotaci</label><input id="genLegs" type="number" min="2" max="6" value="4" style="width:90px"></div>
       <div class="field" style="margin:0"><label for="genDuty">Max. služba (h)</label><input id="genDuty" type="number" min="4" max="16" value="12" style="width:90px"></div>
+      <label class="switch" style="margin-bottom:10px"><input type="checkbox" id="genNight"> Povolit rotace s přespáním</label>
       <button class="btn">Vygenerovat návrh</button></form>
     <div id="genPreview" style="margin-top:14px"></div>
     <h3 class="section-title" style="margin-top:22px;font-size:20px">Zveřejněný rozpis (${(upcoming || []).length})</h3>
@@ -2418,7 +2421,7 @@ async function renderAdminRoster(msg) {
   $("genForm").onsubmit = async e => {
     e.preventDefault();
     $("genPreview").innerHTML = '<p class="muted">Skládám rotace…</p>';
-    rosterPreview = await generateRoster($("genFrom").value, Math.min(14, +$("genDays").value || 7), +$("genLegs").value || 4, +$("genDuty").value || 12);
+    rosterPreview = await generateRoster($("genFrom").value, Math.min(14, +$("genDays").value || 7), +$("genLegs").value || 4, +$("genDuty").value || 12, $("genNight").checked);
     if (!rosterPreview.length) { $("genPreview").innerHTML = '<div class="msg err">Nepodařilo se složit žádnou rotaci. Zkontroluj, že mají linky v crew centru vyplněné časy odletu a příletu, letadla ve Flotile mají typ a skupinu (DAAG/MINI) a že jsi synchronizoval linky.</div>'; return; }
     const byDay = {}; rosterPreview.forEach(r => byDay[r.service_day] = (byDay[r.service_day] || 0) + 1);
     const st = generateRoster.stats || {};
