@@ -2608,21 +2608,54 @@ function crewFor(r, pilotRank, pilotName) {
 }
 function eventFor(r, i, leg, wx, rnd) {
   if (rnd() > 0.4) return null;                                 // zhruba každý třetí let má něco navíc
-  const m = wx.metar.find(x => x.icaoId === leg.dep), cold = m?.temp != null && m.temp <= 3;
   const pick = a => a[Math.floor(rnd() * a.length)];
+  const m = wx.metar.find(x => x.icaoId === leg.dep), temp = m?.temp;
+  const dep = esc(leg.dep), arr = esc(leg.arr), arrName = esc(apByCode(leg.arr)?.[1] || leg.arr);
+  const celeb = pick(["alžírský youtuber", "americký herec", "slavný fotbalista", "francouzská zpěvačka", "český influencer", "olympijská vítězka", "španělský kuchař s michelinskou hvězdou",
+    "ministr dopravy", "oblíbený moderátor počasí", "marocký rapper", "slavná spisovatelka", "streamer s milionem sledujících", "italský módní návrhář", "dánská princezna (neoficiálně)",
+    "tuniský herec z oblíbeného seriálu", "polský šampion v e-sportu", "německý závodník F1", "bývalý kapitán Jáchym Air na zaslouženém odpočinku", "generální ředitel Jáchym Air"]);
   const list = [
-    { t: "VIP na palubě", d: "V první řadě poletí známá osobnost. Palubní průvodčí ji usadí jako poslední, prosíme o diskrétnost a hladké přistání. 😉" },
-    { t: "Nemocný cestující", d: "Cestující hlásil před nástupem zdravotní potíže, lékař ho pustil na palubu. Pokud se stav zhorší, zvaž přistání na alternativě." },
-    { t: "Zpožděný catering", d: "Catering dorazí o něco později. Počítej s možným zdržením při odletu, nespěchej na úkor bezpečnosti." },
-    { t: "Ptáci na letišti", d: `Na letišti ${esc(leg.dep)} je hlášena zvýšená aktivita ptáků. Při vzletu buď ve střehu.` },
-    { t: "Cestující na vozíku", d: "Na palubu nastoupí dva cestující s omezenou pohyblivostí. Nástup začne o pár minut dřív." },
-    { t: "Pes v kabině", d: "Na palubě je asistenční pes. Posádka o něm ví, je to dobrý kluk. 🐕" },
+    // osobnosti a cestující
+    { t: "Známá osobnost na palubě", d: `Poletí s vámi ${celeb}. Palubní průvodčí ho usadí až nakonec, prosíme o diskrétnost – a o pořádně měkké přistání, ať to není na sociálních sítích. 😉` },
+    { t: "Žádost o ruku", d: "Cestující v 12. řadě chce během letu požádat přítelkyni o ruku. Vedoucí kabiny tě poprosí o krátké hlášení z kokpitu – drž palce, ať řekne ano! 💍" },
+    { t: "Narozeniny na palubě", d: "Malá cestující má dnes 7. narozeniny a je to její první let. Posádka chystá dárek a přání – pokud stihneš, mávni jí po přistání z kokpitu." },
+    { t: "Svatební skupina", d: `Na palubě je 26 svatebních hostů letících do ${arrName}. Čekej veselou atmosféru a hodně fotek při nástupu.` },
+    { t: "Fotbaloví fanoušci", d: "Na palubu nastupuje skupina fanoušků po včerejším zápase. Posádka hlídá podávání alkoholu, může být hlučněji." },
+    { t: "Sportovní tým", d: `Letí s vámi celý basketbalový tým na turnaj v ${arrName}. Hodně velkých zavazadel a dlouhých nohou – nástup potrvá déle.` },
     { t: "Školní výlet", d: "Na palubě je skupina školáků. Čekej hlučnější kabinu a spoustu otázek na kapitána po přistání." },
-    { t: "Návazné lety", d: `Několik cestujících má v ${esc(leg.arr)} krátký přestup. Každá minuta se počítá.` },
+    { t: "Zájezd seniorů", d: "Na palubě je skupina seniorů s cestovní kanceláří, několik z nich s asistencí. Nástup začne o pár minut dřív." },
+    { t: "Letecký nadšenec", d: "Cestující u okna se ptá, jestli si po přistání může vyfotit kokpit. Pokud to provoz dovolí, udělej mu radost. 📸" },
+    { t: "Spotteři na letišti", d: `U plotu v ${arr} dnes stojí skupina spotterů s teleobjektivy. Tvoje přistání bude zítra na internetu – žádný tlak. 😄` },
+    // zdraví
+    { t: "Nemocný cestující", d: "Cestující hlásil před nástupem zdravotní potíže, lékař ho pustil na palubu. Pokud se stav zhorší, zvaž přistání na alternativě." },
+    { t: "Alergie na ořechy", d: "Na palubě je cestující se silnou alergií na ořechy. Prodej oříšků je zrušen a posádka o tom informuje cestující v okolí." },
+    { t: "Těhotná cestující", d: "Na palubě je cestující v pokročilém těhotenství s potvrzením od lékaře. Posádka ví, kde je porodnický balíček – snad nebude potřeba. 👶" },
+    // zvířata
+    { t: "Pes v kabině", d: "Na palubě je asistenční pes. Posádka o něm ví, je to dobrý kluk. 🐕" },
+    { t: "Sokol v kabině", d: "Cestující převáží lovecého sokola s vlastním pasem a povolením. Sedí na rukavici majitele v první řadě a prý je klidnější než většina cestujících. 🦅" },
+    { t: "Kočka v podpalubí", d: "V teplotně řízeném nákladovém prostoru cestuje kočka. Zkontroluj, že je zapnuté vytápění nákladového prostoru. 🐈" },
+    // provoz na zemi
+    { t: "Zpožděný catering", d: "Catering dorazí o něco později. Počítej s možným zdržením při odletu, nespěchej na úkor bezpečnosti." },
     { t: "Opožděné tankování", d: "Cisterna s palivem má zpoždění. Zkontroluj, že máš palivo podle plánu, než odjedeš od gate." },
+    { t: "Chybějící cestující", d: "Jeden odbavený cestující se nedostavil k nástupu. Jeho zavazadlo se musí vyložit, což může odlet zdržet o 10–15 minut." },
+    { t: "Náklad navíc", d: "Na poslední chvíli přibyl expresní náklad (náhradní díly pro jinou aerolinku). Aktualizuj hmotnosti v plánu." },
+    { t: "Stávka handlingu", d: `Na letišti ${dep} probíhá výstražná stávka pozemního personálu. Odbavení zavazadel může být pomalejší.` },
+    { t: "Ztracené zavazadlo", d: "Kufr cestujícího se omylem naložil na jiný let. Handling ho hledá, odlet tím snad ovlivněn nebude." },
+    // letiště a vzdušný prostor
+    { t: "Ptáci na letišti", d: `Na letišti ${dep} je hlášena zvýšená aktivita ptáků. Při vzletu buď ve střehu.` },
+    { t: "Dron u letiště", d: `Poblíž letiště ${dep} byl spatřen dron. Provoz může být na chvíli přerušen – sleduj pokyny věže.` },
+    { t: "Práce na dráze", d: `V ${arr} probíhají práce na dráze, část je uzavřená a použitelná délka je kratší. Zkontroluj výpočet přistávacích výkonů.` },
+    { t: "Vojenské cvičení", d: "Část vzdušného prostoru po trati je kvůli vojenskému cvičení uzavřená. Počítej s objížďkou a pár minutami navíc." },
+    { t: "Vládní let", d: `Na letiště ${arr} přilétá vládní speciál. Kolem jeho příletu může být provoz krátce omezen a čekání v holdingu.` },
+    { t: "Návazné lety", d: `Několik cestujících má v ${arr} krátký přestup. Každá minuta se počítá.` },
+    // posádka a kontroly
     { t: "Kontrola z úřadu", d: "Na palubě poletí inspektor letového provozu na tzv. ramp check. Drž se standardních postupů do puntíku." },
+    { t: "Jumpseat", d: "Na sklopném sedadle v kokpitu poletí pilot jiné aerolinky na cestě domů. Bude rád za trochu povídání při cestovním letu." },
+    { t: "Technik na palubě", d: "Letí s vámi technik, který v cíli opraví závadu na jiném letadle. Pokud se cokoli objeví, máš odborníka hned po ruce. 🔧" },
+    { t: "Nový kolega v zácviku", d: "V kabině je palubní průvodčí na prvním letu po výcviku. Purser na něj dohlíží – buď na něj hodný." },
   ];
-  if (cold) list.push({ t: "Odmrazování", d: `V ${esc(leg.dep)} je kolem nuly. Počítej s odmrazováním před odletem a ověř holdover time.` });
+  if (temp != null && temp <= 3) list.push({ t: "Odmrazování", d: `V ${dep} je kolem nuly. Počítej s odmrazováním před odletem a ověř holdover time.` });
+  if (temp != null && temp >= 33) list.push({ t: "Velké horko", d: `V ${dep} je přes 33 °C. Delší rozjezd, nižší výkon motorů a klimatizace na zemi jede naplno – zkontroluj vzletové výkony.` });
   if (i === 0) list.push({ t: "Nemoc v posádce", d: "Jedna z palubních průvodčích onemocněla, za ni nastupuje kolegyně ze zálohy. Seznam posádky je už aktualizovaný." });
   return pick(list);
 }
