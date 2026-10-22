@@ -327,6 +327,16 @@
   .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
   .remarks { margin: 0; padding-left: 20px; line-height: 1.6; }
   .wx-raw { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--bg); padding: 8px 10px; border-radius: 8px; margin: 6px 0 10px; word-break: break-word; }
+  .av-frame { display: inline-flex; border-radius: 50%; padding: 4px; flex: none; }
+  .fr-silver { background: linear-gradient(135deg, #E5E7EB, #9CA3AF, #F3F4F6); }
+  .fr-gold { background: linear-gradient(135deg, #FDE68A, #CA8A04, #FEF3C7); }
+  .fr-butter { background: #FCD34D; box-shadow: 0 0 0 2px #FDE68A inset; }
+  .fr-radar { background: repeating-radial-gradient(circle, #1E9B36 0 3px, #8FD3A1 3px 6px); }
+  .fr-rainbow { background: conic-gradient(#EF4444, #F59E0B, #EAB308, #22C55E, #3B82F6, #8B5CF6, #EF4444); }
+  .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .shop-item { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
+  .shop-item.on { border: 2px solid var(--green); }
+  .shop-prev { height: 54px; display: flex; align-items: center; justify-content: center; background: var(--bg); border-radius: 10px; }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -406,6 +416,7 @@
     <a href="#/piloti" data-r="piloti">Piloti</a>
     <a href="#/novinky" data-r="novinky">Novinky</a>
     <a href="#/rozpis" data-r="rozpis" id="navRoster" style="display:none">Rozpis</a>
+    <a href="#/obchod" data-r="obchod" id="navShop" style="display:none">Obchod</a>
     <a href="#/fotky" data-r="fotky">Fotky</a>
     <a href="#/pratele" data-r="pratele" id="navFriends">Přátelé</a>
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
@@ -438,6 +449,7 @@
   <section class="view" id="view-pratele"><div class="page" id="pratele"></div></section>
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
   <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
+  <section class="view" id="view-obchod"><div class="page" id="obchod"></div></section>
   <section class="view" id="view-briefing"><div class="page" id="briefing"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
   <section class="view" id="view-soukromi"><div class="page legal" id="soukromi"></div></section>
@@ -477,7 +489,20 @@ const route = f => `${esc(f.dep_icao || "????")} → ${esc(f.arr_icao || "????")
 let jaiSet = new Set();
 let me = null;          // { user, profile }
 
+/* ---------- kosmetika z obchodu ---------- */
+let shopItems = new Map();          // kód -> položka
+async function loadShop() { if (!sb) return; const { data } = await sb.from("shop_items").select("*").order("kind").order("sort"); shopItems = new Map((data || []).map(i => [i.code, i])); }
+const shopReady = new Promise(res => setTimeout(() => loadShop().then(res, res), 0));
+const cosVal = code => (code && shopItems.get(code)?.value) || null;
+// jméno pilota s barvou z obchodu (p = profil s eq_name_color)
+function nameHtml(p, text) { const c = cosVal(p?.eq_name_color); return c ? `<span style="color:${esc(c)};font-weight:700">${esc(text ?? p?.username ?? "")}</span>` : esc(text ?? p?.username ?? ""); }
+const titleHtml = p => { const t = cosVal(p?.eq_title); return t ? `<span class="va-chip" style="background:#FEF3C7;color:#78350F">${esc(t)}</span>` : ""; };
 function avatar(p, isJai, cls = "") {
+  const fr = cosVal(p?.eq_frame);
+  if (fr) return `<span class="av-frame fr-${esc(fr)}">${avatarInner(p, isJai, cls)}</span>`;
+  return avatarInner(p, isJai, cls);
+}
+function avatarInner(p, isJai, cls = "") {
   const name = p?.username || "?";
   if (p?.avatar_url) return `<img class="av ${cls}" src="${esc(p.avatar_url)}" alt="">`;
   return `<span class="av ${isJai ? "jai" : ""} ${cls}" aria-hidden="true">${esc(name.slice(0, 2).toUpperCase())}</span>`;
@@ -776,7 +801,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -804,6 +829,7 @@ async function router() {
   if (view === "fotky") renderGallery();
   if (view === "rozpis") renderRoster(parts[1]);
   if (view === "briefing") renderBriefing(+parts[1], +(parts[2] || 0));
+  if (view === "obchod") renderShop();
 }
 window.addEventListener("hashchange", router);
 
@@ -896,8 +922,8 @@ function acCategory(icao, title) {
   if (test(/^(C1[0-9]{2}|C150|C152|C172|C182|C206|C210|PA|P28|DA[0-9]|SR2|BE3|BE5|BE6|M20|C42|DR40|TB|ICON|SAVG|VL3|ZLIN|Z4)/) || /CESSNA 1|SKYHAWK|PIPER|DIAMOND|CIRRUS|BONANZA|MOONEY|ROBIN|ICON A5|SAVAGE|ZLIN|JMB VL3|DR400/.test(t)) return "ga";
   return "narrow";
 }
-function planeIcon(hdg, isJai, sel, cat = "narrow") {
-  const col = isJai ? "#1E9B36" : "#66788A";
+function planeIcon(hdg, isJai, sel, cat = "narrow", custom = null) {
+  const col = custom || (isJai ? "#1E9B36" : "#66788A");
   const shape = AC_SHAPES[cat] || AC_SHAPES.narrow;
   const size = Math.round(shape.size * (isJai ? 1.12 : 1));
   const rotor = shape.rotor ? `<circle cx="12" cy="10" r="8.2" fill="none" stroke="${col}" stroke-width="1.3" opacity=".75"/><circle cx="12" cy="10" r="8.2" fill="none" stroke="#fff" stroke-width=".5" opacity=".6"/>` : "";
@@ -1206,7 +1232,7 @@ async function refreshLive() {
   if (liveTick % 8 === 0) refreshTouchdowns();
   if (liveTick++ % 2 === 0) refreshRecent();
   const since = new Date(Date.now() - 120000).toISOString();
-  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url)").gte("updated_at", since);
+  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url, eq_name_color, eq_title, eq_plane_color)").gte("updated_at", since);
   if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
   liveRows = data || [];
   renderLive();
@@ -1262,11 +1288,11 @@ function renderLive() {
     // letadlo
     let m = markers.get(r.user_id);
     if (!m) {
-      m = L.marker([r.lat, r.lon], { icon: planeIcon(r.hdg, isJai, sel, cat), zIndexOffset: isJai ? 1000 : 0 }).addTo(map);
+      m = L.marker([r.lat, r.lon], { icon: planeIcon(r.hdg, isJai, sel, cat, cosVal(r.profiles?.eq_plane_color)), zIndexOffset: isJai ? 1000 : 0 }).addTo(map);
       m.on("click", () => { location.hash = "#/let/live/" + r.user_id; });
       markers.set(r.user_id, m);
     } else {
-      m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai, sel, cat));
+      m.setLatLng([r.lat, r.lon]); m.setIcon(planeIcon(r.hdg, isJai, sel, cat, cosVal(r.profiles?.eq_plane_color)));
     }
     const cs = r.plan?.callsign || (r.callsign && r.callsign !== r.profiles?.username ? r.callsign : "");
     m.unbindTooltip().bindTooltip(`<b style="font-size:15px">${esc(cs || r.profiles?.username || "")}</b>${r.plan?.dep ? ` · ${esc(r.plan.dep)} → ${esc(r.plan.arr || "?")}` : ""}
@@ -1617,8 +1643,11 @@ async function renderLeaderboard() {
   el.querySelectorAll(".tab").forEach(b => b.onclick = () => { lbTab = b.dataset.t; renderLeaderboard(); });
   if (lbTab === "points") {
     const { data } = await sb.from("pilot_career").select("*").gt("points_30d", 0).order("points_30d", { ascending: false }).limit(25);
+    await shopReady;
+    const { data: pr } = data?.length ? await sb.from("profiles").select("id, eq_name_color, eq_title").in("id", data.map(c => c.user_id)) : { data: [] };
+    const prMap = new Map((pr || []).map(x => [x.id, x]));
     $("lbTable").innerHTML = data?.length ? `<div class="table-wrap"><table><thead><tr><th>#</th><th>Pilot</th><th>Body (30 dní)</th><th>Rotace</th><th>Dochvilnost</th><th>Spokojenost</th></tr></thead><tbody>
-      ${data.map((c, i) => `<tr><td>${i + 1}</td><td><a href="#/pilot/${encodeURIComponent(c.username)}">${esc(c.username)}</a></td><td><b>${nf.format(c.points_30d)}</b></td><td>${c.rotations_done}</td>
+      ${data.map((c, i) => `<tr><td>${i + 1}</td><td><a href="#/pilot/${encodeURIComponent(c.username)}">${nameHtml(prMap.get(c.user_id), c.username)}</a> ${titleHtml(prMap.get(c.user_id))}</td><td><b>${nf.format(c.points_30d)}</b></td><td>${c.rotations_done}</td>
         <td>${c.rotation_legs ? Math.round(c.on_time_legs / c.rotation_legs * 100) + " %" : "–"}</td><td>${c.avg_pax_sat != null ? c.avg_pax_sat + " %" : "–"}</td></tr>`).join("")}</tbody></table></div>`
       : '<div class="card">Zatím nikdo nezískal body. Vezmi si rotaci v Rozpisu!</div>';
     $("lbHours").closest && ($("lbHours").innerHTML = "");
@@ -1677,11 +1706,12 @@ async function renderPilot(username) {
   if (!p) { el.innerHTML = '<div class="card">Pilot nenalezen.</div>'; return; }
   setTimeout(() => renderCareerBox(username), 0);
   const hours = p.minutes / 60, rk = rankOf(hours);
-  const { data: prof } = await sb.from("profiles").select("stream_url").eq("id", p.id).maybeSingle();
+  const [{ data: prof }] = await Promise.all([sb.from("profiles").select("stream_url, avatar_url, eq_name_color, eq_frame, eq_title").eq("id", p.id).maybeSingle(), shopReady]);
+  Object.assign(p, { eq_name_color: prof?.eq_name_color, eq_frame: prof?.eq_frame, eq_title: prof?.eq_title });
   const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score, rwy, incomplete").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
   el.innerHTML = `
     <div class="profile-head">${avatar(p, p.is_jai)}
-      <div><h1 class="profile-name">${esc(p.username)}</h1>
+      <div><h1 class="profile-name">${nameHtml(p)}</h1>${titleHtml(p) ? `<div style="margin:-4px 0 6px">${titleHtml(p)}</div>` : ""}
         <div class="rank-line">${p.callsign ? `<span>${esc(p.callsign)}</span>` : ""}<span>${rk.name}</span>${p.is_jai ? '<span class="badge">Pilot Jáchym Air</span>' : ""}${prof?.stream_url ? `<a class="stream-btn" href="${esc(prof.stream_url)}" target="_blank" rel="noopener">▶ Stream</a>` : ""}</div>
         ${rk.next ? `<div class="rank-bar" title="Do hodnosti ${rk.next.name}"><i style="width:${rk.pct}%"></i></div><small class="muted">Do hodnosti ${rk.next.name} zbývá ${fmt1(Math.max(0, rk.next.h - hours))} h</small>` : ""}
       </div></div>
@@ -2517,6 +2547,51 @@ function careerCardHtml(c, own) {
       <button class="btn ghost" id="raiseBtn" ${canAsk ? "" : "disabled"}>${canAsk ? "Požádat o zvýšení platu" : `Další žádost od ${new Date(new Date(last.created_at).getTime() + 30 * 864e5).toLocaleDateString("cs-CZ")}`}</button>` : ""}</div>`;
 }
 
+/* ---------- obchod ---------- */
+const SHOP_KINDS = { name_color: ["Barva jména", "eq_name_color"], frame: ["Rámeček profilovky", "eq_frame"], title: ["Titul", "eq_title"], plane_color: ["Barva letadla na mapě", "eq_plane_color"] };
+async function renderShop(msg) {
+  const el = $("obchod");
+  if (!me) { el.innerHTML = '<div class="card">Pro obchod se <a href="#/ucet">přihlas</a>.</div>'; return; }
+  if (!ROSTER_PUBLIC && !me.profile?.is_admin) { el.innerHTML = '<div class="card">Obchod připravujeme. 🛍️</div>'; return; }
+  el.innerHTML = '<h1 class="page-title">Obchod</h1><p class="muted">Načítám…</p>';
+  await loadShop();
+  const [{ data: led }, { data: own }, { data: prof }] = await Promise.all([
+    sb.from("points_ledger").select("amount, reason, created_at").eq("user_id", me.user.id).order("created_at", { ascending: false }).limit(200),
+    sb.from("purchases").select("item_code").eq("user_id", me.user.id),
+    sb.from("profiles").select("eq_name_color, eq_frame, eq_title, eq_plane_color, username, avatar_url").eq("id", me.user.id).maybeSingle(),
+  ]);
+  const bal = (led || []).reduce((a, l) => a + l.amount, 0), owned = new Set((own || []).map(o => o.item_code));
+  const prev = it => it.kind === "name_color" ? `<b style="color:${esc(it.value)};font-size:18px">${esc(prof?.username || "pilot")}</b>`
+    : it.kind === "frame" ? `<span class="av-frame fr-${esc(it.value)}">${avatarInner(prof, false)}</span>`
+    : it.kind === "title" ? `<span class="va-chip" style="background:#FEF3C7;color:#78350F">${esc(it.value)}</span>`
+    : `<svg width="34" height="34" viewBox="0 0 24 24" style="transform:rotate(45deg)"><path d="M12 2c.8 0 1.3.8 1.3 1.8V9l7.7 4.6v2l-7.7-2.4v4.9l2.2 1.7V21L12 20.1 8.5 21v-1.2l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.8C10.7 2.8 11.2 2 12 2z" fill="${esc(it.value)}" stroke="#fff" stroke-width="1"/></svg>`;
+  el.innerHTML = `<h1 class="page-title">Obchod</h1>
+    <p class="lead">Za body z letů si kup kosmetiku. Nic z toho nedává výhodu, jen styl. 😎</p>
+    ${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
+    <div class="card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px"><span style="font-size:15px">Zůstatek</span><b style="font-family:var(--display);font-size:32px">${nf.format(bal)} b</b>
+      <span class="muted" style="font-size:14px">Body získáš za lety z Rozpisu (a trochu i za volné lety).</span></div>
+    ${Object.entries(SHOP_KINDS).map(([kind, [label, col]]) => {
+      const items = [...shopItems.values()].filter(i => i.kind === kind && i.active);
+      return items.length ? `<h2 class="section-title">${label}</h2><div class="shop-grid" style="margin-bottom:22px">${items.map(it => {
+        const has = owned.has(it.code), on = prof?.[col] === it.code;
+        return `<div class="shop-item ${on ? "on" : ""}"><div class="shop-prev">${prev(it)}</div><b>${esc(it.name)}</b>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">${has ? '<span class="muted" style="font-size:13px">Vlastníš</span>' : `<b>${nf.format(it.price)} b</b>`}
+          ${!has ? `<button class="btn" data-buy="${esc(it.code)}" ${bal < it.price ? "disabled" : ""} style="padding:6px 12px">Koupit</button>`
+            : on ? `<button class="btn ghost" data-uneq="${col}" style="padding:6px 12px">Sundat</button>` : `<button class="btn ghost" data-eq="${col}|${esc(it.code)}" style="padding:6px 12px">Nasadit</button>`}</div></div>`; }).join("")}</div>` : "";
+    }).join("")}
+    <h2 class="section-title">Pohyby bodů</h2>
+    <div class="card">${(led || []).length ? led.slice(0, 30).map(l => `<div class="adm-row"><div>${esc(l.reason)}<div class="muted" style="font-size:12px">${fmtDate(l.created_at)}</div></div><b style="color:${l.amount < 0 ? "#B91C1C" : "var(--green)"}">${l.amount > 0 ? "+" : ""}${nf.format(l.amount)}</b></div>`).join("") : '<p class="muted" style="margin:0">Zatím žádné body.</p>'}</div>`;
+  el.querySelectorAll("[data-buy]").forEach(b => b.onclick = async () => {
+    const it = shopItems.get(b.dataset.buy);
+    if (!confirm(`Koupit „${it.name}“ za ${nf.format(it.price)} bodů?`)) return;
+    const { error } = await sb.from("purchases").insert({ item_code: it.code });
+    if (!error) { const k = SHOP_KINDS[it.kind][1]; await sb.from("profiles").update({ [k]: it.code }).eq("id", me.user.id); }
+    renderShop(error ? { ok: false, text: error.message.replace(/^.*?: /, "") } : { ok: true, text: `Koupeno a nasazeno: ${it.name} 🎉` });
+  });
+  el.querySelectorAll("[data-eq]").forEach(b => b.onclick = async () => { const [k, code] = b.dataset.eq.split("|"); const { error } = await sb.from("profiles").update({ [k]: code }).eq("id", me.user.id); renderShop(error ? { ok: false, text: error.message } : null); });
+  el.querySelectorAll("[data-uneq]").forEach(b => b.onclick = async () => { await sb.from("profiles").update({ [b.dataset.uneq]: null }).eq("id", me.user.id); renderShop(); });
+}
+
 /* ---------- posádka a nečekané situace v briefingu ---------- */
 function crewFor(r, pilotRank, pilotName) {
   const rnd = seededRand("crew/" + r.id), base = r.base_icao || r.legs?.[0]?.dep || "DAAG";
@@ -3266,6 +3341,7 @@ const ROSTER_PUBLIC = false;
 function updateNav() {
   $("navAdmin").style.display = me?.profile?.is_admin ? "" : "none";
   $("navRoster").style.display = ROSTER_PUBLIC || me?.profile?.is_admin ? "" : "none";
+  $("navShop").style.display = (ROSTER_PUBLIC || me?.profile?.is_admin) && me ? "" : "none";
   const a = $("navAccount");
   a.innerHTML = me?.profile ? `${avatar(me.profile, jaiSet.has(me.user.id), "mini-av")}${esc(me.profile.username)}` : "Přihlásit";
 }
