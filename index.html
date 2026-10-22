@@ -2341,12 +2341,31 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
   timed.forEach(x => { if (!fromAirport.has(x.rt.dep)) fromAirport.set(x.rt.dep, []); fromAirport.get(x.rt.dep).push(x); });
   const stats = { total: jaiRoutes.length, noTime: jaiRoutes.length - timed.length, noType: 0, noReturn: 0, noPlane: 0 };
   const out = [], usedCount = new Map();
+  // už zveřejněné rotace v období – aby se letadla nenaplánovala dvakrát a navazovala polohou
+  const t0 = pragueToUtc(startDay, 0).getTime(), absOf = iso => Math.round((new Date(iso).getTime() - t0) / 60000);
+  const { data: existing } = await sb.from("rotations").select("reg, legs, std, sta, status")
+    .gte("sta", new Date(t0 - 3 * 864e5).toISOString()).lte("std", new Date(t0 + (nDays + 3) * 864e5).toISOString()).neq("status", "cancelled");
+  const sched = new Map();          // registrace -> [{s, e, from, to}]
+  const addSched = (reg, s0, e0, from, to) => { if (!sched.has(reg)) sched.set(reg, []); sched.get(reg).push({ s: s0, e: e0, from, to }); };
+  (existing || []).forEach(r => r.reg && r.legs?.length && addSched(r.reg, absOf(r.std), absOf(r.sta), r.legs[0].dep, r.legs[r.legs.length - 1].arr));
+  const startLoc = new Map((jaiFleet || []).filter(a => a.registration).map(a => [normType(a.registration), a.airport_id]));
   generateRoster._typeUse = new Map();
   for (const pool of ["DAAG", "MINI"]) {
     const baseSet = new Set(basesList.filter(b => b.pool === pool).map(b => b.icao));
     const planes = fleet.filter(f => f.pool === pool);
     const types = [...new Set(planes.map(p => p.ac_type).filter(Boolean))];
-    const busy = new Map(planes.map(p => [p.registration, -1]));      // do kdy je letadlo obsazené (minuty od začátku období)
+    // může letadlo letět od startAbs do endAbs z letiště fromAp do toAp? (žádný překryv, navazuje polohou)
+    const canFly = (p, startAbs, endAbs, fromAp, toAp) => {
+      const list = sched.get(p.registration) || [];
+      if (list.some(x => x.s < endAbs + 30 && x.e > startAbs - 30)) return false;
+      if (pool !== "MINI") return true;                                // Alžír: všechno začíná a končí v Alžíru
+      const before = list.filter(x => x.e <= startAbs).sort((a, b) => b.e - a.e)[0];
+      const loc = before ? before.to : (baseSet.has(startLoc.get(normType(p.registration))) ? startLoc.get(normType(p.registration)) : null);
+      if (loc && loc !== fromAp) return false;
+      const after = list.filter(x => x.s >= endAbs).sort((a, b) => a.s - b.s)[0];
+      if (after && toAp && after.from !== toAp) return false;
+      return true;
+    };
     const usedDay = new Set();                                         // "idLinky@den" – každá linka letí max. jednou denně
     for (let d = 0; d < nDays; d++) {
       const starts = timed.filter(x => baseSet.has(x.rt.dep) && flies(x, d) && !usedDay.has(x.rt.id + "@" + d))
@@ -2355,7 +2374,7 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
         if (usedDay.has(s0.rt.id + "@" + d)) continue;
         const first = { ...s0, day: d, depAbs: d * 1440 + s0.dep, arrAbs: d * 1440 + s0.arr, dutyStart: d * 1440 + s0.dep };
         const typeUse = generateRoster._typeUse || (generateRoster._typeUse = new Map());
-        const freePlane = (t, at) => planes.find(p => normType(p.ac_type) === normType(t) && busy.get(p.registration) <= at - 30);
+        const freePlane = (t, at, end = at + 60, toAp = null) => planes.find(p => normType(p.ac_type) === normType(t) && canFly(p, at, end, first.rt.dep, toAp));
         // výběr typu: náhoda s vahou – vysoká obsazenost linky = větší šance na větší letadlo a naopak; méně využité typy mají přednost
         const lf = first.rt.load_factor != null ? +first.rt.load_factor : 75;
         const caps = types.map(capOf).filter(Boolean), midCap = caps.length ? caps.reduce((a, b) => a + b) / caps.length : 180;
@@ -2401,12 +2420,12 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
           }
           if (!bestT) continue;
           anyChain = true;
-          const p = freePlane(t, first.depAbs);
+          const p = freePlane(t, first.depAbs, bestT.chain[bestT.chain.length - 1].arrAbs, bestT.chain[bestT.chain.length - 1].rt.arr);
           if (p) { best = bestT; plane = p; break; }        // typ s volným letadlem – jinak zkusit další vhodný typ
         }
         if (!best) { if (d === 0) { if (anyChain) stats.noPlane++; else if (fitTypes.length) stats.noReturn++; } continue; }
         const endAbs = best.chain[best.chain.length - 1].arrAbs;
-        busy.set(plane.registration, endAbs);
+        addSched(plane.registration, best.chain[0].depAbs, endAbs, best.chain[0].rt.dep, best.chain[best.chain.length - 1].rt.arr);
         typeUse.set(best.type, (typeUse.get(best.type) || 0) + 1);
         best.chain.forEach(c => { usedDay.add(c.rt.id + "@" + c.day); usedCount.set(c.rt.id, (usedCount.get(c.rt.id) || 0) + 1); });
         const legs = best.chain.map(c => ({ route_id: c.rt.id, flight_no: fltNo(c.rt), dep: c.rt.dep, arr: c.rt.arr,
