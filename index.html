@@ -2271,7 +2271,7 @@ function rotCard(r) {
   const fd = (fleetCache || []).find(f => f.registration === r.reg);
   return `<div class="rot ${mine ? "mine" : ""} ${r.status === "taken" && !mine ? "taken" : ""}">
     <div><div class="rot-meta" style="margin-bottom:6px"><b style="color:var(--text)">${dayLabel(r.service_day)}</b><span>${esc(r.ac_type || "")}${r.reg ? " · " + esc(r.reg) : ""}</span>
-      ${fd?.training_only ? '<span class="va-chip">výcvik palubní posádky</span>' : ""}<span>${legs.length} ${legs.length === 1 ? "let" : legs.length < 5 ? "lety" : "letů"}</span>
+      ${fd?.training_only ? '<span class="va-chip">výcvik palubní posádky</span>' : ""}${legs[0]?.ferry_from ? `<span class="va-chip">letadlo přistaveno z ${esc(legs[0].ferry_from)}</span>` : ""}<span>${legs.length} ${legs.length === 1 ? "let" : legs.length < 5 ? "lety" : "letů"}</span>
       ${(() => { const nd = new Set(legs.map(l => pragueDay(new Date(l.std)))).size; const stops = legs.filter(l => l.night_before).map(l => l.night_before);
         return nd > 1 ? `<span class="va-chip">${nd} ${nd < 5 ? "dny" : "dní"}${stops.length ? " · přespání v " + stops.map(esc).join(", ") : ""}</span>` : `<span>${fmtDur(block)} h</span>`; })()}</div>
       <div class="rot-legs">${legs.map(l => `<div class="rot-leg"><b><a href="#/linka/${encodeURIComponent(l.route_id)}">${esc(l.flight_no)}</a></b>
@@ -2340,7 +2340,7 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
   const fromAirport = new Map();
   timed.forEach(x => { if (!fromAirport.has(x.rt.dep)) fromAirport.set(x.rt.dep, []); fromAirport.get(x.rt.dep).push(x); });
   const stats = { total: jaiRoutes.length, noTime: jaiRoutes.length - timed.length, noType: 0, noReturn: 0, noPlane: 0 };
-  const out = [], usedCount = new Map();
+  const out = [], usedCount = new Map(), baseCount = new Map();
   // už zveřejněné rotace v období – aby se letadla nenaplánovala dvakrát a navazovala polohou
   const t0 = pragueToUtc(startDay, 0).getTime(), absOf = iso => Math.round((new Date(iso).getTime() - t0) / 60000);
   const { data: existing } = await sb.from("rotations").select("reg, legs, std, sta, status")
@@ -2355,26 +2355,50 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
     const planes = fleet.filter(f => f.pool === pool);
     const types = [...new Set(planes.map(p => p.ac_type).filter(Boolean))];
     // může letadlo letět od startAbs do endAbs z letiště fromAp do toAp? (žádný překryv, navazuje polohou)
+    // doba přistavení prázdného letadla mezi letišti: let ~420 kt + hodina na přípravu
+    const ferryMin = (a, b) => { const A = apByCode(a), B = apByCode(b); if (!A || !B) return 240;
+      return Math.round(kmBetween([A[2], A[3]], [B[2], B[3]]) / 1.852 / 420 * 60) + 60; };
+    // může letadlo letět od startAbs do endAbs z letiště fromAp do toAp? Vrací false, nebo {ferryFrom}
     const canFly = (p, startAbs, endAbs, fromAp, toAp) => {
       const list = sched.get(p.registration) || [];
       if (list.some(x => x.s < endAbs + 30 && x.e > startAbs - 30)) return false;
-      if (pool !== "MINI") return true;                                // Alžír: všechno začíná a končí v Alžíru
+      if (pool !== "MINI") return {};                                  // Alžír: všechno začíná a končí v Alžíru
       const before = list.filter(x => x.e <= startAbs).sort((a, b) => b.e - a.e)[0];
       const loc = before ? before.to : (baseSet.has(startLoc.get(normType(p.registration))) ? startLoc.get(normType(p.registration)) : null);
-      if (loc && loc !== fromAp) return false;
+      let ferryFrom = null;
+      if (loc && loc !== fromAp) {
+        const freeSince = before ? before.e : -24 * 60;                 // na začátku období letadlo už někde stojí
+        if (startAbs - freeSince < ferryMin(loc, fromAp)) return false;
+        ferryFrom = loc;                                                 // stihne se přistavit prázdným přeletem
+      }
       const after = list.filter(x => x.s >= endAbs).sort((a, b) => a.s - b.s)[0];
-      if (after && toAp && after.from !== toAp) return false;
-      return true;
+      if (after && toAp && after.from !== toAp && after.s - endAbs < ferryMin(toAp, after.from)) return false;
+      return { ferryFrom };
     };
     const usedDay = new Set();                                         // "idLinky@den" – každá linka letí max. jednou denně
     for (let d = 0; d < nDays; d++) {
-      const starts = timed.filter(x => baseSet.has(x.rt.dep) && flies(x, d) && !usedDay.has(x.rt.id + "@" + d))
-        .sort((a, b) => (usedCount.get(a.rt.id) || 0) - (usedCount.get(b.rt.id) || 0) || a.dep - b.dep);
-      for (const s0 of starts) {
+      const remaining = timed.filter(x => baseSet.has(x.rt.dep) && flies(x, d) && !usedDay.has(x.rt.id + "@" + d));
+      // spravedlivě: nejdřív základny s nejmenším počtem rotací, pak nejméně létané linky, pak podle času
+      const nextStart = () => {
+        let bi = -1;
+        for (let i = 0; i < remaining.length; i++) {
+          const a = remaining[i], b = remaining[bi];
+          if (!b) { bi = i; continue; }
+          const ka = [baseCount.get(a.rt.dep) || 0, usedCount.get(a.rt.id) || 0, a.dep], kb = [baseCount.get(b.rt.dep) || 0, usedCount.get(b.rt.id) || 0, b.dep];
+          if (ka[0] < kb[0] || (ka[0] === kb[0] && (ka[1] < kb[1] || (ka[1] === kb[1] && ka[2] < kb[2])))) bi = i;
+        }
+        return bi < 0 ? null : remaining.splice(bi, 1)[0];
+      };
+      for (let s0 = nextStart(); s0; s0 = nextStart()) {
         if (usedDay.has(s0.rt.id + "@" + d)) continue;
         const first = { ...s0, day: d, depAbs: d * 1440 + s0.dep, arrAbs: d * 1440 + s0.arr, dutyStart: d * 1440 + s0.dep };
         const typeUse = generateRoster._typeUse || (generateRoster._typeUse = new Map());
-        const freePlane = (t, at, end = at + 60, toAp = null) => planes.find(p => normType(p.ac_type) === normType(t) && canFly(p, at, end, first.rt.dep, toAp));
+        // přednost má letadlo, které už na místě stojí (bez přistavení)
+        const freePlane = (t, at, end = at + 60, toAp = null) => {
+          const ok = planes.filter(p => normType(p.ac_type) === normType(t)).map(p => ({ p, r: canFly(p, at, end, first.rt.dep, toAp) })).filter(x => x.r);
+          const pick = ok.find(x => !x.r.ferryFrom) || ok[0];
+          return pick ? Object.assign(pick.p, { _ferry: pick.r.ferryFrom || null }) && pick.p : null;
+        };
         // výběr typu: náhoda s vahou – vysoká obsazenost linky = větší šance na větší letadlo a naopak; méně využité typy mají přednost
         const lf = first.rt.load_factor != null ? +first.rt.load_factor : 75;
         const caps = types.map(capOf).filter(Boolean), midCap = caps.length ? caps.reduce((a, b) => a + b) / caps.length : 180;
@@ -2426,11 +2450,14 @@ async function generateRoster(startDay, nDays, maxLegs, maxDutyH, allowNight = f
         if (!best) { if (d === 0) { if (anyChain) stats.noPlane++; else if (fitTypes.length) stats.noReturn++; } continue; }
         const endAbs = best.chain[best.chain.length - 1].arrAbs;
         addSched(plane.registration, best.chain[0].depAbs, endAbs, best.chain[0].rt.dep, best.chain[best.chain.length - 1].rt.arr);
+        baseCount.set(best.chain[0].rt.dep, (baseCount.get(best.chain[0].rt.dep) || 0) + 1);
+        const ferryFrom = plane._ferry || null;
         typeUse.set(best.type, (typeUse.get(best.type) || 0) + 1);
         best.chain.forEach(c => { usedDay.add(c.rt.id + "@" + c.day); usedCount.set(c.rt.id, (usedCount.get(c.rt.id) || 0) + 1); });
         const legs = best.chain.map(c => ({ route_id: c.rt.id, flight_no: fltNo(c.rt), dep: c.rt.dep, arr: c.rt.arr,
           std: pragueToUtc(startDay, c.depAbs).toISOString(), sta: pragueToUtc(startDay, c.arrAbs).toISOString(),
           load_factor: c.rt.load_factor, lf_var: c.rt.load_factor_variance, night_before: c.nightBefore || undefined }));
+        if (ferryFrom) legs[0].ferry_from = ferryFrom;
         out.push({ service_day: dayStr(d), base_icao: best.chain[0].rt.dep, pool, reg: plane.registration, ac_type: plane.ac_type, legs, std: legs[0].std, sta: legs[legs.length - 1].sta });
       }
     }
@@ -2482,7 +2509,7 @@ async function renderAdminRoster(msg) {
       ${st.unused?.length ? `<div class="muted" style="font-size:13px">Za celé období nezařazené: ${st.unused.slice(0, 60).map(r => `${esc(fltNo(r))} ${esc(r.dep)}–${esc(r.arr)}`).join(", ")}${st.unused.length > 60 ? " …" : ""}</div>` : ""}</details>`;
     $("genPreview").innerHTML = `<div class="card" style="background:var(--bg)"><b>Návrh: ${rosterPreview.length} rotací</b> <span class="muted">(${Object.entries(byDay).map(([d, n]) => `${dayLabel(d)} ${n}`).join(", ")})</span>${statHtml}
       <div style="max-height:300px;overflow:auto;margin:10px 0">${rosterPreview.map((r, i) => `<div class="adm-row"><div><span class="ev-kind">${dayLabel(r.service_day)} · ${esc(r.reg)} (${esc(r.ac_type)})</span><br>
-        <b>${r.legs.map(l => esc(l.flight_no)).join(", ")}</b> · ${r.legs.map(l => esc(l.dep)).join(" → ")} → ${esc(r.legs[r.legs.length - 1].arr)}
+        <b>${r.legs.map(l => esc(l.flight_no)).join(", ")}</b> · ${r.legs[0].ferry_from ? `<span class="muted">(přistaveno z ${esc(r.legs[0].ferry_from)})</span> ` : ""}${r.legs.map(l => esc(l.dep)).join(" → ")} → ${esc(r.legs[r.legs.length - 1].arr)}
         <span class="muted">${hmPrague(r.std)}–${pragueDay(new Date(r.sta)) !== r.service_day ? dayLabel(pragueDay(new Date(r.sta))) + " " : ""}${hmPrague(r.sta)}</span></div><button class="link-btn danger" data-rmprev="${i}">Vyřadit</button></div>`).join("")}</div>
       <button class="btn" id="pubRoster">Zveřejnit rozpis</button></div>`;
     $("genPreview").querySelectorAll("[data-rmprev]").forEach(b => b.onclick = () => { rosterPreview.splice(+b.dataset.rmprev, 1); b.closest(".adm-row").remove(); });
