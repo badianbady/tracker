@@ -449,6 +449,7 @@
   <section class="view" id="view-pratele"><div class="page" id="pratele"></div></section>
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
   <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
+  <section class="view" id="view-rotace"><div class="page" id="rotace"></div></section>
   <section class="view" id="view-obchod"><div class="page" id="obchod"></div></section>
   <section class="view" id="view-briefing"><div class="page" id="briefing"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
@@ -627,6 +628,7 @@ function renderTracker(full) {
         <div class="card tr-landing"><div class="big" id="trScore">–</div><div class="info">
           <h3 id="trVerdict" style="font-size:22px">Zatím žádné přistání</h3><div id="trLand" class="muted">Přistání se tu ukáže automaticky.</div></div></div>
         <div class="card tr-wide save-card" id="saveCard"></div>
+        <div class="card tr-wide save-card" id="tripCard"></div>
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
           <div><b id="trAlt">–</b><span>Výška ft</span></div><div><b id="trIas">–</b><span>IAS kt</span></div>
           <div><b id="trGs">–</b><span>GS kt</span></div><div><b id="trVs">–</b><span>V/S fpm</span></div></div></div>
@@ -779,6 +781,7 @@ function renderTracker(full) {
   const flying = s.flight_state === "flying";
   if ($("trUpdBtn") && flying && s.update_progress == null) { $("trUpdBtn").disabled = true; $("trUpdBtn").textContent = "Aktualizovat po přistání"; }
   if ($("trUpdBtn")) $("trUpdBtn").onclick = async () => { const r = await appApi.do_update(); if (r && r.ok === false) alert(r.msg); };
+  if ($("tripCard") && !$("tripCard").dataset.done) renderTripCard();
   const sc = $("saveCard");
   if (sc) {
     const st = s.flight_state || "idle";
@@ -801,7 +804,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod", "rotace"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -830,6 +833,7 @@ async function router() {
   if (view === "rozpis") renderRoster(parts[1]);
   if (view === "briefing") renderBriefing(+parts[1], +(parts[2] || 0));
   if (view === "obchod") renderShop();
+  if (view === "rotace") renderTrip(+parts[1]);
 }
 window.addEventListener("hashchange", router);
 
@@ -1708,7 +1712,11 @@ async function renderPilot(username) {
   const hours = p.minutes / 60, rk = rankOf(hours);
   const [{ data: prof }] = await Promise.all([sb.from("profiles").select("stream_url, avatar_url, eq_name_color, eq_frame, eq_title").eq("id", p.id).maybeSingle(), shopReady]);
   Object.assign(p, { eq_name_color: prof?.eq_name_color, eq_frame: prof?.eq_frame, eq_title: prof?.eq_title });
-  const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score, rwy, incomplete").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(50);
+  const [{ data: fl }, { data: tripsData }] = await Promise.all([
+    sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, duration_min, distance_nm, fpm, g, score, rwy, incomplete, trip_id").eq("user_id", p.id).order("landed_at", { ascending: false }).limit(100),
+    sb.from("trips").select("*").eq("user_id", p.id).order("created_at", { ascending: false }),
+  ]);
+  const trips = tripsData || [], own = me && me.user.id === p.id;
   el.innerHTML = `
     <div class="profile-head">${avatar(p, p.is_jai)}
       <div><h1 class="profile-name">${nameHtml(p)}</h1>${titleHtml(p) ? `<div style="margin:-4px 0 6px">${titleHtml(p)}</div>` : ""}
@@ -1723,17 +1731,130 @@ async function renderPilot(username) {
       <div class="stat"><b>${p.best_score != null ? fmt1(p.best_score) : "–"}</b><span>Nejlepší přistání</span></div>
     </div>
     <div id="careerBox"></div>
-    <h2 class="section-title">Historie letů</h2>
+    <div id="tripsBox"></div>
+    <h2 class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Historie letů
+      ${own && fl?.length ? `<button class="btn ghost" id="tripSelBtn" style="padding:6px 12px;font-size:14px">Vytvořit rotaci z letů</button>` : ""}</h2>
+    <div id="tripSelBar"></div>
     ${fl?.length ? '<p class="muted" style="margin-top:-6px">Klikni na let a otevře se jeho detail na mapě.</p>' : ""}
-    ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' :
-    `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>Dráha</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
-    ${fl.map(f => `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
-      <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${f.rwy ? esc(f.rwy) : '<span class="muted">–</span>'}</td>${f.incomplete ? '<td colspan="3"><span class="incomplete">Nedokončený</span></td>' : `<td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${scoreHtml(f.score)}</td>`}</tr>`).join("")}
-    </tbody></table></div>`}`;
+    ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' : `<div class="table-wrap"><table id="histTable"><thead><tr><th class="sel-col" style="display:none"></th><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>Dráha</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
+    ${historyRows(fl, trips)}</tbody></table></div>`}`;
+  bindHistory(el, p, fl || [], trips, own);
+}
+function flightRow(f, inTrip) {
+  return `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td class="sel-col" style="display:none"><input type="checkbox" class="sel-f" value="${f.id}" aria-label="Vybrat let"></td>
+    <td>${inTrip ? '<span class="muted" style="margin-right:4px">↳</span>' : ""}${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
+    <td>${nf.format(Math.round(f.distance_nm || 0))} nm</td><td>${f.rwy ? esc(f.rwy) : '<span class="muted">–</span>'}</td>${f.incomplete ? '<td colspan="3"><span class="incomplete">Nedokončený</span></td>' : `<td>${nf.format(f.fpm)}</td><td>${fmtG(f.g)}</td><td>${scoreHtml(f.score)}</td>`}</tr>`;
+}
+const tripChain = list => { const s2 = list.slice().sort((a, b) => new Date(a.landed_at) - new Date(b.landed_at)); return s2.length ? [s2[0].dep_icao || "?", ...s2.map(f => f.arr_icao || "?")].map(esc).join(" → ") : ""; };
+function historyRows(fl, trips) {
+  const byTrip = new Map(), done = new Set(); let out = "";
+  fl.forEach(f => { if (f.trip_id) { if (!byTrip.has(f.trip_id)) byTrip.set(f.trip_id, []); byTrip.get(f.trip_id).push(f); } });
+  for (const f of fl) {
+    if (!f.trip_id) { out += flightRow(f, false); continue; }
+    if (done.has(f.trip_id)) continue;
+    done.add(f.trip_id);
+    const t = trips.find(x => x.id === f.trip_id), list = byTrip.get(f.trip_id);
+    const mins = list.reduce((a, x) => a + (x.duration_min || 0), 0);
+    out += `<tr class="trip-row" data-tid="${f.trip_id}" tabindex="0" style="cursor:pointer;background:var(--green-50, #E8F5EC)"><td class="sel-col" style="display:none"></td>
+      <td colspan="9"><b>🧳 Rotace: ${esc(t?.name || "rotace")}</b>${t?.active ? ' <span class="badge">aktivní</span>' : ""} <span class="muted" style="font-size:13px">· ${tripChain(list)} · ${list.length} ${list.length === 1 ? "let" : list.length < 5 ? "lety" : "letů"} · ${fmtDur(mins)} h</span></td></tr>`;
+    out += list.map(x => flightRow(x, true)).join("");
+  }
+  return out;
+}
+function bindHistory(el, p, fl, trips, own) {
   el.querySelectorAll("tr.clickable").forEach(tr => {
-    const open = () => { location.hash = "#/let/" + tr.dataset.fid; };
+    const open = e => { if (e?.target?.closest("input")) return; location.hash = "#/let/" + tr.dataset.fid; };
     tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); };
   });
+  el.querySelectorAll("tr.trip-row").forEach(tr => { const open = () => { location.hash = "#/rotace/" + tr.dataset.tid; }; tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); }; });
+  // přehled rotací
+  const box = $("tripsBox");
+  if (box && (trips.length || own)) {
+    box.innerHTML = `<h2 class="section-title">Rotace</h2>
+      ${own ? `<div class="card" style="margin-bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">${(() => { const a = trips.find(t => t.active);
+        return a ? `<span>Aktivní rotace <b>${esc(a.name)}</b> – nové lety se do ní přidávají samy.</span><button class="btn ghost" id="tripEnd" style="padding:6px 12px">Ukončit</button>`
+          : `<span class="muted">Letíš víc letů za sebou? Založ aktivní rotaci a lety se do ní budou přidávat samy.</span><input id="tripNewName" maxlength="60" placeholder="Název, např. Víkend v Itálii" style="flex:1;min-width:180px"><button class="btn" id="tripStart" style="padding:6px 12px">Založit</button>`; })()}</div>` : ""}
+      ${trips.length ? `<div class="brief-grid">${trips.map(t => { const list = fl.filter(f => f.trip_id === t.id);
+        return `<a class="card" href="#/rotace/${t.id}" style="text-decoration:none;color:inherit;padding:14px 16px"><b>🧳 ${esc(t.name)}</b>${t.active ? ' <span class="badge">aktivní</span>' : ""}
+          <div class="muted" style="font-size:13px;margin-top:4px">${list.length ? `${tripChain(list)} · ${list.length} ${list.length === 1 ? "let" : list.length < 5 ? "lety" : "letů"}` : "zatím bez letů"}</div></a>`; }).join("")}</div>` : '<p class="muted">Zatím žádné rotace.</p>'}`;
+    if ($("tripStart")) $("tripStart").onclick = async () => {
+      const name = $("tripNewName").value.trim(); if (!name) { $("tripNewName").focus(); return; }
+      const { error } = await sb.from("trips").insert({ name, active: true });
+      if (error) alert(error.message); renderPilot(p.username);
+    };
+    if ($("tripEnd")) $("tripEnd").onclick = async () => { await sb.from("trips").update({ active: false }).eq("user_id", me.user.id).eq("active", true); renderPilot(p.username); };
+  }
+  // výběr letů do rotace
+  if ($("tripSelBtn")) $("tripSelBtn").onclick = () => {
+    el.querySelectorAll(".sel-col").forEach(c => c.style.display = "");
+    $("tripSelBtn").style.display = "none";
+    $("tripSelBar").innerHTML = `<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <span>Zaškrtni lety a</span>
+      <select id="tripTarget"><option value="new">vytvoř novou rotaci</option>${trips.map(t => `<option value="${t.id}">přidej do: ${esc(t.name)}</option>`).join("")}</select>
+      <input id="tripName" maxlength="60" placeholder="Název rotace" style="flex:1;min-width:160px">
+      <button class="btn" id="tripSave" style="padding:6px 12px">Uložit</button><button class="link-btn" id="tripCancel">Zrušit</button></div>`;
+    $("tripTarget").onchange = e => { $("tripName").style.display = e.target.value === "new" ? "" : "none"; };
+    $("tripCancel").onclick = () => renderPilot(p.username);
+    $("tripSave").onclick = async () => {
+      const ids = [...el.querySelectorAll(".sel-f:checked")].map(c => +c.value);
+      if (!ids.length) { alert("Zaškrtni aspoň jeden let."); return; }
+      let tid = $("tripTarget").value;
+      if (tid === "new") {
+        const name = $("tripName").value.trim(); if (!name) { $("tripName").focus(); return; }
+        const { data, error } = await sb.from("trips").insert({ name }).select("id").single();
+        if (error) { alert(error.message); return; } tid = data.id;
+      }
+      const { error } = await sb.from("flights").update({ trip_id: +tid }).in("id", ids);
+      if (error) { alert(error.message); return; }
+      location.hash = "#/rotace/" + tid;
+    };
+  };
+}
+
+async function renderTripCard() {
+  const box = $("tripCard"); if (!box) return;
+  box.dataset.done = "1";
+  if (!me) { box.innerHTML = '<div class="muted">Pro vlastní rotace se přihlas na webu (Můj účet).</div>'; return; }
+  const { data: a, error } = await sb.from("trips").select("*").eq("user_id", me.user.id).eq("active", true).maybeSingle();
+  if (error) { box.style.display = "none"; return; }
+  box.innerHTML = a ? `<div>🧳 <b>Aktivní rotace: ${esc(a.name)}</b> <span class="muted">– každý uložený let se do ní přidá sám.</span></div>
+      <div style="display:flex;gap:8px"><a class="btn ghost" href="#/rotace/${a.id}" style="padding:7px 12px">Zobrazit</a><button class="btn ghost" id="trTripEnd" style="padding:7px 12px">Ukončit</button></div>`
+    : `<div><b>Vlastní rotace</b> <span class="muted">– letíš víc letů za sebou? Lety se do ní budou přidávat samy.</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="trTripName" maxlength="60" placeholder="Název rotace" style="min-width:180px"><button class="btn" id="trTripStart" style="padding:7px 12px">Založit</button></div>`;
+  if ($("trTripStart")) $("trTripStart").onclick = async () => { const n = $("trTripName").value.trim(); if (!n) { $("trTripName").focus(); return; }
+    const { error: e2 } = await sb.from("trips").insert({ name: n, active: true }); if (e2) alert(e2.message); renderTripCard(); };
+  if ($("trTripEnd")) $("trTripEnd").onclick = async () => { await sb.from("trips").update({ active: false }).eq("id", a.id); renderTripCard(); };
+}
+
+/* ---------- detail vlastní rotace ---------- */
+async function renderTrip(id) {
+  const el = $("rotace");
+  el.innerHTML = '<p class="muted">Načítám…</p>';
+  const { data: t } = await sb.from("trips").select("*, profiles(username)").eq("id", id).maybeSingle();
+  if (!t) { el.innerHTML = '<div class="card">Rotace nenalezena.</div>'; return; }
+  const { data: fl } = await sb.from("flights").select("id, aircraft, dep_icao, dep_name, arr_icao, arr_name, landed_at, takeoff_at, duration_min, distance_nm, fpm, g, score, rwy, incomplete, trip_id").eq("trip_id", id).order("landed_at");
+  const list = fl || [], own = me && me.user.id === t.user_id;
+  const mins = list.reduce((a, f) => a + (f.duration_min || 0), 0), dist = list.reduce((a, f) => a + (f.distance_nm || 0), 0);
+  const scored = list.filter(f => f.score != null), avg = scored.length ? scored.reduce((a, f) => a + Number(f.score), 0) / scored.length : null;
+  el.innerHTML = `<p><a href="#/pilot/${encodeURIComponent(t.profiles?.username || "")}">← Profil ${esc(t.profiles?.username || "")}</a></p>
+    <h1 class="page-title">🧳 ${esc(t.name)} ${t.active ? '<span class="badge" style="vertical-align:middle">aktivní</span>' : ""}</h1>
+    <p class="lead">${list.length ? tripChain(list) : "Zatím bez letů."}</p>
+    <div class="stats"><div class="stat"><b>${list.length}</b><span>Letů</span></div><div class="stat"><b>${fmtDur(mins)}</b><span>Nalétáno (h:min)</span></div>
+      <div class="stat"><b>${nf.format(Math.round(dist))}</b><span>Námořních mil</span></div><div class="stat"><b>${avg != null ? fmt1(avg) : "–"}</b><span>Průměrné přistání</span></div></div>
+    ${list.length ? `<div class="table-wrap"><table><thead><tr><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>FPM</th><th>Známka</th>${own ? "<th></th>" : ""}</tr></thead><tbody>
+      ${list.map(f => `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td>${fmtDate(f.landed_at)}</td><td>${route(f)}</td><td class="muted">${esc((f.aircraft || "").slice(0, 34))}</td><td>${fmtDur(f.duration_min)}</td>
+        ${f.incomplete ? '<td colspan="2"><span class="incomplete">Nedokončený</span></td>' : `<td>${nf.format(f.fpm)}</td><td>${scoreHtml(f.score)}</td>`}
+        ${own ? `<td><button class="link-btn danger" data-rmf="${f.id}">Odebrat</button></td>` : ""}</tr>`).join("")}</tbody></table></div>` : ""}
+    ${own ? `<div class="card" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input id="tripRename" value="${esc(t.name)}" maxlength="60" style="flex:1;min-width:180px"><button class="btn ghost" id="tripRenameBtn" style="padding:6px 12px">Přejmenovat</button>
+      ${t.active ? '<button class="btn ghost" id="tripStop" style="padding:6px 12px">Ukončit aktivní rotaci</button>' : ""}
+      <button class="link-btn danger" id="tripDel">Smazat rotaci</button></div>
+      <p class="muted" style="font-size:13px">Další lety přidáš na svém profilu tlačítkem „Vytvořit rotaci z letů“ a volbou „přidej do“. Smazáním rotace se lety nesmažou.</p>` : ""}`;
+  el.querySelectorAll("tr.clickable").forEach(tr => tr.onclick = e => { if (e.target.closest("button")) return; location.hash = "#/let/" + tr.dataset.fid; });
+  el.querySelectorAll("[data-rmf]").forEach(b => b.onclick = async e => { e.stopPropagation(); await sb.from("flights").update({ trip_id: null }).eq("id", +b.dataset.rmf); renderTrip(id); });
+  if ($("tripRenameBtn")) $("tripRenameBtn").onclick = async () => { const n = $("tripRename").value.trim(); if (n) { await sb.from("trips").update({ name: n }).eq("id", id); renderTrip(id); } };
+  if ($("tripStop")) $("tripStop").onclick = async () => { await sb.from("trips").update({ active: false }).eq("id", id); renderTrip(id); };
+  if ($("tripDel")) $("tripDel").onclick = async () => { if (!confirm("Smazat rotaci? Lety zůstanou v historii.")) return; await sb.from("trips").delete().eq("id", id); location.hash = "#/pilot/" + encodeURIComponent(t.profiles?.username || ""); };
 }
 
 /* ---------- přátelé ---------- */
