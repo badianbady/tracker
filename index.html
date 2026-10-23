@@ -562,11 +562,13 @@ async function pollApp() {
   try { st = await appApi.get_state(); } catch { st = null; }
   if (st && st.version) { appState = st; appFails = 0; appStale = false; }
   else {
-    // jednorázový výpadek (vytížený počítač, simulátor se „zadýchá“) ignorovat – až opakované selhání je zastaralá aplikace
-    appFails++;
+    // Zastaralá aplikace odpovídá vždy hláškou „Nepovolená stránka“. Když aplikace jen chvíli neodpovídá
+    // (vytížený počítač, simulátor), nic se nehlásí – zůstanou poslední známé údaje.
     const refused = st && st.ok === false && /Nepovolen/.test(st.msg || "");
-    if (!(appFails >= 6 || (refused && appFails >= 3) || (!appState && appFails >= 3))) return;
-    appState = st || appState || { ok: false };
+    if (!refused) { appFails = 0; return; }
+    appFails++;
+    if (appFails < 3) return;
+    appState = st;
     appStale = true;
   }
   if (appStale) {
@@ -1763,7 +1765,12 @@ function historyRows(fl, trips) {
 }
 function bindHistory(el, p, fl, trips, own) {
   el.querySelectorAll("tr.clickable").forEach(tr => {
-    const open = e => { if (e?.target?.closest("input")) return; location.hash = "#/let/" + tr.dataset.fid; };
+    const open = e => {
+      if (e?.target?.closest("input")) return;
+      const cb = tr.querySelector(".sel-f");
+      if (cb && cb.offsetParent !== null) { cb.checked = !cb.checked; tr.style.background = cb.checked ? "var(--green-50, #E8F5EC)" : ""; return; }   // režim výběru
+      location.hash = "#/let/" + tr.dataset.fid;
+    };
     tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); };
   });
   el.querySelectorAll("tr.trip-row").forEach(tr => { const open = () => { location.hash = "#/rotace/" + tr.dataset.tid; }; tr.onclick = open; tr.onkeydown = e => { if (e.key === "Enter") open(); }; });
@@ -1787,9 +1794,10 @@ function bindHistory(el, p, fl, trips, own) {
   // výběr letů do rotace
   if ($("tripSelBtn")) $("tripSelBtn").onclick = () => {
     el.querySelectorAll(".sel-col").forEach(c => c.style.display = "");
+    el.querySelectorAll(".sel-f").forEach(cb => cb.onchange = () => { cb.closest("tr").style.background = cb.checked ? "var(--green-50, #E8F5EC)" : ""; });
     $("tripSelBtn").style.display = "none";
     $("tripSelBar").innerHTML = `<div class="card" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-      <span>Zaškrtni lety a</span>
+      <span>Klikni na lety, které chceš přidat, a</span>
       <select id="tripTarget"><option value="new">vytvoř novou rotaci</option>${trips.map(t => `<option value="${t.id}">přidej do: ${esc(t.name)}</option>`).join("")}</select>
       <input id="tripName" maxlength="60" placeholder="Název rotace" style="flex:1;min-width:160px">
       <button class="btn" id="tripSave" style="padding:6px 12px">Uložit</button><button class="link-btn" id="tripCancel">Zrušit</button></div>`;
@@ -1805,7 +1813,7 @@ function bindHistory(el, p, fl, trips, own) {
         if (error) { alert(error.message); return; } tid = data.id;
       }
       const { error } = await sb.from("flights").update({ trip_id: +tid }).in("id", ids);
-      if (error) { alert(error.message); return; }
+      if (error) { alert("Lety se nepodařilo přidat: " + error.message); return; }
       location.hash = "#/rotace/" + tid;
     };
   };
@@ -1849,11 +1857,25 @@ async function renderTrip(id) {
       <input id="tripRename" value="${esc(t.name)}" maxlength="60" style="flex:1;min-width:180px"><button class="btn ghost" id="tripRenameBtn" style="padding:6px 12px">Přejmenovat</button>
       ${t.active ? '<button class="btn ghost" id="tripStop" style="padding:6px 12px">Ukončit aktivní rotaci</button>' : ""}
       <button class="link-btn danger" id="tripDel">Smazat rotaci</button></div>
-      <p class="muted" style="font-size:13px">Další lety přidáš na svém profilu tlačítkem „Vytvořit rotaci z letů“ a volbou „přidej do“. Smazáním rotace se lety nesmažou.</p>` : ""}`;
+      <p class="muted" style="font-size:13px">Smazáním rotace se lety nesmažou.</p>
+      <h2 class="section-title" style="margin-top:22px">Přidat lety</h2><div id="tripAdd"><p class="muted">Načítám…</p></div>` : ""}`;
   el.querySelectorAll("tr.clickable").forEach(tr => tr.onclick = e => { if (e.target.closest("button")) return; location.hash = "#/let/" + tr.dataset.fid; });
   el.querySelectorAll("[data-rmf]").forEach(b => b.onclick = async e => { e.stopPropagation(); await sb.from("flights").update({ trip_id: null }).eq("id", +b.dataset.rmf); renderTrip(id); });
   if ($("tripRenameBtn")) $("tripRenameBtn").onclick = async () => { const n = $("tripRename").value.trim(); if (n) { await sb.from("trips").update({ name: n }).eq("id", id); renderTrip(id); } };
   if ($("tripStop")) $("tripStop").onclick = async () => { await sb.from("trips").update({ active: false }).eq("id", id); renderTrip(id); };
+  if (own && $("tripAdd")) {
+    const { data: cand } = await sb.from("flights").select("id, aircraft, dep_icao, arr_icao, landed_at, duration_min, score, trip_id").eq("user_id", t.user_id)
+      .or(`trip_id.is.null,trip_id.neq.${id}`).order("landed_at", { ascending: false }).limit(40);
+    $("tripAdd").innerHTML = (cand || []).length ? `<div class="card">${cand.map(f => `<div class="adm-row"><div><b>${route(f)}</b> <span class="muted">${fmtDate(f.landed_at)} · ${esc((f.aircraft || "").slice(0, 30))} · ${fmtDur(f.duration_min)}</span>
+        ${f.trip_id ? '<span class="va-chip">v jiné rotaci</span>' : ""}</div><button class="btn ghost" data-addf="${f.id}" style="padding:5px 12px">Přidat</button></div>`).join("")}</div>`
+      : '<p class="muted">Žádné další lety k přidání.</p>';
+    $("tripAdd").querySelectorAll("[data-addf]").forEach(b => b.onclick = async () => {
+      b.disabled = true;
+      const { error } = await sb.from("flights").update({ trip_id: id }).eq("id", +b.dataset.addf);
+      if (error) { alert("Let se nepodařilo přidat: " + error.message); b.disabled = false; return; }
+      renderTrip(id);
+    });
+  }
   if ($("tripDel")) $("tripDel").onclick = async () => { if (!confirm("Smazat rotaci? Lety zůstanou v historii.")) return; await sb.from("trips").delete().eq("id", id); location.hash = "#/pilot/" + encodeURIComponent(t.profiles?.username || ""); };
 }
 
