@@ -3513,7 +3513,7 @@ async function loadMe() {
   loadFriends().then(updateBadges);
 }
 // Rozpis je zatím ve vývoji – vidí ho jen správce. Až bude hotový, přepni na true.
-const ROSTER_PUBLIC = false;
+const ROSTER_PUBLIC = true;
 function updateNav() {
   $("navAdmin").style.display = me?.profile?.is_admin ? "" : "none";
   $("navRoster").style.display = ROSTER_PUBLIC || me?.profile?.is_admin ? "" : "none";
