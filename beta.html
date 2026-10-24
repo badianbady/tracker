@@ -853,7 +853,7 @@ Object.assign(EN, {
 });
 EN_PAT.push(
   [/^🛫 Vzlet z (\w+)$/, "🛫 Takeoff from $1"],
-  [/^Foto © (.+)$/, "Photo © $1"], [/^let (\S+)$/, "flight $1"],
+  [/^let (\S+)$/, "flight $1"],
   [/^🛬 PŘISTÁNÍ(?: v (\w+))?: (.+) – (.+)$/, (m, ap, d, h) => `🛬 LANDING${ap ? " at " + ap : ""}: ${d} – ${tr(h)}`],
   [/^Letový plán: (.+)$/, (m, a) => "Flight plan: " + a.replace("alt.", "altn")], [/^Přihlášen jako (.+) \((.+)\)$/, "Signed in as $1 ($2)"],
   [/^Je k dispozici nová verze (.+)$/, "New version $1 available"], [/^Databáze letišť připravena \((.+) letišť\)\.$/, "Airport database ready ($1 airports)."],
@@ -861,6 +861,27 @@ EN_PAT.push(
   [/^Let se nepodařilo uložit \((.+)\), zkusím to znovu později\.$/, "The flight couldn't be saved ($1), will retry later."],
   [/^Spojení s MSFS přerušeno: ?(.*)$/, "Connection to MSFS lost: $1"], [/^Polohu se nepodařilo odeslat: ?(.*)$/, "Position couldn't be sent: $1"], [/^Web odmítl polohu: ?(.*)$/, "The website rejected the position: $1"],
   [/^Let se při zavírání nepodařilo uložit: ?(.*)$/, "The flight couldn't be saved on close: $1"],
+);
+
+Object.assign(EN, {
+  "Letadla pro tuto linku": "Aircraft for this route", "Obsazenost": "Load factor", "vlastní fotka pilota": "pilot's own photo",
+  // obchod (názvy z databáze)
+  "Zelená Jáchym Air": "Jáchym Air green", "Nebeská modrá": "Sky blue", "Západ slunce": "Sunset", "Noční fialová": "Night violet", "Zlatá": "Gold",
+  "Stříbrný rámeček": "Silver frame", "Zlatý rámeček": "Gold frame", "Máslový rámeček 🧈": "Butter frame 🧈", "Radarový rámeček": "Radar frame", "Duhový rámeček": "Rainbow frame",
+  "Mistr másla": "Butter Master", "Mistr másla 🧈": "Butter Master 🧈", "Kapitán dochvilnosti": "Captain Punctual", "Kapitán dochvilnosti ⏱️": "Captain Punctual ⏱️",
+  "Noční sova": "Night Owl", "Noční sova 🦉": "Night Owl 🦉", "Cestovatel": "Globetrotter", "Cestovatel 🌍": "Globetrotter 🌍", "Pán obratů": "Turnaround King", "Pán obratů ⚡": "Turnaround King ⚡",
+  "Legenda Alžíru": "Legend of Algiers", "Legenda Alžíru 🏆": "Legend of Algiers 🏆", "Červené letadlo": "Red plane", "Modré letadlo": "Blue plane", "Fialové letadlo": "Purple plane",
+  "Oranžové letadlo": "Orange plane", "Zlaté letadlo": "Gold plane", "Obchod: Zelená Jáchym Air": "Shop: Jáchym Air green",
+  "Bonus za dokončenou rotaci": "Completed rotation bonus", "Novinka": "News", "YouTube": "YouTube",
+});
+EN_PAT.push(
+  [/^Let týdne · končí (.+)$/, (m, a) => "Flight of the week · ends " + tr(a)], [/^končí (.+)$/, (m, a) => "ends " + tr(a)], [/^za (\d+) (h|min)(.*)$/, "in $1 $2$3"], [/^před (\d+) (h|min)$/, "$1 $2 ago"],
+  [/^Linky Jáchym Air \((\d+)\)$/, "Jáchym Air routes ($1)"], [/^Obsazenost ± (\d+) %$/, "Load factor ± $1 %"], [/^v (\w{4})$/, "at $1"], [/^stojí v (\w{4}) ✓$/, "parked at $1 ✓"],
+  [/^Výsledky \((\d+) (pilot|piloti|pilotů)\)$/, (m, a) => `Results (${a} ${a === "1" ? "pilot" : "pilots"})`],
+  [/^Zatím nikdo neodletěl\. Leť (\w+) → (\w+)(?: s (.+?))? a buď první!$/, (m, a, b, c) => `Nobody has flown it yet. Fly ${a} → ${b}${c ? " in a " + c : ""} and be the first!`],
+  [/^Foto © (.+)$/, (m, a) => "Photo © " + tr(a)], [/^([\d,.\s]+) b$/, "$1 pts"], [/^Obchod: (.+)$/, (m, a) => "Shop: " + tr(a)],
+  [/^Let (\w+) → (\w+) z rotace$/, "Rotation flight $1 → $2"], [/^Volný let (\S+) → (\S+)$/, "Free flight $1 → $2"],
+  [/^Od (.+)$/, "From $1"], [/^Do (.+)$/, "Until $1"], [/^Let týdne$/, "Flight of the week"],
 );
 
 function windText(s) {
@@ -2349,7 +2370,9 @@ async function friendButton(el, uid, username) {
     };
   }
 }
-const ago = d => { if (!d) return "dávno"; const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 1 ? "právě teď" : m < 60 ? `před ${m} min` : m < 1440 ? `před ${Math.round(m / 60)} h` : fmtDate(d); };
+const ago = d => { if (!d) return tr("dávno"); const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (LANG === "en") return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : fmtDate(d);
+  return m < 1 ? "právě teď" : m < 60 ? `před ${m} min` : m < 1440 ? `před ${Math.round(m / 60)} h` : fmtDate(d); };
 async function renderFriends(msg) {
   const el = $("pratele");
   if (!me) { el.innerHTML = '<h1 class="page-title">Přátelé</h1><div class="card">Pro přátele a zprávy se <a href="#/ucet">přihlas</a>.</div>'; return; }
@@ -2569,7 +2592,8 @@ function relTime(d) {
   let t;
   if (m < 60) t = `${m} min`;
   else if (m < 48 * 60) { const h = Math.floor(m / 60); t = `${h} h${m % 60 && h < 10 ? ` ${m % 60} min` : ""}`; }
-  else { const dd = Math.round(m / 1440); t = `${dd} ${dd < 5 ? "dny" : "dní"}`; }
+  else { const dd = Math.round(m / 1440); t = LANG === "en" ? `${dd} days` : `${dd} ${dd < 5 ? "dny" : "dní"}`; }
+  if (LANG === "en") return past ? `${t} ago` : `in ${t}`;
   return past ? `před ${t}` : `za ${t}`;
 }
 const fmtDT = d => d ? new Date(d).toLocaleString(LOCALE, { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
