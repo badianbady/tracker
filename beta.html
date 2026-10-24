@@ -717,7 +717,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "a pak": "and then", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
 EN_PAT.push(
@@ -801,6 +801,68 @@ EN_PAT.push(
   [/^\((kat\. \w), do (.+)\)$/, (m, a, b) => `(${a.replace("kat.", "cat.")}, until ${b})`],
 );
 
+Object.assign(EN, {
+  "Přidej screenshoty přímo během letu, po uložení letu se k němu připojí.": "Add screenshots during the flight; they'll be attached once the flight is saved.",
+  // Správa
+  "Tady zakládáš let týdne, YouTube eventy a novinky.": "Here you create the flight of the week, YouTube events and news.", "Tahle stránka je jen pro správce webu.": "This page is for site admins only.",
+  "Nová položka": "New item", "Všechny položky": "All items", "Zatím nic. Vytvoř první let týdne!": "Nothing yet. Create the first flight of the week!", "Vytvořit": "Create", "Název": "Title",
+  "Začátek": "Start", "Konec": "End", "Konec je dřív než začátek.": "The end is before the start.", "Odkaz (např. na YouTube stream)": "Link (e.g. to a YouTube stream)",
+  "Odkaz musí začínat https://": "The link must start with https://", "Odkazy začínající https:// se samy změní na klikací.": "Links starting with https:// become clickable automatically.",
+  "Připnout (má přednost na hlavní stránce)": "Pin (shown first on the home page)", "Vytvořeno! Hned je vidět v Novinkách i na mapě.": "Created! It's visible in the News and on the map right away.",
+  "Teď je na webu": "On the website now", "vždy": "always", "Zrušit úpravy": "Cancel editing", "@Popis, pravidla, tipy na scenérie…": "@Description, rules, scenery tips…",
+  "@např. Přes Alpy do Innsbrucku": "@e.g. Over the Alps to Innsbruck", "Linky z crew centra": "Routes from the crew centre",
+  "Zkopíruje linky a flotilu z crew.jachymair.com, aby byly vidět na mapě. Spusť po každé změně linek v crew centru.": "Copies routes and fleet from crew.jachymair.com so they show on the map. Run it after every route change in the crew centre.",
+  "Nejdřív synchronizuj linky z crew centra, načte se i flotila.": "Sync the routes from the crew centre first; the fleet is loaded too.", "Synchronizovat linky": "Sync routes",
+  "Rozpis rotací": "Rotation roster", "Tracker poskládá z linek a jejich časů rotace: z Alžíru zpět do Alžíru a mezi minihuby s letadly z minihubů. Návrh si projdi, případně něco vyřaď, a zveřejni.": "The tracker builds rotations from the routes and their times: from Algiers back to Algiers, and between the minihubs with minihub aircraft. Review the draft, remove anything you don't want, and publish.",
+  "Od": "From", "Dní": "Days", "Max. letů v rotaci": "Max legs per rotation", "Max. služba (h)": "Max duty (h)", "Povolit rotace s přespáním": "Allow rotations with night stops",
+  "Vygenerovat návrh": "Generate draft", "Zveřejnit rozpis": "Publish roster", "Smazat všechny volné budoucí rotace": "Delete all open future rotations", "Vyřadit": "Remove",
+  "Smazat všechny volné (neobsazené) budoucí rotace?": "Delete all open (untaken) future rotations?", "Volné rotace smazány.": "Open rotations deleted.",
+  "Flotila – provozní údaje": "Fleet – operational data", "Stáří, kapacita a poznámky k letadlům. Použijí se v briefinzích a při výpočtu obsazenosti.": "Age, capacity and notes for the aircraft. Used in briefings and load calculations.",
+  "Skupina": "Group", "Ve službě od": "In service since", "Míst celkem": "Total seats", "Z toho premium": "Of which premium", "Výcvik": "Training", "@Jen výcvikové lety": "@Training flights only",
+  "Přidat letadlo (registrace)": "Add aircraft (registration)", "@např. 7T-JAK": "@e.g. 7T-JAK", "Doplnit letadla z crew centra": "Import aircraft from the crew centre",
+  "Přidá letadla, která jsou v crew centru, ale tady chybí. Pak u nich doplň kapacitu a skupinu.": "Adds aircraft that are in the crew centre but missing here. Then fill in their capacity and group.",
+  "Tohle letadlo už v seznamu je.": "This aircraft is already in the list.", "Uvolnit": "Release", "Opravit": "Fix", "Minihuby": "Minihubs",
+  "Katalog závad (MEL)": "Defect catalogue (MEL)", "Odložené závady, které můžou letadla po letech „dostat“. Kategorie A–D určuje vážnost, dny lhůtu na opravu. Starší letadla mají větší šanci; „od stáří“ omezí závadu jen na starší letadla.": "Deferred defects aircraft can “get” after flights. Category A–D sets the severity, days the repair deadline. Older aircraft are more likely; “min. age” limits a defect to older aircraft.",
+  "Závada": "Defect", "Dopad pro piloty": "Impact for pilots", "Kat.": "Cat.", "Častost": "Frequency", "Od stáří": "Min. age", "Aktivní": "Active", "Dopad": "Impact", "Závada přidána.": "Defect added.",
+  "Smazat závadu z katalogu?": "Delete this defect from the catalogue?",
+  "Poznámky k letištím": "Airport notes", "Místní standardy, parkování, zvláštnosti a doba obratu. Objeví se v briefinzích letů z a na dané letiště.": "Local standards, parking, peculiarities and turnaround time. Shown in briefings for flights from and to the airport.",
+  "Letiště (ICAO)": "Airport (ICAO)", "Doba obratu (min)": "Turnaround (min)", "Poznámky pro piloty": "Notes for pilots", "Uložit poznámku": "Save note", "Zatím žádné poznámky.": "No notes yet.",
+  "@např. Parkování nosem ven na apronu B, pozor na úzké pojezdové dráhy…": "@e.g. Nose-out parking on apron B, watch out for narrow taxiways…", "Smazat poznámku?": "Delete this note?",
+  "Fotky letadel Jáchym Air": "Jáchym Air aircraft photos", "Fotka se ukáže v detailu letu u letadla s danou registrací (má přednost před Planespotters). Ideálně na šířku, max. 5 MB.": "The photo appears in the flight detail for that registration (takes priority over Planespotters). Ideally landscape, max 5 MB.",
+  "Přidat fotku pro jinou registraci nebo typ letadla": "Add a photo for another registration or aircraft type", "@např. OK-JAI nebo A346 (ilustrační foto pro celý typ)": "@e.g. OK-JAI or A346 (illustrative photo for the whole type)",
+  "Virtuální aerolinky": "Virtual airlines", "Přidat virtuálku": "Add virtual airline", "Virtuálka přidána.": "Virtual airline added.", "Tahle zkratka už existuje.": "This code already exists.", "Smazat virtuálku?": "Delete this virtual airline?",
+  "Nahlášení": "Reports", "Žádná nahlášení. 👍": "No reports. 👍", "Vyřízeno": "Resolved", "Zveřejněný rozpis": "Published roster",
+  "Nepodařilo se složit žádnou rotaci. Zkontroluj, že mají linky v crew centru vyplněné časy odletu a příletu, letadla ve Flotile mají typ a skupinu (DAAG/MINI) a že jsi synchronizoval linky.": "No rotations could be built. Check that the routes in the crew centre have departure and arrival times, the aircraft in the Fleet have a type and group (DAAG/MINI), and that you've synced the routes.",
+  "Všechna letadla z crew centra už ve Flotile jsou. (Pokud nějaké chybí, synchronizuj linky.)": "All crew centre aircraft are already in the Fleet. (If any are missing, sync the routes.)",
+});
+EN_PAT.push(
+  [/^Aktivní rotace: (.+)$/, "Active rotation: $1"], [/^Zveřejněný rozpis \((\d+)\)$/, "Published roster ($1)"], [/^Návrh: (\d+) rotací$/, "Draft: $1 rotations"],
+  [/^Přehled linek: (.+)$/, (m, a) => "Route overview: " + a.replace(" celkem", " total").replace("bez časů", "without times").replace("za celé období zařazeno", "scheduled over the period").replace(" z ", " of ").replace("první den", "first day")],
+  [/^(\S+) uloženo\.$/, "$1 saved."], [/^Zveřejněno (\d+) rotací\. Piloti je najdou v Rozpisu\.$/, "Published $1 rotations. Pilots will find them in the Roster."],
+);
+
+Object.assign(EN, {
+  // události aplikace
+  "Let uložen na web ✔": "Flight saved to the website ✔", "Chybí knihovna SimConnect.": "The SimConnect library is missing.", "Připojeno k MSFS ✔": "Connected to MSFS ✔",
+  "Čekám na MSFS…": "Waiting for MSFS…", "Zaznamenávám pojíždění…": "Recording taxi…", "Dlouhé stání – předchozí pojíždění zahozeno.": "Long stop – previous taxi discarded.",
+  "Falešný vzlet při načítání letu zahozen, čekám na skutečný vzlet.": "False takeoff while loading the flight discarded, waiting for the real takeoff.",
+  "Let ukončen bez přistání – ukládám, co se doletělo.": "Flight ended without landing – saving what was flown.", "Stahuji databázi letišť (jen poprvé)…": "Downloading the airport database (first time only)…",
+  "Tracker se připojil až během pojíždění – trasa začíná odsud.": "The tracker connected during taxi – the track starts here.", "Tracker se připojil až za letu – vzlet a pojíždění chybí.": "The tracker connected in flight – takeoff and taxi are missing.",
+  "DEMO režim: simuluji let, přistání přijde zhruba každé 2 minuty. Na web se nic neposílá.": "DEMO mode: simulating a flight, a landing roughly every 2 minutes. Nothing is sent to the website.",
+  "🛫 Vzlet": "🛫 Takeoff",
+});
+EN_PAT.push(
+  [/^🛫 Vzlet z (\w+)$/, "🛫 Takeoff from $1"],
+  [/^Foto © (.+)$/, "Photo © $1"], [/^let (\S+)$/, "flight $1"],
+  [/^🛬 PŘISTÁNÍ(?: v (\w+))?: (.+) – (.+)$/, (m, ap, d, h) => `🛬 LANDING${ap ? " at " + ap : ""}: ${d} – ${tr(h)}`],
+  [/^Letový plán: (.+)$/, (m, a) => "Flight plan: " + a.replace("alt.", "altn")], [/^Přihlášen jako (.+) \((.+)\)$/, "Signed in as $1 ($2)"],
+  [/^Je k dispozici nová verze (.+)$/, "New version $1 available"], [/^Databáze letišť připravena \((.+) letišť\)\.$/, "Airport database ready ($1 airports)."],
+  [/^Databáze drah připravena \((.+) drah\)\.$/, "Runway database ready ($1 runways)."], [/^Odesláno (\d+) dříve neodeslaných letů ✔$/, "Sent $1 previously unsent flights ✔"],
+  [/^Let se nepodařilo uložit \((.+)\), zkusím to znovu později\.$/, "The flight couldn't be saved ($1), will retry later."],
+  [/^Spojení s MSFS přerušeno: ?(.*)$/, "Connection to MSFS lost: $1"], [/^Polohu se nepodařilo odeslat: ?(.*)$/, "Position couldn't be sent: $1"], [/^Web odmítl polohu: ?(.*)$/, "The website rejected the position: $1"],
+  [/^Let se při zavírání nepodařilo uložit: ?(.*)$/, "The flight couldn't be saved on close: $1"],
+);
+
 function windText(s) {
   return s.replace(/^bezvětří/, "calm").replace(/vítr proměnlivý/, "wind variable").replace(/^vítr/, "wind").replace(/nárazy/g, "gusts").replace(/dohlednost 10 km a více/g, "visibility 10 km or more")
     .replace(/dohlednost/g, "visibility").replace(/bez významné oblačnosti/g, "no significant cloud").replace(/polojasno/g, "scattered").replace(/skoro jasno/g, "few")
@@ -813,6 +875,9 @@ function tr(text) {
   if (!core) return text;
   if (Object.prototype.hasOwnProperty.call(EN, core)) return lead + EN[core] + trail;
   for (const [re, rep] of EN_PAT) { if (!re.test(core)) continue; const out = core.replace(re, rep); if (out !== core) return lead + out + trail; }
+  // ikonka nebo znak na začátku / konci („✉ Napsat“, „· let“, „Kapitán:“): přeložit text uvnitř
+  const sym = core.match(/^([^\p{L}\p{N}„“"(]+)?(.*?)([^\p{L}\p{N}…)“”"%]+)?$/u);
+  if (sym && (sym[1] || sym[3]) && sym[2]) { const inner = tr(sym[2]); if (inner !== sym[2]) return lead + (sym[1] || "") + inner + (sym[3] || "") + trail; }
   // složený text „A · B · C“: přeložit každou část zvlášť
   if (core.includes(" · ")) { const parts = core.split(" · "), outp = parts.map(x => tr(x)); if (outp.some((x, i) => x !== parts[i])) return lead + outp.join(" · ") + trail; }
   return text;
@@ -1153,7 +1218,7 @@ function renderTracker(full) {
     $("trLand").innerHTML = `${nf.format(l.fpm)} fpm · ${fmtG(l.g)} G · ${esc(l.odlet || "????")} → ${esc(l.prilet || "????")} · ${String(l.cas).slice(11, 16)}`
       + (l.draha ? `<br>${esc(l.draha)}` : "") + (l.odskoky ? ` · odskoky: ${l.odskoky}` : "");
   }
-  $("trLog").textContent = (s.log || []).slice().reverse().map(([t, m]) => `${t}  ${m}`).join("\n") || "Zatím nic.";
+  $("trLog").textContent = (s.log || []).slice().reverse().map(([t, m]) => `${t}  ${tr(m)}`).join("\n") || tr("Zatím nic.");
   $("trUpd").innerHTML = (s.update_error ? `<div class="msg err">${esc(s.update_error)}</div>` : "") + (s.update ? `<div class="upd-banner"><span>Nová verze ${esc(s.update.version)} je připravená</span>
     <button class="btn" id="trUpdBtn" ${s.update_progress != null ? "disabled" : ""}>${s.update_progress != null ? (s.update_progress >= 100 ? "Instaluji…" : `Stahuji ${s.update_progress} %`) : "Aktualizovat"}</button></div>` : "");
   const flying = s.flight_state === "flying";
@@ -3704,7 +3769,7 @@ async function renderAdminDefects(msg) {
   box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
     <div class="table-wrap" style="max-height:340px;overflow:auto"><table><thead><tr><th>Závada</th><th>Dopad pro piloty</th><th>Kat.</th><th>Dní</th><th>Častost</th><th>Od stáří</th><th>Aktivní</th><th></th></tr></thead><tbody>
     ${(data || []).map(d => `<tr data-did="${d.id}"><td style="white-space:normal;min-width:160px"><b>${esc(d.title)}</b></td><td style="white-space:normal;font-size:13px;min-width:220px">${esc(d.effect || "")}</td>
-      <td>${esc(d.category)}</td><td>${d.days}</td><td>${d.weight}</td><td>${d.min_age ? d.min_age + " let" : "–"}</td>
+      <td>${esc(d.category)}</td><td>${d.days}</td><td>${d.weight}</td><td>${d.min_age ? d.min_age + (LANG === "en" ? " y" : " let") : "–"}</td>
       <td style="text-align:center"><input type="checkbox" class="df-act" ${d.active ? "checked" : ""} aria-label="Aktivní"></td><td><button class="link-btn danger df-rm">Smazat</button></td></tr>`).join("")}</tbody></table></div>
     <form id="dfAdd" style="display:grid;grid-template-columns:1fr 2fr 80px 80px 80px 90px auto;gap:8px;align-items:end;margin-top:12px">
       <div class="field" style="margin:0"><label for="dfT">Závada</label><input id="dfT" required maxlength="120"></div>
