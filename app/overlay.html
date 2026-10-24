@@ -204,9 +204,18 @@
     st.setProperty("--accent-light", mix(255, .45));
   }
   const SHOW_MS = (Number(qs.get("cas")) || 20) * 1000;   // jak dlouho je karta přistání vidět (s)
+  // jazyk overlaye: ?lang=en
+  const EN_OV = qs.get("lang") === "en";
+  const OV = { "Výška": "Altitude", "Kurz": "Heading", "Rychlost dosednutí": "Touchdown rate", "Přetížení": "G-force", "Spouštím tracker…": "Starting tracker…",
+    "Čekám na MSFS…": "Waiting for MSFS…", "Tracker neběží – spusť jai_tracker": "Tracker not running – start the app", "Na zemi": "On ground", "Pojíždění": "Taxi", "Vzlet": "Takeoff",
+    "Stoupání": "Climb", "Cestovní let": "Cruise", "Klesání": "Descent", "Přiblížení": "Approach", "Přistání": "Landing", "Máslo!": "Butter!", "Výborné přistání": "Excellent landing",
+    "Dobré přistání": "Good landing", "Tvrdší přistání": "Firm landing", "Tvrdé přistání": "Hard landing", "Kontrola podvozku": "Gear inspection", "Připojeno": "Connected" };
+  const ov = t => !EN_OV || t == null ? t : (OV[t] || String(t).replace(/za prahem/g, "past the threshold").replace(/před prahem/g, "before the threshold")
+    .replace(/vlevo od osy/g, "left of centreline").replace(/vpravo od osy/g, "right of centreline").replace(/na ose/g, "on centreline").replace(/odskoky/g, "bounces"));
+  if (EN_OV) { document.documentElement.lang = "en"; document.querySelectorAll(".lbl, .dlbl, #aircraft, #phase").forEach(el => { el.textContent = ov(el.textContent); }); }
 
   const $ = id => document.getElementById(id);
-  const nf = new Intl.NumberFormat("cs-CZ");
+  const nf = new Intl.NumberFormat(EN_OV ? "en-GB" : "cs-CZ");
   const unit = u => `<span class="unit">${u}</span>`;
   const segs = $("segs");
   for (let i = 0; i < 10; i++) { const s = document.createElement("div"); s.className = "seg"; segs.appendChild(s); }
@@ -219,7 +228,7 @@
     const bar = $("bar");
     if (!d.connected) {
       bar.classList.add("offline");
-      $("aircraft").textContent = d.status || "Čekám na MSFS…";
+      $("aircraft").textContent = ov(d.status || "Čekám na MSFS…");
     } else {
       bar.classList.remove("offline");
       $("aircraft").textContent = d.aircraft || "";
@@ -228,7 +237,7 @@
       $("gs").innerHTML = d.gs + unit("kt");
       $("vs").innerHTML = (d.vs > 0 ? "+" : "") + nf.format(d.vs) + unit("fpm");
       $("hdg").innerHTML = String(d.hdg).padStart(3, "0") + unit("°");
-      $("phase").textContent = d.phase;
+      $("phase").textContent = ov(d.phase);
     }
     if (d.landing && d.landing.id !== shownId) {
       shownId = d.landing.id;
@@ -237,11 +246,11 @@
   }
 
   function showLanding(l) {
-    $("lScore").innerHTML = Number(l.skore).toLocaleString("cs-CZ", { maximumFractionDigits: 1 }) + "<small>/10</small>";
-    $("lVerdict").textContent = l.hodnoceni;
+    $("lScore").innerHTML = Number(l.skore).toLocaleString(EN_OV ? "en-GB" : "cs-CZ", { maximumFractionDigits: 1 }) + "<small>/10</small>";
+    $("lVerdict").textContent = ov(l.hodnoceni);
     $("lFpm").innerHTML = nf.format(l.fpm) + unit("fpm");
-    $("lG").innerHTML = l.g.toFixed(2).replace(".", ",") + unit("G");
-    $("lRwy").textContent = [l.draha, l.odskoky ? `odskoky: ${l.odskoky}` : ""].filter(Boolean).join(" · ");
+    $("lG").innerHTML = (EN_OV ? l.g.toFixed(2) : l.g.toFixed(2).replace(".", ",")) + unit("G");
+    $("lRwy").textContent = ov([l.draha, l.odskoky ? `odskoky: ${l.odskoky}` : ""].filter(Boolean).join(" · "));
     const on = Math.round(l.skore);
     [...segs.children].forEach((s, i) => {
       s.classList.toggle("on", i < on);
