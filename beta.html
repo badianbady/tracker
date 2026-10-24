@@ -580,8 +580,8 @@ const EN_PAT = [
   [/^Crew center: Let (\d+) odeslán ✔$/, "Crew centre: flight $1 filed ✔"], [/^Crew center: (.+)$/, "Crew centre: $1"], [/^(\S+) h letu$/, "$1 h of flying"], [/^(\S+) bodů$/, "$1 points"],
   [/^další: ?$/, "next:"], [/^(\d+) mimo provoz · (\d+) odložených závad$/, "$1 out of service · $2 deferred defects"], [/^· (\d+) mimo provoz · (\d+) odložených závad$/, "· $1 out of service · $2 deferred defects"],
   [/^Moji přátelé \((\d+)\)$/, "My friends ($1)"], [/^Přihlášen jako (.+)$/, "Signed in as $1"], [/^Ve vzduchu \((\d+)\)$/, "In the air ($1)"],
-  [/^(\d+) let$/, "$1 years"], [/^(\d+) roky$/, "$1 years"], [/^1 rok$/, "1 year"], [/^(\d+) měs\.$/, "$1 mo."],
-  [/^(.*) · (\d+) roky? (\d+) měs\.$/, "$1 · $2 y $3 mo."], [/^(.*) · 1 rok (\d+) měs\.$/, "$1 · 1 y $2 mo."],
+  [/^(\d+) let$/, "$1 flights"], [/^(\d+) měs\.$/, "$1 mo."],
+  [/^(\d{3}°|proměnlivý) (\d+) kt(, nárazy (\d+) kt)?$/, m => m.replace("proměnlivý", "variable").replace("nárazy", "gusts")],
   [/^([\d\s,.]+) ft · (\d+) kt · (.+)$/, (m, a, b, c) => `${a} ft · ${b} kt · ${tr(c)}`],
   [/^(\d+) min dříve$/, "$1 min early"], [/^\+(\d+) min$/, "+$1 min"], [/^(\d+) lety?$/, "$1 flights"], [/^(\d+) letů$/, "$1 flights"],
   [/^Vliv na obsazenost: (.+)$/, (m, a) => "Load factors: " + a.replace("páteční provoz", "Friday traffic").replace("nedělní návraty", "Sunday returns").replace("slabší střed týdne", "quieter midweek").replace("letní prázdniny", "summer holidays").replace("vánoční prázdniny", "Christmas holidays").replace("svátek:", "holiday:")],
@@ -717,7 +717,8 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
+  "a pak": "and then", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
 EN_PAT.push(
   [/^MSFS · (.+)$/, (m, a) => `MSFS · ${tr(a)}`], [/^(.+) · alternativa (\w+)$/, (m, a, b) => `${tr(a)} · alternate ${b}`],
@@ -791,6 +792,9 @@ Object.assign(EN, {
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
   [/^MEL: (.+?) – (.+)$/, (m, a, b) => `MEL: ${tr(a)} – ${tr(b)}`],
+  [/^rosný bod (-?\d+) °C$/, "dew point $1 °C"],
+  [/^(skoro jasno|polojasno|oblačno|zataženo|nebe neviditelné|jasno)\b(.*)$/, m => m.replace(/skoro jasno/g, "few").replace(/polojasno/g, "scattered").replace(/oblačno/g, "broken").replace(/zataženo/g, "overcast").replace(/nebe neviditelné/g, "sky obscured").replace(/jasno/g, "clear")],
+  [/^(\d+) letů?$/, "$1 flights"],
   [/^(\d+) ks · ([\d,.\s]+) kg$/, "$1 pcs · $2 kg"], [/^← Profil (.+)$/, "← Profile $1"], [/^Start motorů jen s pozemním zdrojem \(GPU\) a vzduchem z letiště\.?$/, "Engine start only with ground power (GPU) and ground air."], [/^Personální oddělení, (.+):$/, "HR department, $1:"],
   [/^Vaše výkony jsou solidní\. Schvalujeme zvýšení platu o (\S+) %\. Pro větší navýšení zapracujte na dochvilnosti a přistáních\.$/, "Your performance is solid. We approve a $1 % pay rise. For a bigger rise, work on punctuality and landings."],
   [/^Děkujeme za žádost\. Za posledních 30 dní jste odlétal\(a\) jen (\d+) (let|lety|letů) z rozpisu, což je na posouzení málo\. Zkuste to znovu, až budete mít za sebou víc rotací\.$/, "Thanks for your request. In the last 30 days you've flown only $1 roster flight(s), which isn't enough to assess. Try again once you've flown more rotations."],
@@ -809,6 +813,8 @@ function tr(text) {
   if (!core) return text;
   if (Object.prototype.hasOwnProperty.call(EN, core)) return lead + EN[core] + trail;
   for (const [re, rep] of EN_PAT) { if (!re.test(core)) continue; const out = core.replace(re, rep); if (out !== core) return lead + out + trail; }
+  // složený text „A · B · C“: přeložit každou část zvlášť
+  if (core.includes(" · ")) { const parts = core.split(" · "), outp = parts.map(x => tr(x)); if (outp.some((x, i) => x !== parts[i])) return lead + outp.join(" · ") + trail; }
   return text;
 }
 const I18N_SKIP = "script,style,textarea,code,pre,.ugc,.ev-text,.wx-raw,.bubble,[data-noi18n]";
@@ -3628,6 +3634,7 @@ async function renderAdminRoster(msg) {
 
 /* ---------- správa: flotila a poznámky k letištím ---------- */
 const ageText = d => { if (!d) return "–"; const m = Math.max(0, Math.round((Date.now() - new Date(d)) / (30.44 * 864e5)));
+  if (LANG === "en") return m < 12 ? `${m} mo.` : `${Math.floor(m / 12)} y${m % 12 ? ` ${m % 12} mo.` : ""}`;
   return m < 12 ? `${m} měs.` : `${Math.floor(m / 12)} ${Math.floor(m / 12) < 5 ? "roky" : "let"}${m % 12 ? ` ${m % 12} měs.` : ""}`.replace(/^1 roky/, "1 rok"); };
 async function renderAdminFleet(msg) {
   const box = $("admFleet"); if (!box) return;
