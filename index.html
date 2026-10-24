@@ -337,6 +337,8 @@
   .shop-item { border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; background: var(--surface); }
   .shop-item.on { border: 2px solid var(--green); }
   .shop-prev { height: 54px; display: flex; align-items: center; justify-content: center; background: var(--bg); border-radius: 10px; }
+  .lang-btn { border: 1.5px solid rgba(255,255,255,.7); background: transparent; color: #fff; font: 700 13px var(--display); border-radius: 999px; padding: 4px 10px; cursor: pointer; margin-left: 4px; }
+  .lang-btn:hover { background: rgba(255,255,255,.15); }
   .tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6); }
   .leaflet-popup-content { font-family: var(--body); font-size: 14px; }
   .pop-cs { font-family: var(--display); font-weight: 800; font-size: 20px; }
@@ -422,6 +424,7 @@
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
     <a href="#/tracker" data-r="tracker" id="navTracker" style="display:none">Tracker</a>
     <a href="#/ucet" data-r="ucet" id="navAccount">Přihlásit</a>
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Jazyk / Language" data-noi18n></button>
   </nav>
 </header>
 
@@ -463,6 +466,465 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
+/* ---------- angličtina: překladová vrstva ---------- */
+// Stránky se vykreslují česky; v angličtině se texty přeloží podle slovníku. Obsah od lidí (.ugc) se nepřekládá.
+const LANG = (() => { try { const v = localStorage.getItem("jai_lang"); if (v === "cs" || v === "en") return v; } catch { }
+  return /^(cs|sk)/i.test(navigator.language || "") ? "cs" : "en"; })();
+const LOCALE = LANG === "en" ? "en-GB" : "cs-CZ";
+const EN = {
+  // navigace a obecné
+  "Mapa": "Map", "Žebříček": "Leaderboard", "Piloti": "Pilots", "Novinky": "News", "Přátelé": "Friends", "Správa": "Admin", "Rozpis": "Roster",
+  "Obchod": "Shop", "Fotky": "Photos", "Přihlásit": "Sign in", "Tracker": "Tracker", "Můj účet": "My account", "← Zpět": "← Back", "Zpět": "Back",
+  "Uložit": "Save", "Smazat": "Delete", "Upravit": "Edit", "Přidat": "Add", "Zrušit": "Cancel", "Vrátit": "Return", "Ukončit": "End", "Přejmenovat": "Rename",
+  "Přesunout": "Move", "Načítám…": "Loading…", "Živě": "Live", "aktivní": "active", "žádné": "none", "Žádná": "None", "Zatím tu nic není.": "Nothing here yet.",
+  "Dnes": "Today", "Zítra": "Tomorrow", "Včera": "Yesterday", "Celkově": "All time", "Tento týden": "This week", "Další informace": "More info", "Přesto spustit": "Run anyway",
+  // mapa
+  "Ve vzduchu": "In the air", "Let Jáchym Air": "Jáchym Air flight", "Ostatní lety": "Other flights", "Poslední přistání": "Recent landings",
+  "Moje poslední přistání": "My recent landing", "Letiště": "Airports", "Radar srážek": "Precipitation radar", "Nastavení mapy": "Map settings",
+  "Výška trasy (ft)": "Track altitude (ft)", "Tloušťka tras:": "Track width:", "Počasí u letišť": "Airport weather", "Podrobně (kód, teplota, počasí)": "Detailed (code, temperature, weather)",
+  "Kompaktně (kód a barva podmínek)": "Compact (code and condition colour)", "Jen body": "Dots only", "Právě nikdo neletí. Spusť tracker a objevíš se tady.": "Nobody is flying right now. Start the tracker and you'll show up here.",
+  "Cestovní let": "Cruise", "Stoupání": "Climb", "Klesání": "Descent", "Na zemi": "On ground", "Pojíždění": "Taxi", "Vzlet": "Takeoff", "Přiblížení": "Approach", "Přistání": "Landing",
+  "Výška ft": "Altitude ft", "GS kt": "GS kt", "V/S fpm": "V/S fpm", "Kurz": "Heading", "Výška": "Altitude",
+  // detail letu
+  "Plán vzlet": "Sched. dep.", "Plán přistání": "Sched. arr.", "Odhad": "Estimate", "Doba letu": "Flight time", "Palivo kg": "Fuel kg", "Alternativa": "Alternate",
+  "Trasa": "Route", "Reakce": "Reactions", "Buď první": "Be the first", "Fotky z letu": "Flight photos", "📷 Přidat fotky": "📷 Add photos",
+  "📷 Nahrát vlastní fotku letadla": "📷 Upload your own aircraft photo", "Smazat tento let": "Delete this flight", "Napsat": "Message", "+ Přidat do přátel": "+ Add friend",
+  "Dosednutí": "Touchdown", "Rychlost": "Speed", "Dráha": "Runway", "Vítr": "Wind", "Odskoky": "Bounces", "Máslo!": "Butter!", "Výborné přistání": "Excellent landing",
+  "Dobré přistání": "Good landing", "Tvrdší přistání": "Firm landing", "Tvrdé přistání": "Hard landing", "Kontrola podvozku": "Gear inspection",
+  "Nedokončený let": "Incomplete flight", "uložen bez přistání": "saved without landing", "Nedokončený": "Incomplete", "Let nenalezen. Možná byl smazán.": "Flight not found. It may have been deleted.",
+  "Letadlo": "Aircraft", "Doba": "Duration", "Vzdálenost": "Distance", "Známka": "Score", "Datum": "Date", "FPM": "FPM", "G": "G",
+  "METAR není k dispozici.": "METAR not available.", "TAF není k dispozici.": "TAF not available.", "Počasí": "Weather", "Teplota": "Temperature", "Dohlednost": "Visibility",
+  "Oblačnost": "Clouds", "QNH": "QNH", "Načítám počasí…": "Loading weather…", "Letiště nemá meteostanici, METAR tu není.": "This airport has no weather station, no METAR.",
+  // žebříček, piloti, profil
+  "Žebříček přistání": "Landing leaderboard", "Nejměkčí přistání komunity. Známka 0–10 vychází z rychlosti dosednutí a přetížení.": "The community's smoothest landings. The 0–10 score is based on touchdown rate and G-force.",
+  "Nejvíc nalétáno": "Most hours flown", "Body (30 dní)": "Points (30 days)", "Pilot": "Pilot", "Všichni, kdo létají s trackerem.": "Everyone flying with the tracker.",
+  "Najít pilota": "Find a pilot", "Zatím se nikdo nezaregistroval.": "Nobody has signed up yet.", "Letů": "Flights", "Nalétáno (h:min)": "Flown (h:min)",
+  "Námořních mil": "Nautical miles", "Průměrné přistání": "Average landing", "Nejlepší přistání": "Best landing", "Historie letů": "Flight history",
+  "Klikni na let a otevře se jeho detail na mapě.": "Click a flight to open it on the map.", "Zatím žádné lety.": "No flights yet.",
+  "Kadet": "Cadet", "Second Officer": "Second Officer", "First Officer": "First Officer", "Kapitán": "Captain", "Senior kapitán": "Senior Captain",
+  "Senior First Officer": "Senior First Officer", "Training kapitán": "Training Captain",
+  "Kariéra u Jáchym Air": "Career at Jáchym Air", "Body celkem": "Total points", "Body za 30 dní": "Points (30 days)", "Dokončených rotací": "Rotations completed",
+  "Dochvilnost": "Punctuality", "Spokojenost cestujících": "Passenger satisfaction", "Rotace": "Rotations", "Vytvořit rotaci z letů": "Create a rotation from flights",
+  "Aktivní rotace": "Active rotation", "Smazáním rotace se lety nesmažou.": "Deleting a rotation doesn't delete the flights.", "Přidat lety": "Add flights",
+  "Ukončit aktivní rotaci": "End active rotation", "Smazat rotaci": "Delete rotation", "Zatím žádné rotace.": "No rotations yet.", "v jiné rotaci": "in another rotation",
+  "Zatím bez letů.": "No flights yet.", "Odebrat": "Remove", "Založit": "Create", "Zobrazit": "Show",
+  // přátelé, fotky, novinky
+  "Přidej si kamarády, sleduj, kdo zrovna letí, a piš si s nimi.": "Add friends, see who's flying and chat with them.",
+  "Zatím nikoho nemáš. Najdi kamarády vpravo nebo klikni na letadlo na mapě.": "No friends yet. Find some on the right or click a plane on the map.",
+  "Fotky z letů": "Flight photos", "Screenshoty pilotů z jejich letů. Svoje přidáš v detailu letu na svém profilu.": "Pilots' screenshots from their flights. Add yours in a flight's detail on your profile.",
+  "Zatím tu nejsou žádné fotky. Buď první: otevři svůj let a přidej screenshoty!": "No photos yet. Be the first: open your flight and add screenshots!",
+  "Zatím žádné fotky. Přidej screenshoty z letu!": "No photos yet. Add screenshots from your flight!", "Pilot k letu zatím nepřidal fotky.": "The pilot hasn't added photos yet.",
+  "Právě letí": "Flying now", "Let týdne, YouTube eventy a novinky z Jáchym Air.": "Flight of the week, YouTube events and news from Jáchym Air.", "Všechny novinky": "All news",
+  "Let týdne": "Flight of the week", "Detail": "Details",
+  // účet
+  "Přihlášení": "Sign in", "Registrace": "Sign up", "Přihlas se ke svému pilotnímu účtu.": "Sign in to your pilot account.", "Založ si účet a tvoje lety se začnou ukládat.": "Create an account and your flights will start saving.",
+  "Přihlásit se": "Sign in", "Vytvořit účet": "Create account", "Nemáš účet?": "No account?", "Už máš účet?": "Already have an account?", "Zapomněl jsi heslo?": "Forgot your password?",
+  "Uživatelské jméno": "Username", "@např. jachym12": "@e.g. jachym12", "Heslo": "Password", "Aspoň 8 znaků": "At least 8 characters", "E-mail": "Email",
+  "Odhlásit se": "Sign out", "Profilový obrázek": "Profile picture", "Odkaz na tvůj stream (nepovinné)": "Link to your stream (optional)", "Uložit profil": "Save profile",
+  "Twitch, YouTube nebo Kick. Na mapě se u tebe objeví tlačítko „Sledovat stream“.": "Twitch, YouTube or Kick. A “Watch stream” button will appear next to you on the map.",
+  "Uživatelské jméno v SimBriefu (nepovinné)": "SimBrief username (optional)", "Aplikace podle něj načte tvůj letový plán.": "The app uses it to load your flight plan.",
+  "Moje virtuálka": "My virtual airline", "Zobrazí se u tvých letů. Jáchym Air se zapíná sám u rezervovaných linek.": "Shown on your flights. Jáchym Air switches on automatically for booked routes.",
+  "Pilot Jáchym Air": "Jáchym Air pilot", "Crew centrum Jáchym Air": "Jáchym Air crew centre", "Crew center Jáchym Air": "Jáchym Air crew centre",
+  "Tvoje letadlo svítí na mapě zeleně. Aby se lety samy odesílaly i do crew centra, vlož klíč také do aplikace (záložka Tracker).": "Your plane shows green on the map. To file flights to the crew centre automatically, enter the key in the app too (Tracker tab).",
+  "Stáhnout aplikaci": "Download the app", "Aplikace běží na tvém PC vedle MSFS, posílá tvoji polohu na mapu a po přistání uloží let. Aktualizuje se sama.": "The app runs on your PC next to MSFS, sends your position to the map and saves your flight after landing. It updates itself.",
+  "Moje data": "My data", "Stáhnout moje data": "Download my data", "Stáhni si kopii všeho, co o tobě JAI Tracker ukládá: profil, lety, přátele, zprávy a reakce (soubor JSON).": "Download a copy of everything JAI Tracker stores about you: profile, flights, friends, messages and reactions (JSON file).",
+  "Smazání účtu": "Delete account", "Smaže se tvůj účet, profil, všechny lety, přátelé, zprávy a reakce. Nejde to vrátit.": "Your account, profile, all flights, friends, messages and reactions will be deleted. This can't be undone.",
+  "Pro potvrzení napiš své uživatelské jméno": "Type your username to confirm", "Smazat účet natrvalo": "Delete account permanently", "Změna hesla": "Change password",
+  "Nové heslo": "New password", "Změnit heslo": "Change password", "Ochrana osobních údajů": "Privacy policy", "Pravidla komunity": "Community rules",
+  // rozpis a kariéra
+  "Moje základna a poloha": "My base and location", "Základna": "Base", "Teď jsem": "I'm now at", "Změnit základnu": "Change base", "Jednou za 7 dní": "Once every 7 days",
+  "Přeletět jako cestující": "Fly as a passenger", "Jednou za 48 hodin": "Once every 48 hours", "Mám teď čas": "I have time now", "Najít rotaci": "Find a rotation",
+  "Rozpis podle dnů": "Roster by day", "Moje základna": "My base", "Všechny základny": "All bases", "Na tenhle den tu zatím nejsou žádné rotace.": "No rotations for this day yet.",
+  "Moje rotace": "My rotations", "Vzít rotaci": "Take rotation", "Briefing": "Briefing", "Tvoje rotace": "Your rotation", "Rezervovat v crew centru": "Book in crew centre",
+  "Stav flotily": "Fleet status", "Moje kariéra": "My career", "Výplatní páska (posledních 30 dní)": "Payslip (last 30 days)", "Základní plat": "Base salary",
+  "Letové příplatky": "Flight pay", "Výkonnostní bonus": "Performance bonus", "Celkem": "Total", "Plat je jen pro zábavu, skutečné peníze to nejsou 😄": "Salary is just for fun, it's not real money 😄",
+  "Požádat o zvýšení platu": "Ask for a pay rise", "letadlo v údržbě": "aircraft in maintenance", "výcvik palubní posádky": "cabin crew training",
+  "Rotace Jáchym Air podle rozpisu. Časy jsou v českém čase. Brzy přibudou briefingy a body za dochvilnost.": "Jáchym Air rotations from the roster. Times are in Czech time.",
+  // briefing
+  "Slovo od dispečinku": "Word from dispatch", "Posádka": "Crew", "Kapitán:": "Captain:", "První důstojník:": "First officer:", "Vedoucí kabiny (purser):": "Purser:",
+  "Palubní průvodčí:": "Flight attendant:", "Instruktor kabiny:": "Cabin instructor:", "Cestující a náklad": "Passengers and cargo", "Cestující": "Passengers",
+  "Premium economy": "Premium economy", "Economy": "Economy", "Z toho kojenci": "Of which infants", "Zavazadla": "Bags", "Náklad": "Cargo", "Odhad payloadu": "Estimated payload",
+  "Registrace": "Registration", "Typ": "Type", "Stáří": "Age", "Konfigurace": "Configuration", "Poznámka": "Note", "Provoz": "Operation", "Technický stav": "Technical status",
+  "Odložené závady:": "Deferred defects:", "Bez odložených závad.": "No deferred defects.", "Počasí na tvůj let": "Weather for your flight",
+  "Zobrazit původní zprávy (METAR a TAF)": "Show raw reports (METAR and TAF)", "Poznámky k letištím": "Airport notes", "Naplánovat v SimBriefu": "Plan in SimBrief",
+  "Linka na mapě": "Route on map", "SimBrief dostane trasu, letadlo, čas odletu a počet cestujících. Zkontroluj údaje před vygenerováním plánu.": "SimBrief gets the route, aircraft, departure time and passenger count. Check the details before generating the plan.",
+  "Odlet": "Departure", "Přílet": "Arrival", "Blok": "Block",
+  // obchod
+  "Zůstatek": "Balance", "Za body z letů si kup kosmetiku. Nic z toho nedává výhodu, jen styl. 😎": "Spend your flight points on cosmetics. None of it gives an advantage, just style. 😎",
+  "Body získáš za lety z Rozpisu (a trochu i za volné lety).": "You earn points for roster flights (and a few for free flights).", "Barva jména": "Name colour", "Rámeček profilovky": "Avatar frame",
+  "Titul": "Title", "Barva letadla na mapě": "Plane colour on the map", "Koupit": "Buy", "Vlastníš": "Owned", "Nasadit": "Equip", "Sundat": "Remove",
+  "Pohyby bodů": "Points history", "Zatím žádné body.": "No points yet.",
+  // tracker
+  "Stav": "Status", "Web": "Web", "MSFS": "MSFS", "Fáze letu": "Flight phase", "Létám pro": "Flying for", "Squawk": "Squawk", "Čekám na MSFS": "Waiting for MSFS",
+  "Údaje o letu": "Flight details", "Callsign": "Callsign", "Číslo letu": "Flight number", "Odlet (ICAO)": "Departure (ICAO)", "Přílet (ICAO)": "Arrival (ICAO)",
+  "Vrátit podle SimBriefu": "Reset to SimBrief", "Vymazat": "Clear", "Uložit let": "Save flight", "Ukončit a uložit let": "End and save flight",
+  "Události": "Events", "Odhlásit tracker": "Sign out tracker", "Přihlášení trackeru": "Tracker sign-in", "Přihlásit tracker": "Sign in tracker",
+  "Zatím žádné přistání": "No landing yet", "Přistání se tu ukáže automaticky.": "Your landing will show up here automatically.", "OBS overlay": "OBS overlay",
+  "Styl": "Style", "Umístění": "Position", "Barva": "Colour", "Zkopírovat odkaz": "Copy link", "Otevřít náhled": "Open preview",
+  "Letový plán (SimBrief)": "Flight plan (SimBrief)", "Načíst plán": "Load plan", "Vlastní rotace": "Own rotation",
+  "Žádný rozpracovaný let. Let se uloží sám po přistání a dojetí na stání.": "No flight in progress. Your flight saves itself after landing and parking.",
+  // patička
+  "Spusť": "Start",
+};
+const BASE_EN = { "Alžír": "Algiers", "Katovice": "Katowice", "Norimberk": "Nuremberg", "Drážďany": "Dresden", "Billund": "Billund", "Bratislava": "Bratislava", "Pardubice": "Pardubice", "Stuttgart": "Stuttgart" };
+Object.entries(BASE_EN).forEach(([k, v]) => { EN[k] = v; });
+Object.assign(EN, { "– nové lety se do ní přidávají samy.": "– new flights are added to it automatically.", "@Vybrat let": "@Select flight", "@začni psát…": "@start typing…",
+  "– každý uložený let se do ní přidá sám.": "– every saved flight is added to it automatically.", "Letíš víc letů za sebou? Založ aktivní rotaci a lety se do ní budou přidávat samy.": "Flying several legs in a row? Create an active rotation and flights will be added automatically.",
+  "@Název, např. Víkend v Itálii": "@Name, e.g. Weekend in Italy", "@Název rotace": "@Rotation name", "Klikni na lety, které chceš přidat, a": "Click the flights you want to add, and",
+  "vytvoř novou rotaci": "create a new rotation", "Zaškrtni aspoň jeden let.": "Select at least one flight." });
+// věty s proměnnými částmi
+const EN_PAT = [
+  [/^Do hodnosti (.+) zbývá (\S+) h$/, (m, a, b) => `${b} h left to ${tr(a)}`], [/^Do hodnosti (.+)$/, (m, a) => `To ${tr(a)}`],
+  [/^Zbývá: (.+)$/, (m, a) => "Remaining: " + a.replace(/ h letu/g, " h of flying").replace(/ bodů/g, " points").replace(/průměrné přistání/g, "average landing").replace(/dochvilnost/g, "punctuality").replace("už jen chvilka", "almost there")],
+  [/^(\w{4}) · (.+)$/, (m, a, b) => BASE_EN[b] ? `${a} · ${BASE_EN[b]}` : m], [/^(.+) \((\w{4})\)$/, (m, a, b) => BASE_EN[a] ? `${BASE_EN[a]} (${b})` : m],
+  [/^Crew center: Let (\d+) odeslán ✔$/, "Crew centre: flight $1 filed ✔"], [/^Crew center: (.+)$/, "Crew centre: $1"], [/^(\S+) h letu$/, "$1 h of flying"], [/^(\S+) bodů$/, "$1 points"],
+  [/^další: ?$/, "next:"], [/^(\d+) mimo provoz · (\d+) odložených závad$/, "$1 out of service · $2 deferred defects"], [/^· (\d+) mimo provoz · (\d+) odložených závad$/, "· $1 out of service · $2 deferred defects"],
+  [/^Moji přátelé \((\d+)\)$/, "My friends ($1)"], [/^Přihlášen jako (.+)$/, "Signed in as $1"], [/^Ve vzduchu \((\d+)\)$/, "In the air ($1)"],
+  [/^(\d+) let$/, "$1 flights"], [/^(\d+) měs\.$/, "$1 mo."],
+  [/^(\d{3}°|proměnlivý) (\d+) kt(, nárazy (\d+) kt)?$/, m => m.replace("proměnlivý", "variable").replace("nárazy", "gusts")],
+  [/^([\d\s,.]+) ft · (\d+) kt · (.+)$/, (m, a, b, c) => `${a} ft · ${b} kt · ${tr(c)}`],
+  [/^(\d+) min dříve$/, "$1 min early"], [/^\+(\d+) min$/, "+$1 min"], [/^(\d+) lety?$/, "$1 flights"], [/^(\d+) letů$/, "$1 flights"],
+  [/^Vliv na obsazenost: (.+)$/, (m, a) => "Load factors: " + a.replace("páteční provoz", "Friday traffic").replace("nedělní návraty", "Sunday returns").replace("slabší střed týdne", "quieter midweek").replace("letní prázdniny", "summer holidays").replace("vánoční prázdniny", "Christmas holidays").replace("svátek:", "holiday:")],
+  [/^předpověď na (odlet|přílet) (\S+)$/, (m, a, b) => `forecast for ${a === "odlet" ? "departure" : "arrival"} ${b}`],
+  [/^Předpověď na (odlet|přílet) (\S+) zatím není – TAF platí do (.+)\.(.*)$/, (m, a, b, c, d) => `No forecast yet for ${a === "odlet" ? "departure" : "arrival"} ${b} – the TAF is valid until ${c}.${d}`],
+  [/^aktuální počasí$/, "current weather"], [/^Najdu volnou rotaci s odletem z místa, kde jsi \((\w+)\), v příštích 4 hodinách\.$/, "I'll find a free rotation departing from where you are ($1) in the next 4 hours."],
+  [/^BRIEFING · (\S+) · (\S+)(.*)$/, (m, a, b, c) => `BRIEFING · ${a} · ${tr(b)}${c.replace(" · pilot ", " · pilot ")}`],
+  [/^Rotace: (.+)$/, "Rotation: $1"], [/^🧳 Rotace: (.+)$/, "🧳 Rotation: $1"], [/^Letí (.+)$/, "Flown by $1"], [/^(\d+)× MEL$/, "$1× MEL"],
+  [/^letadlo přistaveno z (\w+)$/, "aircraft positioned from $1"], [/^(\d) dny · přespání v (.+)$/, "$1 days · night stop in $2"], [/^(\d) dny$/, "$1 days"],
+  [/^obrat (\d+) min$/, "turnaround $1 min"], [/^obs\. ~(\d+) %$/, "load ~$1 %"], [/^· obs\. ~(\d+) %$/, "· load ~$1 %"],
+  [/^Obrat v (\w+): (\d+) minut, pak (\S+) do (\w+)\.$/, "Turnaround in $1: $2 minutes, then $3 to $4."],
+  [/^Krátký obrat v (\w+): jen (\d+) minut do dalšího letu (\S+)\. Drž se rozpisu\.$/, "Short turnaround in $1: only $2 minutes until flight $3. Stick to the schedule."],
+  [/^MEL: (.+)$/, "MEL: $1"], [/^Technický stav (\d+) % · do A-check (\d+) h$/, "Technical status $1 % · $2 h to A-check"],
+  [/^Pilot (.+)$/, "Pilot $1"], [/^vítr (.+)$/, (m) => windText(m)], [/^bezvětří(.*)$/, (m) => windText(m)],
+  [/^(\d+) \/ (\d+) \((\d+) %\)$/, "$1 / $2 ($3 %)"],
+  [/^(\d{3}°|VRB|proměnlivý)(.*)(čelní|zadní|boční)(.*)$/, m => m.replace("proměnlivý", "variable").replace(/čelní/g, "headwind").replace(/zadní/g, "tailwind").replace(/boční/g, "crosswind").replace(/zleva/g, "from the left").replace(/zprava/g, "from the right")],
+  [/^(.+) · ([\d,]+) bodů$/, "$1 · $2 points"],
+  [/^RWY (.+)$/, m => m.replace(/za prahem/g, "past the threshold").replace(/před prahem/g, "before the threshold").replace(/vlevo od osy/g, "left of centreline").replace(/vpravo od osy/g, "right of centreline").replace(/na ose/g, "on centreline")],
+];
+Object.assign(EN, {
+  // hlášky a stavy
+  "Už máš účet?": "Already have an account?", "Načítám let…": "Loading flight…", "Načítám linku…": "Loading route…", "Připravuji briefing…": "Preparing briefing…", "Připravuji…": "Preparing…",
+  "Skládám rotace…": "Building rotations…", "Nahrávám…": "Uploading…", "Nahrávám fotku…": "Uploading photo…", "Ukládám…": "Saving…", "Odesílám…": "Sending…", "Ověřuji…": "Verifying…",
+  "Mažu…": "Deleting…", "Uloženo.": "Saved.", "Smazáno.": "Deleted.", "Zkopírováno ✔": "Copied ✔", "Profil uložen.": "Profile saved.", "Heslo změněno.": "Password changed.",
+  "Heslo bylo změněno. Jsi přihlášen.": "Password changed. You're signed in.", "Jsi přihlášen. Vítej zpět!": "You're signed in. Welcome back!", "E-mail potvrzen. Vítej na palubě!": "Email confirmed. Welcome aboard!",
+  "Účet vytvořen. Vítej na palubě!": "Account created. Welcome aboard!", "Účet vytvořen. Potvrď ho odkazem v e-mailu a pak se přihlas.": "Account created. Confirm it with the link in your email, then sign in.",
+  "Špatný e-mail nebo heslo.": "Wrong email or password.", "Toto uživatelské jméno už někdo má.": "That username is taken.", "Účet byl smazán. Díky, že jsi s námi létal.": "Your account has been deleted. Thanks for flying with us.",
+  "Nejdřív napiš do pole E-mail svou adresu a pak klikni znovu na „Zapomněl jsi heslo?“.": "First enter your email address, then click “Forgot your password?” again.",
+  "3–20 znaků, písmena bez diakritiky, čísla, _ . -": "3–20 characters: letters, numbers, _ . -", "Uložit heslo": "Save password", "Uložit změny": "Save changes",
+  "Odkaz na stream musí vést na Twitch, YouTube nebo Kick (začínat https://).": "The stream link must point to Twitch, YouTube or Kick (start with https://).",
+  "Obrázek je větší než 2 MB.": "The image is larger than 2 MB.", "tohle není obrázek": "this isn't an image", "obrázek nejde zpracovat": "the image can't be processed", "neznámá chyba": "unknown error",
+  "Opravdu smazat tento let? Nejde to vrátit.": "Really delete this flight? This can't be undone.", "Opravdu smazat účet a všechna data? Tohle nejde vrátit.": "Really delete your account and all data? This can't be undone.",
+  "Uživatelské jméno v SimBriefu": "SimBrief username", "Jméno ze SimBriefu obsahuje nepovolené znaky.": "The SimBrief name contains invalid characters.",
+  "Nepřihlášen": "Not signed in", "Přihlášen": "Signed in", "✔ Připojeno": "✔ Connected", "Neznámý pilot": "Unknown pilot", "někdo": "someone", "dávno": "long ago", "právě teď": "just now",
+  "Je mi aspoň 15 let, nebo mám souhlas rodiče. Souhlasím s": "I'm at least 15, or I have a parent's consent. I agree to the", "a beru na vědomí": "and acknowledge the",
+  "pravidly komunity": "community rules", "zásady ochrany osobních údajů": "privacy policy",
+  // aplikace / tracker záložka
+  "Tato stránka funguje jen v aplikaci Jáchym Air Tracker.": "This page only works in the Jáchym Air Tracker app.", "Tvoje aplikace je zastaralá": "Your app is out of date",
+  "Tahle verze aplikace se neumí spojit s aktuálním webem, proto tu nevidíš stav letu ani nabídku aktualizace. Sledování letů v ní může fungovat jen částečně.": "This version of the app can't connect to the current website, so you don't see your flight status or the update offer. Flight tracking may only partly work.",
+  "Stáhnout novou verzi": "Download the new version", "zavři aplikaci, stáhni si novou verzi a starý soubor": "close the app, download the new version and replace the old",
+  "jí nahraď. Přihlášení i nastavení zůstanou.": "file with it. Your sign-in and settings stay.", "Když Windows ukáže modré okno, klikni na „Další informace“ a „Přesto spustit“.": "If Windows shows a blue window, click “More info” and “Run anyway”.",
+  "Aktualizovat po přistání": "Update after landing", "Aby se tvoje lety ukládaly, přihlas tracker stejným účtem jako na webu.": "To save your flights, sign the tracker in with the same account as on the website.",
+  "Přistál jsi.": "You've landed.", "Let se uloží sám, až budeš 30 s stát na stání, nebo ho ulož hned.": "The flight saves itself after 30 s parked, or save it now.",
+  "Let probíhá.": "Flight in progress.", "Když let ukončíš bez přistání, uloží se jako nedokončený. Stejně se uloží i při zavření aplikace.": "If you end the flight without landing, it saves as incomplete. The same happens if you close the app.",
+  "Ukončit let teď? Uloží se jako nedokončený (bez přistání).": "End the flight now? It will be saved as incomplete (no landing).", "Let uložen jako nedokončený.": "Flight saved as incomplete.", "Let uložen ✔": "Flight saved ✔",
+  "Vyplní se samy ze SimBriefu. Můžeš je přepsat, ručně zadané mají přednost.": "Filled in from SimBrief. You can override them; manual values take priority.", "Údaje o letu uloženy.": "Flight details saved.",
+  "Moje virtuálka (mimo linky Jáchym Air)": "My virtual airline (outside Jáchym Air routes)", "Žádná / vlastní lety": "None / own flights", "Jáchym Air (rezervovaná linka) ✔": "Jáchym Air (booked route) ✔",
+  "Zelené letadlo Jáchym Air se zapne samo, když letíš linku rezervovanou v crew centru.": "The green Jáchym Air plane switches on automatically when you fly a route booked in the crew centre.",
+  "Načti poslední OFP ze SimBriefu. Na mapě se ukáže plánovaná trasa a ostatní uvidí, kam letíš.": "Load your latest OFP from SimBrief. The planned route appears on the map and others can see where you're flying.",
+  "Načíst letový plán": "Load flight plan", "Načíst znovu": "Reload", "Zrušit plán": "Clear plan", "Plán aktualizován.": "Plan updated.",
+  "API klíč": "API key", "API klíč z crew centra": "API key from the crew centre", "Vlož API klíč ze svého profilu v crew centru. Klíč zůstane jen v tomto počítači a lety se pak budou samy odesílat do crew centra.": "Enter the API key from your crew centre profile. The key stays on this computer and flights will be filed to the crew centre automatically.",
+  "Po přistání let automaticky odeslat": "File the flight automatically after landing", "Odeslat poslední let": "File last flight", "Poslední stav": "Last status", "Odpojit crew center z této aplikace?": "Disconnect the crew centre from this app?",
+  "Let se odešle, když máš v crew centru rezervaci (bid) se stejným odletem a cílem.": "The flight is filed when you have a bid in the crew centre with the same departure and destination.",
+  "Klasický": "Classic", "Minimalistický": "Minimal", "Tmavý": "Dark", "Kokpit": "Cockpit", "Vlevo dole": "Bottom left", "Vpravo dole": "Bottom right", "Vlevo nahoře": "Top left", "Vpravo nahoře": "Top right", "Velikost": "Size",
+  "V OBS přidej zdroj Prohlížeč (Browser), vlož odkaz a nastav 1920 × 1080.": "In OBS add a Browser source, paste the link and set 1920 × 1080.", "Pro vlastní rotace se přihlas na webu (Můj účet).": "Sign in on the website (My account) to use your own rotations.",
+  "– letíš víc letů za sebou? Lety se do ní budou přidávat samy.": "– flying several legs in a row? Flights will be added automatically.", "Vlastní rotace": "Own rotation",
+  // linky a rezervace
+  "Linka Jáchym Air": "Jáchym Air route", "Crew center u linky neuvádí letadla.": "The crew centre doesn't list aircraft for this route.", "Zrušit rezervaci": "Cancel booking",
+  "Let máš rezervovaný. Po přistání se sám odešle do crew centra.": "Flight booked. It will be filed to the crew centre automatically after landing.", "V aplikaci JAI Tracker můžeš let rezervovat rovnou tady.": "In the JAI Tracker app you can book the flight right here.",
+  "Žádné. Klikni na letiště se zeleným bodem a vyber si linku.": "None. Click an airport with a green dot and pick a route.", "Přílety": "Arrivals", "Odlety": "Departures", "Zatím žádné linky.": "No routes yet.",
+  "Pravidelná linka": "Scheduled route", "Charter": "Charter", "Nákladní": "Cargo", "Tento pilot už neletí. Dokončený let najdeš na jeho profilu.": "This pilot is no longer flying. You'll find the finished flight on their profile.",
+  "Zatím tu nejsou žádná přistání. Buď první!": "No landings yet. Be the first!", "Zatím žádná přistání.": "No landings yet.", "Fotka letadla není k dispozici": "No aircraft photo available",
+  "vlastní fotka pilota": "pilot's own photo", "Jáchym Air · ilustrační foto typu": "Jáchym Air · illustrative type photo",
+  // přátelé, zprávy
+  "Chce tě za přítele": "Wants to be your friend", "Žádost odeslána": "Request sent", "Žádosti o přátelství": "Friend requests", "Odeslané žádosti": "Sent requests", "Přijmout": "Accept", "Odmítnout": "Decline",
+  "Teď jste přátelé!": "You're friends now!", "Už jste propojení": "You're already connected", "Nikoho jsem nenašel.": "Nobody found.", "Napiš zprávu…": "Write a message…", "@Napiš zprávu…": "@Write a message…",
+  "Zatím žádné zprávy. Napiš první!": "No messages yet. Write the first one!", "Psát si můžete, až budete přátelé.": "You can chat once you're friends.", "Moc zpráv za sebou, chvilku počkej.": "Too many messages in a row, wait a moment.",
+  "Zprávu se nepodařilo odeslat.": "The message couldn't be sent.", "Nahlásit": "Report", "Smazat zprávu": "Delete message", "Co se stalo? Správce uvidí tvůj popis i poslední zprávy.": "What happened? The admin will see your description and recent messages.",
+  "Díky, správce se na to podívá.": "Thanks, an admin will take a look.", "Nahlášení se nepovedlo.": "The report failed.", "Buď na ostatní milý. Nevhodné chování můžeš nahlásit, správce ho uvidí.": "Be nice to others. You can report inappropriate behaviour; an admin will see it.",
+  "← Přátelé": "← Friends", "Pro přátele a zprávy se": "For friends and messages,", "Pro zprávy se": "For messages,", "Pro braní rotací se": "To take rotations,", "přihlas": "sign in",
+  // novinky
+  "Nadcházející streamy": "Upcoming streams", "Živě teď na YouTube": "Live on YouTube now", "ŽIVĚ": "LIVE", "právě běží": "live now", "skončil": "ended", "Otevřít odkaz": "Open link", "▶ Sledovat na YouTube": "▶ Watch on YouTube",
+  "Zatím nic.": "Nothing yet.", "Upravit ve Správě": "Edit in Admin",
+  // rozpis a kariéra
+  "Rozpis rotací připravujeme. Brzy tu bude! ✈️": "The rotation roster is coming soon! ✈️", "Rozpis rotací připravujeme.": "The rotation roster is coming soon.",
+  "Nejdřív si vyber základnu, nebo přepni na Všechny základny.": "Choose a base first, or switch to All bases.", "nevybraná": "not selected", "neznámo – nastaví se po prvním letu": "unknown – set after your first flight",
+  "Tam už jsi.": "You're already there.", "Rotace vrácena.": "Rotation returned.", "Vrátit rotaci do volného rozpisu?": "Return the rotation to the open roster?",
+  "Požádat personální oddělení o zvýšení platu? Další žádost půjde až za 30 dní.": "Ask HR for a pay rise? You can only ask again in 30 days.", "nejvyšší hodnost 🏆": "highest rank 🏆", "už jen chvilka": "almost there",
+  "Personální oddělení,": "HR department,", "Stav letadla zatím není znám.": "Aircraft status not known yet.", "údržba": "maintenance", "Mimo provoz do": "Out of service until",
+  "Obchod připravujeme. 🛍️": "The shop is coming soon. 🛍️", "Zatím nikdo nezískal body. Vezmi si rotaci v Rozpisu!": "Nobody has points yet. Take a rotation from the Roster!",
+  "volný let": "free flight", "let z rotace": "rotation flight", "dochvilnost": "punctuality", "přistání": "landing", "spokojenost cestujících": "passenger satisfaction", "jiný typ z rodiny": "other type in family",
+  "včas": "on time", "zatím bez letů": "no flights yet", "letů": "flights", "pilotů": "pilots",
+  // briefing – počasí, situace, posádka
+  "Přechodně": "Temporarily", "Teď:": "Now:", "aktuální počasí": "current weather", "Počasí pro toto letiště není k dispozici (letiště nemá meteostanici).": "No weather for this airport (it has no weather station).",
+  "Předpověď TAF pro toto letiště není k dispozici.": "No TAF forecast for this airport.", "První důstojník": "First officer", "Vedoucí kabiny (purser)": "Purser", "Palubní průvodčí": "Flight attendant",
+  "Instruktor kabiny": "Cabin instructor", "záloha": "standby", "Let je téměř vyprodaný – počítej s delším nástupem a plnými zavazadlovými prostory.": "The flight is nearly sold out – expect slower boarding and full overhead bins.",
+  "Plný let. Handling hlásí vysoký počet zavazadel, nakládka může trvat déle.": "Full flight. Handling reports lots of bags, loading may take longer.", "Kapacita prakticky vyčerpaná – připrav se na pomalejší boarding.": "Practically full – be ready for slower boarding.",
+  "Slabší obsazenost, nástup by měl proběhnout rychle.": "Light load, boarding should be quick.", "Poloprázdný let – ideální příležitost odletět včas.": "Half-empty flight – a perfect chance to leave on time.",
+  "Brzký ranní odlet – posádka se hlásí v předstihu, počítej s nočním provozem na letišti.": "Early morning departure – crew reports early, expect night operations at the airport.",
+  "Ranní vlna: první let dne, letadlo bude studené – nech si čas na přípravu kabiny.": "Morning wave: first flight of the day, the aircraft will be cold – allow time to prepare the cabin.",
+  "Dlouhý sektor – zkontroluj zásobu jídla a vody pro posádku.": "Long sector – check crew food and water.", "Delší let – plánuj palivo s rezervou a zkontroluj alternativy po trati.": "Longer flight – plan fuel with a margin and check en-route alternates.",
+  "Letadlo má starší EIS displeje – počítej s klasickým uspořádáním přístrojů.": "The aircraft has older EIS displays – expect the classic instrument layout.",
+  "Výcvikový let palubní posádky – na palubě je instruktor kabiny, postupy proveď podle standardů.": "Cabin crew training flight – a cabin instructor is on board, follow standard procedures.",
+  "Prakticky nové letadlo – užij si ho!": "Practically brand-new aircraft – enjoy it!", "Letadlo je ve flotile teprve krátce, stav je výborný.": "The aircraft is new to the fleet and in excellent condition.",
+  "Starší letadlo – technici doporučují důkladnou předletovou prohlídku.": "Older aircraft – engineering recommends a thorough walkaround.", "Standardní provoz, žádná zvláštní upozornění. Hezký let!": "Normal operations, nothing special to report. Have a nice flight!",
+  "Klidný den v provozu. Přejeme pohodový let.": "A quiet day in operations. Have a relaxed flight.",
+  // situace – názvy
+  "Známá osobnost na palubě": "Celebrity on board", "Žádost o ruku": "Marriage proposal", "Narozeniny na palubě": "Birthday on board", "Svatební skupina": "Wedding party", "Fotbaloví fanoušci": "Football fans",
+  "Sportovní tým": "Sports team", "Školní výlet": "School trip", "Zájezd seniorů": "Seniors' tour", "Letecký nadšenec": "Aviation enthusiast", "Spotteři na letišti": "Spotters at the airport",
+  "Nemocný cestující": "Unwell passenger", "Alergie na ořechy": "Nut allergy", "Těhotná cestující": "Pregnant passenger", "Pes v kabině": "Dog in the cabin", "Sokol v kabině": "Falcon in the cabin",
+  "Kočka v podpalubí": "Cat in the hold", "Zpožděný catering": "Late catering", "Opožděné tankování": "Late refuelling", "Chybějící cestující": "No-show passenger", "Náklad navíc": "Extra cargo",
+  "Stávka handlingu": "Ground handling strike", "Ztracené zavazadlo": "Misloaded bag", "Ptáci na letišti": "Birds at the airport", "Dron u letiště": "Drone near the airport", "Práce na dráze": "Runway works",
+  "Vojenské cvičení": "Military exercise", "Vládní let": "Government flight", "Návazné lety": "Tight connections", "Kontrola z úřadu": "Ramp inspection", "Jumpseat": "Jumpseat",
+  "Technik na palubě": "Engineer on board", "Nový kolega v zácviku": "New crew member", "Odmrazování": "De-icing", "Velké horko": "Extreme heat", "Nemoc v posádce": "Crew sickness",
+  // situace – texty bez proměnných
+  "Cestující hlásil před nástupem zdravotní potíže, lékař ho pustil na palubu. Pokud se stav zhorší, zvaž přistání na alternativě.": "A passenger reported feeling unwell before boarding; a doctor cleared them to fly. If their condition worsens, consider diverting.",
+  "Cestující v 12. řadě chce během letu požádat přítelkyni o ruku. Vedoucí kabiny tě poprosí o krátké hlášení z kokpitu – drž palce, ať řekne ano! 💍": "A passenger in row 12 wants to propose to his girlfriend during the flight. The purser will ask you for a short announcement from the flight deck – fingers crossed she says yes! 💍",
+  "Malá cestující má dnes 7. narozeniny a je to její první let. Posádka chystá dárek a přání – pokud stihneš, mávni jí po přistání z kokpitu.": "A little passenger turns 7 today and it's her first flight. The crew is preparing a present – if you can, wave to her from the flight deck after landing.",
+  "Na palubu nastupuje skupina fanoušků po včerejším zápase. Posádka hlídá podávání alkoholu, může být hlučněji.": "A group of fans is boarding after yesterday's match. The crew is watching the alcohol service; it may get noisy.",
+  "Na palubě je skupina školáků. Čekej hlučnější kabinu a spoustu otázek na kapitána po přistání.": "A school group is on board. Expect a noisier cabin and lots of questions for the captain after landing.",
+  "Na palubě je skupina seniorů s cestovní kanceláří, několik z nich s asistencí. Nástup začne o pár minut dřív.": "A seniors' tour group is on board, several needing assistance. Boarding starts a few minutes early.",
+  "Cestující u okna se ptá, jestli si po přistání může vyfotit kokpit. Pokud to provoz dovolí, udělej mu radost. 📸": "A window-seat passenger asks if they can photograph the flight deck after landing. If operations allow, make their day. 📸",
+  "Na palubě je cestující se silnou alergií na ořechy. Prodej oříšků je zrušen a posádka o tom informuje cestující v okolí.": "A passenger with a severe nut allergy is on board. Nut sales are cancelled and the crew will inform nearby passengers.",
+  "Na palubě je cestující v pokročilém těhotenství s potvrzením od lékaře. Posádka ví, kde je porodnický balíček – snad nebude potřeba. 👶": "A heavily pregnant passenger with a doctor's note is on board. The crew knows where the birth kit is – hopefully it won't be needed. 👶",
+  "Na palubě je asistenční pes. Posádka o něm ví, je to dobrý kluk. 🐕": "An assistance dog is on board. The crew knows about him – he's a good boy. 🐕",
+  "Cestující převáží lovecého sokola s vlastním pasem a povolením. Sedí na rukavici majitele v první řadě a prý je klidnější než většina cestujících. 🦅": "A passenger is travelling with a hunting falcon that has its own passport and permit. It sits on its owner's glove in row 1 and is reportedly calmer than most passengers. 🦅",
+  "V teplotně řízeném nákladovém prostoru cestuje kočka. Zkontroluj, že je zapnuté vytápění nákladového prostoru. 🐈": "A cat is travelling in the heated hold. Check that cargo heating is on. 🐈",
+  "Catering dorazí o něco později. Počítej s možným zdržením při odletu, nespěchej na úkor bezpečnosti.": "Catering will arrive a bit late. Expect a possible departure delay; don't rush at the expense of safety.",
+  "Cisterna s palivem má zpoždění. Zkontroluj, že máš palivo podle plánu, než odjedeš od gate.": "The fuel truck is delayed. Make sure you have the planned fuel before leaving the gate.",
+  "Jeden odbavený cestující se nedostavil k nástupu. Jeho zavazadlo se musí vyložit, což může odlet zdržet o 10–15 minut.": "A checked-in passenger didn't show up for boarding. Their bag must be offloaded, which may delay departure by 10–15 minutes.",
+  "Na poslední chvíli přibyl expresní náklad (náhradní díly pro jinou aerolinku). Aktualizuj hmotnosti v plánu.": "Last-minute express cargo was added (spare parts for another airline). Update the weights in your plan.",
+  "Kufr cestujícího se omylem naložil na jiný let. Handling ho hledá, odlet tím snad ovlivněn nebude.": "A passenger's suitcase was loaded on another flight by mistake. Handling is looking for it; departure shouldn't be affected.",
+  "Část vzdušného prostoru po trati je kvůli vojenskému cvičení uzavřená. Počítej s objížďkou a pár minutami navíc.": "Part of the airspace along your route is closed for a military exercise. Expect a detour and a few extra minutes.",
+  "Na palubě poletí inspektor letového provozu na tzv. ramp check. Drž se standardních postupů do puntíku.": "An aviation inspector will be on board for a ramp check. Follow standard procedures to the letter.",
+  "Na sklopném sedadle v kokpitu poletí pilot jiné aerolinky na cestě domů. Bude rád za trochu povídání při cestovním letu.": "A pilot from another airline is riding the flight deck jumpseat on the way home. They'd appreciate a little chat in cruise.",
+  "Letí s vámi technik, který v cíli opraví závadu na jiném letadle. Pokud se cokoli objeví, máš odborníka hned po ruce. 🔧": "An engineer is flying with you to fix another aircraft at the destination. If anything comes up, you've got an expert right there. 🔧",
+  "V kabině je palubní průvodčí na prvním letu po výcviku. Purser na něj dohlíží – buď na něj hodný.": "A flight attendant is on their first flight after training. The purser is keeping an eye on them – be nice.",
+  "Jedna z palubních průvodčích onemocněla, za ni nastupuje kolegyně ze zálohy. Seznam posádky je už aktualizovaný.": "One of the flight attendants is sick; a standby colleague is replacing her. The crew list is already updated.",
+  // svátky
+  "Nový rok": "New Year's Day", "Svátek práce": "Labour Day", "Den vítězství": "Victory Day", "Cyril a Metoděj": "Saints Cyril and Methodius Day", "Mistr Jan Hus": "Jan Hus Day",
+  "Den české státnosti": "Czech Statehood Day", "Vznik Československa": "Independence Day", "Den boje za svobodu": "Freedom and Democracy Day", "Štědrý den": "Christmas Eve",
+  "1. svátek vánoční": "Christmas Day", "2. svátek vánoční": "Boxing Day", "Velký pátek": "Good Friday", "Velikonoční pondělí": "Easter Monday",
+  // fotky letadel, obchod
+  "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
+  "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
+  "a pak": "and then", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
+});
+EN_PAT.push(
+  [/^MSFS · (.+)$/, (m, a) => `MSFS · ${tr(a)}`], [/^(.+) · alternativa (\w+)$/, (m, a, b) => `${tr(a)} · alternate ${b}`],
+  [/^Nová verze (.+)$/, "New version $1"], [/^Aplikace verze (.*) · běží na tvém PC vedle MSFS$/, "App version $1 · runs on your PC next to MSFS"],
+  [/^Let se nepodařilo (smazat|přidat|načíst): (.*)$/, (m, a, b) => `The flight couldn't be ${({ smazat: "deleted", "přidat": "added", "načíst": "loaded" })[a]}: ${b}`],
+  [/^Lety se nepodařilo přidat: (.*)$/, "The flights couldn't be added: $1"], [/^Účet se nepodařilo smazat: (.*)$/, "The account couldn't be deleted: $1"],
+  [/^Nahrání se nepovedlo: (.*)$/, "Upload failed: $1"], [/^Fotku se nepodařilo nahrát: (.*)$/, "The photo couldn't be uploaded: $1"],
+  [/^Nemáš dost bodů \(máš (\S+), potřebuješ (\S+)\)\.$/, "Not enough points (you have $1, you need $2)."], [/^Koupit „(.+)“ za (\S+) bodů\?$/, "Buy “$1” for $2 points?"],
+  [/^Koupeno a nasazeno: (.+)$/, "Bought and equipped: $1"], [/^Rotace je tvoje!(.*)$/, (m, a) => "The rotation is yours!" + (a.trim() ? " You can book the flights in the crew centre right away." : "")],
+  [/^Najednou můžeš mít nejvýš 3 naplánované rotace\.$/, "You can have at most 3 planned rotations at once."], [/^Tuhle rotaci už má někdo jiný\.$/, "Someone else already has this rotation."],
+  [/^O zvýšení platu můžeš žádat jen jednou za 30 dní\.$/, "You can only ask for a pay rise once every 30 days."], [/^Základnu jde změnit jen jednou za 7 dní\.$/, "You can only change your base once every 7 days."],
+  [/^Přemístit se jako cestující jde jen jednou za 48 hodin\.$/, "You can only reposition as a passenger once every 48 hours."], [/^Jsi v (.+)\. Hezký let jako cestující! 🧳$/, (m, a) => `You're in ${tr(a)}. Enjoy the flight as a passenger! 🧳`],
+  [/^Přeletět jako cestující do (.+)\? Další přesun půjde až za 48 hodin\.$/, (m, a) => `Fly as a passenger to ${tr(a)}? You can move again in 48 hours.`],
+  [/^Další žádost od (.+)$/, "Next request from $1"], [/^Body za let: (.+)$/, "Points for flight: $1"], [/^Let z rotace · (.*)$/, (m, a) => "Rotation flight · " + a.replace("včas", "on time").replace(/zpoždění (\d+) min/, "delay $1 min").replace(/spokojenost cestujících/, "passenger satisfaction")],
+  [/^Obrat v (\w+): (\d+) minut, pak (\S+) do (\w+)\.$/, "Turnaround in $1: $2 minutes, then $3 to $4."],
+  [/^Dnes je (.+) – zvýšený provoz na letištích\.$/, (m, a) => `Today is ${tr(a)} – busier airports.`],
+  [/^Poletí s vámi (.+)\. Palubní průvodčí ho usadí až nakonec, prosíme o diskrétnost – a o pořádně měkké přistání, ať to není na sociálních sítích\. 😉$/, (m, a) => `Flying with you today: ${CELEB_EN[a] || a}. The cabin crew will seat them last – please be discreet, and make it a really soft landing so it doesn't end up on social media. 😉`],
+  [/^Na palubě je (\d+) svatebních hostů letících do (.+)\. Čekej veselou atmosféru a hodně fotek při nástupu\.$/, "There are $1 wedding guests on board flying to $2. Expect a cheerful atmosphere and lots of photos at boarding."],
+  [/^Na palubě je 26 svatebních hostů letících do (.+)\. Čekej veselou atmosféru a hodně fotek při nástupu\.$/, "There are 26 wedding guests on board flying to $1. Expect a cheerful atmosphere and lots of photos at boarding."],
+  [/^Letí s vámi celý basketbalový tým na turnaj v (.+)\. Hodně velkých zavazadel a dlouhých nohou – nástup potrvá déle\.$/, "A whole basketball team is flying with you to a tournament in $1. Lots of big bags and long legs – boarding will take longer."],
+  [/^U plotu v (\w+) dnes stojí skupina spotterů s teleobjektivy\. Tvoje přistání bude zítra na internetu – žádný tlak\. 😄$/, "Spotters with long lenses are at the fence in $1 today. Your landing will be online tomorrow – no pressure. 😄"],
+  [/^Na letišti (\w+) probíhá výstražná stávka pozemního personálu\. Odbavení zavazadel může být pomalejší\.$/, "There's a warning strike by ground staff at $1. Baggage handling may be slower."],
+  [/^Na letišti (\w+) je hlášena zvýšená aktivita ptáků\. Při vzletu buď ve střehu\.$/, "Increased bird activity is reported at $1. Stay alert on takeoff."],
+  [/^Poblíž letiště (\w+) byl spatřen dron\. Provoz může být na chvíli přerušen – sleduj pokyny věže\.$/, "A drone was spotted near $1. Traffic may be briefly suspended – follow tower instructions."],
+  [/^V (\w+) probíhají práce na dráze, část je uzavřená a použitelná délka je kratší\. Zkontroluj výpočet přistávacích výkonů\.$/, "Runway works are under way at $1; part of the runway is closed and the available length is shorter. Check your landing performance."],
+  [/^Na letiště (\w+) přilétá vládní speciál\. Kolem jeho příletu může být provoz krátce omezen a čekání v holdingu\.$/, "A government aircraft is arriving at $1. Traffic may be briefly restricted around its arrival, with holding."],
+  [/^Několik cestujících má v (\w+) krátký přestup\. Každá minuta se počítá\.$/, "Several passengers have a tight connection at $1. Every minute counts."],
+  [/^V (\w+) je kolem nuly\. Počítej s odmrazováním před odletem a ověř holdover time\.$/, "It's around freezing at $1. Expect de-icing before departure and check the holdover time."],
+  [/^V (\w+) je přes 33 °C\. (.*)$/, "It's over 33 °C at $1. Longer takeoff roll, lower engine performance and the air conditioning working hard on the ground – check your takeoff performance."],
+  [/^V (\w+) (fouká|se v čase příletu čeká) silný vítr \((.+)\) – připrav se na turbulentní přiblížení\.$/, (m, a, b, c) => `${b === "fouká" ? "Strong winds at" : "Strong winds are expected at arrival time at"} ${a} (${c.replace("nárazy", "gusts")}) – prepare for a bumpy approach.`],
+  [/^V cíli (jsou nyní|se v čase příletu čekají) podmínky (\w+) – počítej s přístrojovým přiblížením a zkontroluj alternativu\.$/, (m, a, b) => `${a === "jsou nyní" ? "The destination currently has" : "Expected at arrival time:"} ${b} conditions – plan an instrument approach and check your alternate.`],
+  [/^V (\w+) (hlásí bouřky|předpověď počítá s bouřkami) – sleduj vývoj a měj plán B\.$/, (m, a, b) => `${b === "hlásí bouřky" ? "Thunderstorms reported at" : "Thunderstorms forecast at"} ${a} – keep an eye on it and have a plan B.`],
+  [/^Přečti si poznámky k letišti (\w+) níže\.$/, "Read the notes for $1 below."], [/^Pozor: letadlo (\S+) je v čase odletu mimo provoz \((.+)\)\. Domluv se se správcem na náhradě\.$/, "Warning: aircraft $1 is out of service at departure time ($2). Contact an admin about a replacement."],
+  [/^S pravděpodobností (\d+) %:$/, "With $1 % probability:"], [/^předpověď na (odlet|přílet) (\S+)$/, (m, a, b) => `forecast for ${a === "odlet" ? "departure" : "arrival"} ${b}`],
+  [/^Pilot (.+)$/, "Pilot $1"], [/^\(přistaveno z (\w+)\)$/, "(positioned from $1)"], [/^Letadlo bude přistaveno z (\w+)\.$/, "The aircraft will be positioned from $1."],
+);
+const CELEB_EN = { "alžírský youtuber": "an Algerian YouTuber", "americký herec": "an American actor", "slavný fotbalista": "a famous footballer", "francouzská zpěvačka": "a French singer",
+  "český influencer": "a Czech influencer", "olympijská vítězka": "an Olympic champion", "španělský kuchař s michelinskou hvězdou": "a Michelin-starred Spanish chef", "ministr dopravy": "the transport minister",
+  "oblíbený moderátor počasí": "a popular TV weather presenter", "marocký rapper": "a Moroccan rapper", "slavná spisovatelka": "a famous novelist", "streamer s milionem sledujících": "a streamer with a million followers",
+  "italský módní návrhář": "an Italian fashion designer", "dánská princezna (neoficiálně)": "a Danish princess (unofficially)", "tuniský herec z oblíbeného seriálu": "a Tunisian TV series star",
+  "polský šampion v e-sportu": "a Polish e-sports champion", "německý závodník F1": "a German F1 driver", "bývalý kapitán Jáchym Air na zaslouženém odpočinku": "a retired Jáchym Air captain",
+  "generální ředitel Jáchym Air": "the CEO of Jáchym Air" };
+// dialogová okna (alert/confirm) také přeložit
+if (LANG === "en") { const _a = window.alert.bind(window), _c = window.confirm.bind(window); window.alert = m => _a(tr(String(m))); window.confirm = m => _c(tr(String(m))); }
+
+Object.assign(EN, {
+  // katalog závad (výchozí položky)
+  "APU nefunkční": "APU inoperative", "Start motorů jen s pozemním zdrojem (GPU) a vzduchem z letiště. Na zemi bez klimatizace z APU.": "Engine start only with ground power (GPU) and ground air. No APU air conditioning on the ground.",
+  "Jeden pack klimatizace mimo provoz": "One air-conditioning pack inoperative", "Omezení maximální letové hladiny (plánuj max. FL310) a vyšší spotřeba.": "Maximum flight level restriction (plan max FL310) and higher fuel burn.",
+  "Jeden reverser deaktivován": "One thrust reverser deactivated", "Počítej s delší přistávací dráhou a vyšším nastavením autobrake.": "Expect a longer landing distance and a higher autobrake setting.",
+  "Autobrake nefunkční": "Autobrake inoperative", "Brzdění po přistání a přerušeném vzletu ručně.": "Manual braking after landing and for a rejected takeoff.",
+  "Meteoradar nefunkční": "Weather radar inoperative", "Let jen mimo oblasti s předpovídanými bouřkami. Zkontroluj TAF po trati.": "Fly only outside areas with forecast thunderstorms. Check en-route TAFs.",
+  "Odmrazování křídel omezeno": "Wing anti-ice limited", "Zákaz letu do známé nebo očekávané námrazy.": "No flight into known or forecast icing.",
+  "Spoiler deaktivován": "Spoiler deactivated", "Delší přistávací dráha, zkontroluj výpočet výkonů.": "Longer landing distance, check your performance calculation.",
+  "Jeden FMGC/FMC nefunkční": "One FMGC/FMC inoperative", "Let s jedním systémem řízení letu, druhý jen v záloze.": "Flying with one flight management system, the other only as a backup.",
+  "ACARS/CPDLC nefunkční": "ACARS/CPDLC inoperative", "Komunikace s dispečinkem a ATC jen hlasem.": "Voice-only communication with dispatch and ATC.",
+  "Jedna toaleta mimo provoz": "One lavatory inoperative", "Méně toalet pro cestující, palubní posádka upozorní při nástupu.": "Fewer lavatories for passengers; the cabin crew will announce it at boarding.",
+  "Kávovar v galley nefunkční": "Galley coffee maker inoperative", "Bez teplých nápojů z přední galley. Cestující nebudou nadšení.": "No hot drinks from the forward galley. Passengers won't be thrilled.",
+  "Wi-Fi na palubě nefunkční": "On-board Wi-Fi inoperative", "Cestující bez připojení k internetu.": "No internet for passengers.",
+  "Logo světlo nefunkční": "Logo light inoperative", "Bez dopadu na provoz.": "No operational impact.",
+  "Kyslíková maska u jednoho sedadla": "Oxygen mask at one seat", "Sedadlo blokováno, kapacita o 1 místo nižší.": "Seat blocked, capacity reduced by 1.",
+  "Jedna obrazovka EIS bliká": "One EIS screen flickering", "Sleduj záložní přístroje, při selhání přepni zobrazení.": "Monitor the standby instruments; switch displays if it fails.",
+  "Netěsnost hydrauliky (sledovat)": "Hydraulic leak (monitor)", "Kontroluj množství hydraulické kapaliny před každým letem.": "Check hydraulic quantity before every flight.",
+  "Starší EIS displeje": "Older EIS displays", "Economy a premium economy": "Economy and premium economy", "Split scimitar winglets (SSW)": "Split scimitar winglets (SSW)",
+  // personální oddělení (odpovědi z databáze)
+  "Vaše výsledky jsou výjimečné. Vedení schválilo zvýšení platu o 6 %. Gratulujeme a děkujeme za vzornou reprezentaci Jáchym Air!": "Your results are exceptional. Management has approved a 6 % pay rise. Congratulations, and thank you for representing Jáchym Air so well!",
+  "Odvádíte velmi dobrou práci. Schvalujeme zvýšení platu o 4 %.": "You're doing very good work. We approve a 4 % pay rise.",
+  "Váš plat už dosáhl maxima pro vaši smlouvu. Další růst vás čeká s vyšší hodností.": "Your salary has reached the maximum for your contract. Further growth comes with a higher rank.",
+  "Žádost bohužel tentokrát zamítáme. Zaměřte se na dochvilnost, kvalitu přistání a spokojenost cestujících a zkuste to za měsíc znovu.": "Unfortunately we have to decline this time. Focus on punctuality, landing quality and passenger satisfaction, and try again in a month.",
+});
+EN_PAT.push(
+  [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
+  [/^MEL: (.+?) – (.+)$/, (m, a, b) => `MEL: ${tr(a)} – ${tr(b)}`],
+  [/^rosný bod (-?\d+) °C$/, "dew point $1 °C"],
+  [/^(skoro jasno|polojasno|oblačno|zataženo|nebe neviditelné|jasno)\b(.*)$/, m => m.replace(/skoro jasno/g, "few").replace(/polojasno/g, "scattered").replace(/oblačno/g, "broken").replace(/zataženo/g, "overcast").replace(/nebe neviditelné/g, "sky obscured").replace(/jasno/g, "clear")],
+  [/^(\d+) letů?$/, "$1 flights"],
+  [/^(\d+) ks · ([\d,.\s]+) kg$/, "$1 pcs · $2 kg"], [/^← Profil (.+)$/, "← Profile $1"], [/^Start motorů jen s pozemním zdrojem \(GPU\) a vzduchem z letiště\.?$/, "Engine start only with ground power (GPU) and ground air."], [/^Personální oddělení, (.+):$/, "HR department, $1:"],
+  [/^Vaše výkony jsou solidní\. Schvalujeme zvýšení platu o (\S+) %\. Pro větší navýšení zapracujte na dochvilnosti a přistáních\.$/, "Your performance is solid. We approve a $1 % pay rise. For a bigger rise, work on punctuality and landings."],
+  [/^Děkujeme za žádost\. Za posledních 30 dní jste odlétal\(a\) jen (\d+) (let|lety|letů) z rozpisu, což je na posouzení málo\. Zkuste to znovu, až budete mít za sebou víc rotací\.$/, "Thanks for your request. In the last 30 days you've flown only $1 roster flight(s), which isn't enough to assess. Try again once you've flown more rotations."],
+  [/^\((kat\. \w), do (.+)\)$/, (m, a, b) => `(${a.replace("kat.", "cat.")}, until ${b})`],
+);
+
+Object.assign(EN, {
+  "Přidej screenshoty přímo během letu, po uložení letu se k němu připojí.": "Add screenshots during the flight; they'll be attached once the flight is saved.",
+  // Správa
+  "Tady zakládáš let týdne, YouTube eventy a novinky.": "Here you create the flight of the week, YouTube events and news.", "Tahle stránka je jen pro správce webu.": "This page is for site admins only.",
+  "Nová položka": "New item", "Všechny položky": "All items", "Zatím nic. Vytvoř první let týdne!": "Nothing yet. Create the first flight of the week!", "Vytvořit": "Create", "Název": "Title",
+  "Začátek": "Start", "Konec": "End", "Konec je dřív než začátek.": "The end is before the start.", "Odkaz (např. na YouTube stream)": "Link (e.g. to a YouTube stream)",
+  "Odkaz musí začínat https://": "The link must start with https://", "Odkazy začínající https:// se samy změní na klikací.": "Links starting with https:// become clickable automatically.",
+  "Připnout (má přednost na hlavní stránce)": "Pin (shown first on the home page)", "Vytvořeno! Hned je vidět v Novinkách i na mapě.": "Created! It's visible in the News and on the map right away.",
+  "Teď je na webu": "On the website now", "vždy": "always", "Zrušit úpravy": "Cancel editing", "@Popis, pravidla, tipy na scenérie…": "@Description, rules, scenery tips…",
+  "@např. Přes Alpy do Innsbrucku": "@e.g. Over the Alps to Innsbruck", "Linky z crew centra": "Routes from the crew centre",
+  "Zkopíruje linky a flotilu z crew.jachymair.com, aby byly vidět na mapě. Spusť po každé změně linek v crew centru.": "Copies routes and fleet from crew.jachymair.com so they show on the map. Run it after every route change in the crew centre.",
+  "Nejdřív synchronizuj linky z crew centra, načte se i flotila.": "Sync the routes from the crew centre first; the fleet is loaded too.", "Synchronizovat linky": "Sync routes",
+  "Rozpis rotací": "Rotation roster", "Tracker poskládá z linek a jejich časů rotace: z Alžíru zpět do Alžíru a mezi minihuby s letadly z minihubů. Návrh si projdi, případně něco vyřaď, a zveřejni.": "The tracker builds rotations from the routes and their times: from Algiers back to Algiers, and between the minihubs with minihub aircraft. Review the draft, remove anything you don't want, and publish.",
+  "Od": "From", "Dní": "Days", "Max. letů v rotaci": "Max legs per rotation", "Max. služba (h)": "Max duty (h)", "Povolit rotace s přespáním": "Allow rotations with night stops",
+  "Vygenerovat návrh": "Generate draft", "Zveřejnit rozpis": "Publish roster", "Smazat všechny volné budoucí rotace": "Delete all open future rotations", "Vyřadit": "Remove",
+  "Smazat všechny volné (neobsazené) budoucí rotace?": "Delete all open (untaken) future rotations?", "Volné rotace smazány.": "Open rotations deleted.",
+  "Flotila – provozní údaje": "Fleet – operational data", "Stáří, kapacita a poznámky k letadlům. Použijí se v briefinzích a při výpočtu obsazenosti.": "Age, capacity and notes for the aircraft. Used in briefings and load calculations.",
+  "Skupina": "Group", "Ve službě od": "In service since", "Míst celkem": "Total seats", "Z toho premium": "Of which premium", "Výcvik": "Training", "@Jen výcvikové lety": "@Training flights only",
+  "Přidat letadlo (registrace)": "Add aircraft (registration)", "@např. 7T-JAK": "@e.g. 7T-JAK", "Doplnit letadla z crew centra": "Import aircraft from the crew centre",
+  "Přidá letadla, která jsou v crew centru, ale tady chybí. Pak u nich doplň kapacitu a skupinu.": "Adds aircraft that are in the crew centre but missing here. Then fill in their capacity and group.",
+  "Tohle letadlo už v seznamu je.": "This aircraft is already in the list.", "Uvolnit": "Release", "Opravit": "Fix", "Minihuby": "Minihubs",
+  "Katalog závad (MEL)": "Defect catalogue (MEL)", "Odložené závady, které můžou letadla po letech „dostat“. Kategorie A–D určuje vážnost, dny lhůtu na opravu. Starší letadla mají větší šanci; „od stáří“ omezí závadu jen na starší letadla.": "Deferred defects aircraft can “get” after flights. Category A–D sets the severity, days the repair deadline. Older aircraft are more likely; “min. age” limits a defect to older aircraft.",
+  "Závada": "Defect", "Dopad pro piloty": "Impact for pilots", "Kat.": "Cat.", "Častost": "Frequency", "Od stáří": "Min. age", "Aktivní": "Active", "Dopad": "Impact", "Závada přidána.": "Defect added.",
+  "Smazat závadu z katalogu?": "Delete this defect from the catalogue?",
+  "Poznámky k letištím": "Airport notes", "Místní standardy, parkování, zvláštnosti a doba obratu. Objeví se v briefinzích letů z a na dané letiště.": "Local standards, parking, peculiarities and turnaround time. Shown in briefings for flights from and to the airport.",
+  "Letiště (ICAO)": "Airport (ICAO)", "Doba obratu (min)": "Turnaround (min)", "Poznámky pro piloty": "Notes for pilots", "Uložit poznámku": "Save note", "Zatím žádné poznámky.": "No notes yet.",
+  "@např. Parkování nosem ven na apronu B, pozor na úzké pojezdové dráhy…": "@e.g. Nose-out parking on apron B, watch out for narrow taxiways…", "Smazat poznámku?": "Delete this note?",
+  "Fotky letadel Jáchym Air": "Jáchym Air aircraft photos", "Fotka se ukáže v detailu letu u letadla s danou registrací (má přednost před Planespotters). Ideálně na šířku, max. 5 MB.": "The photo appears in the flight detail for that registration (takes priority over Planespotters). Ideally landscape, max 5 MB.",
+  "Přidat fotku pro jinou registraci nebo typ letadla": "Add a photo for another registration or aircraft type", "@např. OK-JAI nebo A346 (ilustrační foto pro celý typ)": "@e.g. OK-JAI or A346 (illustrative photo for the whole type)",
+  "Virtuální aerolinky": "Virtual airlines", "Přidat virtuálku": "Add virtual airline", "Virtuálka přidána.": "Virtual airline added.", "Tahle zkratka už existuje.": "This code already exists.", "Smazat virtuálku?": "Delete this virtual airline?",
+  "Nahlášení": "Reports", "Žádná nahlášení. 👍": "No reports. 👍", "Vyřízeno": "Resolved", "Zveřejněný rozpis": "Published roster",
+  "Nepodařilo se složit žádnou rotaci. Zkontroluj, že mají linky v crew centru vyplněné časy odletu a příletu, letadla ve Flotile mají typ a skupinu (DAAG/MINI) a že jsi synchronizoval linky.": "No rotations could be built. Check that the routes in the crew centre have departure and arrival times, the aircraft in the Fleet have a type and group (DAAG/MINI), and that you've synced the routes.",
+  "Všechna letadla z crew centra už ve Flotile jsou. (Pokud nějaké chybí, synchronizuj linky.)": "All crew centre aircraft are already in the Fleet. (If any are missing, sync the routes.)",
+});
+EN_PAT.push(
+  [/^Aktivní rotace: (.+)$/, "Active rotation: $1"], [/^Zveřejněný rozpis \((\d+)\)$/, "Published roster ($1)"], [/^Návrh: (\d+) rotací$/, "Draft: $1 rotations"],
+  [/^Přehled linek: (.+)$/, (m, a) => "Route overview: " + a.replace(" celkem", " total").replace("bez časů", "without times").replace("za celé období zařazeno", "scheduled over the period").replace(" z ", " of ").replace("první den", "first day")],
+  [/^(\S+) uloženo\.$/, "$1 saved."], [/^Zveřejněno (\d+) rotací\. Piloti je najdou v Rozpisu\.$/, "Published $1 rotations. Pilots will find them in the Roster."],
+);
+
+Object.assign(EN, {
+  // události aplikace
+  "Let uložen na web ✔": "Flight saved to the website ✔", "Chybí knihovna SimConnect.": "The SimConnect library is missing.", "Připojeno k MSFS ✔": "Connected to MSFS ✔",
+  "Čekám na MSFS…": "Waiting for MSFS…", "Zaznamenávám pojíždění…": "Recording taxi…", "Dlouhé stání – předchozí pojíždění zahozeno.": "Long stop – previous taxi discarded.",
+  "Falešný vzlet při načítání letu zahozen, čekám na skutečný vzlet.": "False takeoff while loading the flight discarded, waiting for the real takeoff.",
+  "Let ukončen bez přistání – ukládám, co se doletělo.": "Flight ended without landing – saving what was flown.", "Stahuji databázi letišť (jen poprvé)…": "Downloading the airport database (first time only)…",
+  "Tracker se připojil až během pojíždění – trasa začíná odsud.": "The tracker connected during taxi – the track starts here.", "Tracker se připojil až za letu – vzlet a pojíždění chybí.": "The tracker connected in flight – takeoff and taxi are missing.",
+  "DEMO režim: simuluji let, přistání přijde zhruba každé 2 minuty. Na web se nic neposílá.": "DEMO mode: simulating a flight, a landing roughly every 2 minutes. Nothing is sent to the website.",
+  "🛫 Vzlet": "🛫 Takeoff",
+});
+EN_PAT.push(
+  [/^🛫 Vzlet z (\w+)$/, "🛫 Takeoff from $1"],
+  [/^let (\S+)$/, "flight $1"],
+  [/^🛬 PŘISTÁNÍ(?: v (\w+))?: (.+) – (.+)$/, (m, ap, d, h) => `🛬 LANDING${ap ? " at " + ap : ""}: ${d} – ${tr(h)}`],
+  [/^Letový plán: (.+)$/, (m, a) => "Flight plan: " + a.replace("alt.", "altn")], [/^Přihlášen jako (.+) \((.+)\)$/, "Signed in as $1 ($2)"],
+  [/^Je k dispozici nová verze (.+)$/, "New version $1 available"], [/^Databáze letišť připravena \((.+) letišť\)\.$/, "Airport database ready ($1 airports)."],
+  [/^Databáze drah připravena \((.+) drah\)\.$/, "Runway database ready ($1 runways)."], [/^Odesláno (\d+) dříve neodeslaných letů ✔$/, "Sent $1 previously unsent flights ✔"],
+  [/^Let se nepodařilo uložit \((.+)\), zkusím to znovu později\.$/, "The flight couldn't be saved ($1), will retry later."],
+  [/^Spojení s MSFS přerušeno: ?(.*)$/, "Connection to MSFS lost: $1"], [/^Polohu se nepodařilo odeslat: ?(.*)$/, "Position couldn't be sent: $1"], [/^Web odmítl polohu: ?(.*)$/, "The website rejected the position: $1"],
+  [/^Let se při zavírání nepodařilo uložit: ?(.*)$/, "The flight couldn't be saved on close: $1"],
+);
+
+Object.assign(EN, {
+  "Letadla pro tuto linku": "Aircraft for this route", "Obsazenost": "Load factor", "vlastní fotka pilota": "pilot's own photo",
+  // obchod (názvy z databáze)
+  "Zelená Jáchym Air": "Jáchym Air green", "Nebeská modrá": "Sky blue", "Západ slunce": "Sunset", "Noční fialová": "Night violet", "Zlatá": "Gold",
+  "Stříbrný rámeček": "Silver frame", "Zlatý rámeček": "Gold frame", "Máslový rámeček 🧈": "Butter frame 🧈", "Radarový rámeček": "Radar frame", "Duhový rámeček": "Rainbow frame",
+  "Mistr másla": "Butter Master", "Mistr másla 🧈": "Butter Master 🧈", "Kapitán dochvilnosti": "Captain Punctual", "Kapitán dochvilnosti ⏱️": "Captain Punctual ⏱️",
+  "Noční sova": "Night Owl", "Noční sova 🦉": "Night Owl 🦉", "Cestovatel": "Globetrotter", "Cestovatel 🌍": "Globetrotter 🌍", "Pán obratů": "Turnaround King", "Pán obratů ⚡": "Turnaround King ⚡",
+  "Legenda Alžíru": "Legend of Algiers", "Legenda Alžíru 🏆": "Legend of Algiers 🏆", "Červené letadlo": "Red plane", "Modré letadlo": "Blue plane", "Fialové letadlo": "Purple plane",
+  "Oranžové letadlo": "Orange plane", "Zlaté letadlo": "Gold plane", "Obchod: Zelená Jáchym Air": "Shop: Jáchym Air green",
+  "Bonus za dokončenou rotaci": "Completed rotation bonus", "Novinka": "News", "YouTube": "YouTube",
+});
+EN_PAT.push(
+  [/^Let týdne · končí (.+)$/, (m, a) => "Flight of the week · ends " + tr(a)], [/^končí (.+)$/, (m, a) => "ends " + tr(a)], [/^za (\d+) (h|min)(.*)$/, "in $1 $2$3"], [/^před (\d+) (h|min)$/, "$1 $2 ago"],
+  [/^Linky Jáchym Air \((\d+)\)$/, "Jáchym Air routes ($1)"], [/^Obsazenost ± (\d+) %$/, "Load factor ± $1 %"], [/^v (\w{4})$/, "at $1"], [/^stojí v (\w{4}) ✓$/, "parked at $1 ✓"],
+  [/^Výsledky \((\d+) (pilot|piloti|pilotů)\)$/, (m, a) => `Results (${a} ${a === "1" ? "pilot" : "pilots"})`],
+  [/^Zatím nikdo neodletěl\. Leť (\w+) → (\w+)(?: s (.+?))? a buď první!$/, (m, a, b, c) => `Nobody has flown it yet. Fly ${a} → ${b}${c ? " in a " + c : ""} and be the first!`],
+  [/^Foto © (.+)$/, (m, a) => "Photo © " + tr(a)], [/^([\d,.\s]+) b$/, "$1 pts"], [/^Obchod: (.+)$/, (m, a) => "Shop: " + tr(a)],
+  [/^Let (\w+) → (\w+) z rotace$/, "Rotation flight $1 → $2"], [/^Volný let (\S+) → (\S+)$/, "Free flight $1 → $2"],
+  [/^Od (.+)$/, "From $1"], [/^Do (.+)$/, "Until $1"], [/^Let týdne$/, "Flight of the week"],
+);
+
+function windText(s) {
+  return s.replace(/^bezvětří/, "calm").replace(/vítr proměnlivý/, "wind variable").replace(/^vítr/, "wind").replace(/nárazy/g, "gusts").replace(/dohlednost 10 km a více/g, "visibility 10 km or more")
+    .replace(/dohlednost/g, "visibility").replace(/bez významné oblačnosti/g, "no significant cloud").replace(/polojasno/g, "scattered").replace(/skoro jasno/g, "few")
+    .replace(/oblačno/g, "broken").replace(/zataženo/g, "overcast").replace(/slabý /g, "light ").replace(/silný /g, "heavy ").replace(/déšť/g, "rain").replace(/mrholení/g, "drizzle")
+    .replace(/sníh/g, "snow").replace(/bouřka/g, "thunderstorm").replace(/přeháňky/g, "showers").replace(/mlha/g, "fog").replace(/kouřmo/g, "mist").replace(/zákal/g, "haze");
+}
+function tr(text) {
+  if (LANG !== "en" || !text) return text;
+  const lead = text.match(/^\s*/)[0], trail = text.match(/\s*$/)[0], core = text.trim();
+  if (!core) return text;
+  if (Object.prototype.hasOwnProperty.call(EN, core)) return lead + EN[core] + trail;
+  for (const [re, rep] of EN_PAT) { if (!re.test(core)) continue; const out = core.replace(re, rep); if (out !== core) return lead + out + trail; }
+  // ikonka nebo znak na začátku / konci („✉ Napsat“, „· let“, „Kapitán:“): přeložit text uvnitř
+  const sym = core.match(/^([^\p{L}\p{N}„“"(]+)?(.*?)([^\p{L}\p{N}…)“”"%]+)?$/u);
+  if (sym && (sym[1] || sym[3]) && sym[2]) { const inner = tr(sym[2]); if (inner !== sym[2]) return lead + (sym[1] || "") + inner + (sym[3] || "") + trail; }
+  // složený text „A · B · C“: přeložit každou část zvlášť
+  if (core.includes(" · ")) { const parts = core.split(" · "), outp = parts.map(x => tr(x)); if (outp.some((x, i) => x !== parts[i])) return lead + outp.join(" · ") + trail; }
+  return text;
+}
+const I18N_SKIP = "script,style,textarea,code,pre,.ugc,.ev-text,.wx-raw,.bubble,[data-noi18n]";
+function translateTree(root) {
+  if (LANG !== "en" || !root) return;
+  if (root.nodeType === 3) { const p = root.parentElement; if (p && !p.closest(I18N_SKIP)) { const v = tr(root.nodeValue); if (v !== root.nodeValue) root.nodeValue = v; } return; }
+  if (root.nodeType !== 1 || root.closest?.(I18N_SKIP)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n; const todo = [];
+  while ((n = w.nextNode())) { if (!n.parentElement?.closest(I18N_SKIP)) todo.push(n); }
+  todo.forEach(t => { const v = tr(t.nodeValue); if (v !== t.nodeValue) t.nodeValue = v; });
+  const els = [root, ...root.querySelectorAll("[placeholder],[title],[aria-label],[alt]")];
+  els.forEach(el => ["placeholder", "title", "aria-label", "alt"].forEach(a => { const v = el.getAttribute?.(a); if (v) { const k = EN["@" + v] ? "@" + v : null; const t2 = k ? EN[k] : tr(v); if (t2 !== v) el.setAttribute(a, t2); } }));
+}
+if (LANG === "en") {
+  document.documentElement.lang = "en";
+  new MutationObserver(muts => { for (const m of muts) { if (m.type === "characterData") translateTree(m.target); else m.addedNodes.forEach(translateTree); } })
+    .observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+  document.addEventListener("DOMContentLoaded", () => translateTree(document.body));
+}
+function setLang(l) { try { localStorage.setItem("jai_lang", l); } catch { } location.reload(); }
+document.addEventListener("DOMContentLoaded", () => { const b = document.getElementById("langBtn"); if (b) { b.textContent = LANG === "en" ? "CZ" : "EN"; b.title = LANG === "en" ? "Přepnout do češtiny" : "Switch to English"; b.onclick = () => setLang(LANG === "en" ? "cs" : "en"); } });
+
+
 const CFG = window.JAI_CONFIG || {};
 document.getElementById("appName").textContent = CFG.APP_NAME || "JAI Tracker";
 document.title = CFG.APP_NAME || "JAI Tracker";
@@ -478,10 +940,10 @@ const sb = notConfigured ? null : supabase.createClient(CFG.SUPABASE_URL, CFG.SU
 /* ---------- pomocné funkce ---------- */
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const nf = new Intl.NumberFormat("cs-CZ");
-const fmt1 = n => Number(n).toLocaleString("cs-CZ", { maximumFractionDigits: 1 });
-const fmtG = n => Number(n).toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const fmtDate = d => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
+const nf = new Intl.NumberFormat(LOCALE);
+const fmt1 = n => Number(n).toLocaleString(LOCALE, { maximumFractionDigits: 1 });
+const fmtG = n => Number(n).toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDate = d => new Date(d).toLocaleDateString(LOCALE, { day: "numeric", month: "numeric", year: "numeric" });
 const fmtDur = min => { min = Math.round(min || 0); return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`; };
 const scoreCls = s => s >= 8 ? "s-hi" : s >= 6 ? "s-mid" : s >= 3 ? "s-lo" : "s-bad";
 const scoreHtml = s => s == null ? '<span class="muted">–</span>' : `<span class="score ${scoreCls(s)}">${fmt1(s)}</span>`;
@@ -709,6 +1171,7 @@ function renderTracker(full) {
       if (obs.pos) q.set("pozice", obs.pos);
       if (obs.color.toLowerCase() !== "#1e9b36") q.set("barva", obs.color.slice(1));
       if (obs.scale !== 100) q.set("scale", (obs.scale / 100).toFixed(2));
+      if (LANG === "en") q.set("lang", "en");
       const qs = q.toString(); return s.obs_url + "/" + (qs ? "?" + qs : ""); };
     const syncObs = () => { settings.obs = obs; saveSettings(); $("obsUrl").textContent = obsUrl(); $("obsScaleV").textContent = obs.scale; };
     $("obsStyl").value = obs.styl; $("obsPos").value = obs.pos; $("obsColor").value = obs.color; $("obsScale").value = obs.scale; syncObs();
@@ -777,7 +1240,7 @@ function renderTracker(full) {
     $("trLand").innerHTML = `${nf.format(l.fpm)} fpm · ${fmtG(l.g)} G · ${esc(l.odlet || "????")} → ${esc(l.prilet || "????")} · ${String(l.cas).slice(11, 16)}`
       + (l.draha ? `<br>${esc(l.draha)}` : "") + (l.odskoky ? ` · odskoky: ${l.odskoky}` : "");
   }
-  $("trLog").textContent = (s.log || []).slice().reverse().map(([t, m]) => `${t}  ${m}`).join("\n") || "Zatím nic.";
+  $("trLog").textContent = (s.log || []).slice().reverse().map(([t, m]) => `${t}  ${tr(m)}`).join("\n") || tr("Zatím nic.");
   $("trUpd").innerHTML = (s.update_error ? `<div class="msg err">${esc(s.update_error)}</div>` : "") + (s.update ? `<div class="upd-banner"><span>Nová verze ${esc(s.update.version)} je připravená</span>
     <button class="btn" id="trUpdBtn" ${s.update_progress != null ? "disabled" : ""}>${s.update_progress != null ? (s.update_progress >= 100 ? "Instaluji…" : `Stahuji ${s.update_progress} %`) : "Aktualizovat"}</button></div>` : "");
   const flying = s.flight_state === "flying";
@@ -1433,7 +1896,7 @@ function renderRoutePanel() {
 
 /* ---------- detail letu (živý i dokončený) ---------- */
 const apByCode = code => airports.find(a => a[0] === code);
-const hm = d => d ? new Date(d).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" }) : "–";
+const hm = d => d ? new Date(d).toLocaleTimeString(LOCALE, { hour: "2-digit", minute: "2-digit" }) : "–";
 function delayHtml(sched, actual) {
   if (!sched || !actual) return "";
   const m = Math.round((new Date(actual) - new Date(sched)) / 60000);
@@ -1908,7 +2371,9 @@ async function friendButton(el, uid, username) {
     };
   }
 }
-const ago = d => { if (!d) return "dávno"; const m = Math.round((Date.now() - new Date(d)) / 60000); return m < 1 ? "právě teď" : m < 60 ? `před ${m} min` : m < 1440 ? `před ${Math.round(m / 60)} h` : fmtDate(d); };
+const ago = d => { if (!d) return tr("dávno"); const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (LANG === "en") return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : fmtDate(d);
+  return m < 1 ? "právě teď" : m < 60 ? `před ${m} min` : m < 1440 ? `před ${Math.round(m / 60)} h` : fmtDate(d); };
 async function renderFriends(msg) {
   const el = $("pratele");
   if (!me) { el.innerHTML = '<h1 class="page-title">Přátelé</h1><div class="card">Pro přátele a zprávy se <a href="#/ucet">přihlas</a>.</div>'; return; }
@@ -1974,7 +2439,7 @@ async function renderChat(username) {
     if (newest !== lastId) {
       lastId = newest;
       const log = $("chLog"); if (!log) return;
-      log.innerHTML = list.length ? list.map(m => `<div class="bubble ${m.sender === me.user.id ? "me" : "them"}">${esc(m.body)}<small>${new Date(m.created_at).toLocaleString("cs-CZ", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</small></div>`).join("")
+      log.innerHTML = list.length ? list.map(m => `<div class="bubble ${m.sender === me.user.id ? "me" : "them"}">${esc(m.body)}<small>${new Date(m.created_at).toLocaleString(LOCALE, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}</small></div>`).join("")
         : '<p class="muted">Zatím žádné zprávy. Napiš první!</p>';
       log.scrollTop = log.scrollHeight;
     }
@@ -2128,10 +2593,11 @@ function relTime(d) {
   let t;
   if (m < 60) t = `${m} min`;
   else if (m < 48 * 60) { const h = Math.floor(m / 60); t = `${h} h${m % 60 && h < 10 ? ` ${m % 60} min` : ""}`; }
-  else { const dd = Math.round(m / 1440); t = `${dd} ${dd < 5 ? "dny" : "dní"}`; }
+  else { const dd = Math.round(m / 1440); t = LANG === "en" ? `${dd} days` : `${dd} ${dd < 5 ? "dny" : "dní"}`; }
+  if (LANG === "en") return past ? `${t} ago` : `in ${t}`;
   return past ? `před ${t}` : `za ${t}`;
 }
-const fmtDT = d => d ? new Date(d).toLocaleString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+const fmtDT = d => d ? new Date(d).toLocaleString(LOCALE, { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
 function ytId(url) {
   const m = String(url || "").match(/(?:youtu\.be\/|v=|\/live\/|\/embed\/|\/shorts\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
@@ -2396,9 +2862,9 @@ function pragueToUtc(day, minutes) {
   return new Date(t);
 }
 const pragueDay = date => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Prague" }).format(date);
-const hmPrague = d => new Date(d).toLocaleTimeString("cs-CZ", { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit" });
+const hmPrague = d => new Date(d).toLocaleTimeString(LOCALE, { timeZone: "Europe/Prague", hour: "2-digit", minute: "2-digit" });
 const dayLabel = day => { const t = pragueDay(new Date()), tm = pragueDay(new Date(Date.now() + 864e5));
-  return day === t ? "Dnes" : day === tm ? "Zítra" : new Date(day + "T12:00:00Z").toLocaleDateString("cs-CZ", { weekday: "short", day: "numeric", month: "numeric" }); };
+  return day === t ? "Dnes" : day === tm ? "Zítra" : new Date(day + "T12:00:00Z").toLocaleDateString(LOCALE, { weekday: "short", day: "numeric", month: "numeric" }); };
 function parseHM(str) { const m = String(str || "").match(/(\d{1,2})\s*[:.h]?\s*(\d{2})/); if (!m) return null; const h = +m[1], mi = +m[2]; return h < 24 && mi < 60 ? h * 60 + mi : null; }
 
 /* ---------- základny, poloha pilota ---------- */
@@ -2560,9 +3026,9 @@ function statusHtml(reg, compact) {
   const cond = Math.round(100 - (st.wear || 0)), left = Math.max(0, Math.round(CHECK_HOURS - (st.hours_since_check || 0)));
   const oos = st.oos_until && new Date(st.oos_until) > new Date();
   const bar = `<div style="height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:4px 0 6px"><div style="height:100%;width:${cond}%;background:${cond > 70 ? "var(--green)" : cond > 40 ? "#EAB308" : "#DC2626"}"></div></div>`;
-  return `${oos ? `<div class="msg err" style="margin:0 0 8px">Mimo provoz do ${new Date(st.oos_until).toLocaleString("cs-CZ", { timeZone: "Europe/Prague", weekday: "short", hour: "2-digit", minute: "2-digit" })}: ${esc(st.oos_reason || "údržba")}</div>` : ""}
+  return `${oos ? `<div class="msg err" style="margin:0 0 8px">Mimo provoz do ${new Date(st.oos_until).toLocaleString(LOCALE, { timeZone: "Europe/Prague", weekday: "short", hour: "2-digit", minute: "2-digit" })}: ${esc(st.oos_reason || "údržba")}</div>` : ""}
     <div style="font-size:14px">Technický stav <b>${cond} %</b> · do A-check <b>${left} h</b></div>${bar}
-    ${df.length ? `<div style="font-size:14px"><b>Odložené závady:</b><ul style="margin:4px 0 0;padding-left:18px">${df.map(d => `<li><b>${esc(d.title)}</b> <span class="muted" style="font-size:12px">(${MEL_TXT[d.category] || ""}, do ${new Date(d.due_at).toLocaleDateString("cs-CZ")})</span>${!compact && d.effect ? `<br><span class="muted" style="font-size:13px">${esc(d.effect)}</span>` : ""}</li>`).join("")}</ul></div>`
+    ${df.length ? `<div style="font-size:14px"><b>Odložené závady:</b><ul style="margin:4px 0 0;padding-left:18px">${df.map(d => `<li><b>${esc(d.title)}</b> <span class="muted" style="font-size:12px">(${MEL_TXT[d.category] || ""}, do ${new Date(d.due_at).toLocaleDateString(LOCALE)})</span>${!compact && d.effect ? `<br><span class="muted" style="font-size:13px">${esc(d.effect)}</span>` : ""}</li>`).join("")}</ul></div>`
       : '<div class="muted" style="font-size:13px">Bez odložených závad.</div>'}`;
 }
 
@@ -2686,8 +3152,8 @@ function careerCardHtml(c, own) {
       <dt>Výkonnostní bonus</dt><dd>${eur(c.salary.bonus)} <span class="muted">(${nf.format(c.points30)} b)</span></dd>
       <dt><b>Celkem</b></dt><dd><b>${eur(c.salary.total)}</b></dd></dl>
       <p class="muted" style="font-size:12px;margin:6px 0 10px">Plat je jen pro zábavu, skutečné peníze to nejsou 😄</p>
-      ${last ? `<div class="msg ${Number(last.pct) > 0 ? "ok" : "err"}" style="margin:0 0 10px"><b>Personální oddělení, ${new Date(last.created_at).toLocaleDateString("cs-CZ")}:</b> ${esc(last.message || "")}</div>` : ""}
-      <button class="btn ghost" id="raiseBtn" ${canAsk ? "" : "disabled"}>${canAsk ? "Požádat o zvýšení platu" : `Další žádost od ${new Date(new Date(last.created_at).getTime() + 30 * 864e5).toLocaleDateString("cs-CZ")}`}</button>` : ""}</div>`;
+      ${last ? `<div class="msg ${Number(last.pct) > 0 ? "ok" : "err"}" style="margin:0 0 10px"><b>Personální oddělení, ${new Date(last.created_at).toLocaleDateString(LOCALE)}:</b> ${esc(last.message || "")}</div>` : ""}
+      <button class="btn ghost" id="raiseBtn" ${canAsk ? "" : "disabled"}>${canAsk ? "Požádat o zvýšení platu" : `Další žádost od ${new Date(new Date(last.created_at).getTime() + 30 * 864e5).toLocaleDateString(LOCALE)}`}</button>` : ""}</div>`;
 }
 
 /* ---------- obchod ---------- */
@@ -2901,7 +3367,7 @@ function forecastHtml(icao, atIso, label, wx) {
       <div style="font-size:14px">${esc(periodText(fc.base))}</div>
       ${fc.changes.map(c => `<div style="font-size:13px;margin-top:3px"><b>${c.probability ? `S pravděpodobností ${c.probability} %` : "Přechodně"}:</b> ${esc(periodText(c))}</div>`).join("")}`;
   } else if (fc?.outOfRange) {
-    main = `<div class="muted" style="font-size:13px">Předpověď na ${label} ${hmPrague(atIso)} zatím není – TAF platí do ${new Date(fc.validTo).toLocaleString("cs-CZ", { timeZone: "Europe/Prague", weekday: "short", hour: "2-digit", minute: "2-digit" })}.
+    main = `<div class="muted" style="font-size:13px">Předpověď na ${label} ${hmPrague(atIso)} zatím není – TAF platí do ${new Date(fc.validTo).toLocaleString(LOCALE, { timeZone: "Europe/Prague", weekday: "short", hour: "2-digit", minute: "2-digit" })}.
       ${m ? `Teď: ${esc(periodText(m))}.` : ""}</div>`;
   } else if (m) {
     main = `<div style="font-size:14px"><span class="muted">Teď:</span> ${esc(periodText(m))}</div><div class="muted" style="font-size:12px">Předpověď TAF pro toto letiště není k dispozici.</div>`;
@@ -3258,6 +3724,7 @@ async function renderAdminRoster(msg) {
 
 /* ---------- správa: flotila a poznámky k letištím ---------- */
 const ageText = d => { if (!d) return "–"; const m = Math.max(0, Math.round((Date.now() - new Date(d)) / (30.44 * 864e5)));
+  if (LANG === "en") return m < 12 ? `${m} mo.` : `${Math.floor(m / 12)} y${m % 12 ? ` ${m % 12} mo.` : ""}`;
   return m < 12 ? `${m} měs.` : `${Math.floor(m / 12)} ${Math.floor(m / 12) < 5 ? "roky" : "let"}${m % 12 ? ` ${m % 12} měs.` : ""}`.replace(/^1 roky/, "1 rok"); };
 async function renderAdminFleet(msg) {
   const box = $("admFleet"); if (!box) return;
@@ -3327,7 +3794,7 @@ async function renderAdminDefects(msg) {
   box.innerHTML = `${msg ? `<div class="msg ${msg.ok ? "ok" : "err"}">${esc(msg.text)}</div>` : ""}
     <div class="table-wrap" style="max-height:340px;overflow:auto"><table><thead><tr><th>Závada</th><th>Dopad pro piloty</th><th>Kat.</th><th>Dní</th><th>Častost</th><th>Od stáří</th><th>Aktivní</th><th></th></tr></thead><tbody>
     ${(data || []).map(d => `<tr data-did="${d.id}"><td style="white-space:normal;min-width:160px"><b>${esc(d.title)}</b></td><td style="white-space:normal;font-size:13px;min-width:220px">${esc(d.effect || "")}</td>
-      <td>${esc(d.category)}</td><td>${d.days}</td><td>${d.weight}</td><td>${d.min_age ? d.min_age + " let" : "–"}</td>
+      <td>${esc(d.category)}</td><td>${d.days}</td><td>${d.weight}</td><td>${d.min_age ? d.min_age + (LANG === "en" ? " y" : " let") : "–"}</td>
       <td style="text-align:center"><input type="checkbox" class="df-act" ${d.active ? "checked" : ""} aria-label="Aktivní"></td><td><button class="link-btn danger df-rm">Smazat</button></td></tr>`).join("")}</tbody></table></div>
     <form id="dfAdd" style="display:grid;grid-template-columns:1fr 2fr 80px 80px 80px 90px auto;gap:8px;align-items:end;margin-top:12px">
       <div class="field" style="margin:0"><label for="dfT">Závada</label><input id="dfT" required maxlength="120"></div>
@@ -3399,6 +3866,7 @@ const LEGAL_DATE = "18. 10. 2026";
 const contactHtml = () => CFG.CONTACT_EMAIL ? `<a href="mailto:${esc(CFG.CONTACT_EMAIL)}">${esc(CFG.CONTACT_EMAIL)}</a>` : "zprávou správci webu (uživatel <b>jachym12</b>) přes stránku Přátelé";
 const legalLinks = () => `<p class="legal-links"><a href="#/soukromi">Ochrana osobních údajů</a> · <a href="#/pravidla">Pravidla komunity</a></p>`;
 function renderPrivacy() {
+  if (LANG === "en") return renderPrivacyEn();
   $("soukromi").innerHTML = `<h1 class="page-title">Ochrana osobních údajů</h1>
   <p class="lead">Jak JAI Tracker zachází s tvými údaji. Platné od ${LEGAL_DATE}.</p>
   <h2>Kdo údaje zpracovává</h2>
@@ -3460,6 +3928,7 @@ function renderPrivacy() {
   ${legalLinks()}`;
 }
 function renderRules() {
+  if (LANG === "en") return renderRulesEn();
   $("pravidla").innerHTML = `<h1 class="page-title">Pravidla komunity</h1>
   <p class="lead">JAI Tracker je místo pro všechny, kdo rádi létají. Aby tu bylo dobře každému, platí pár jednoduchých pravidel.</p>
   <h2>Buď slušný</h2>
@@ -3484,6 +3953,86 @@ function renderRules() {
   <h2>Co když pravidla někdo poruší</h2>
   <p>Správce může smazat nevhodný obsah a při vážném nebo opakovaném porušení i účet. Dotazy a připomínky: ${contactHtml()}.</p>
   ${legalLinks()}`;
+}
+
+const contactHtmlEn = () => CFG.CONTACT_EMAIL ? `<a href="mailto:${esc(CFG.CONTACT_EMAIL)}">${esc(CFG.CONTACT_EMAIL)}</a>` : "a message to the site admin (user <b>jachym12</b>) via the Friends page";
+const legalLinksEn = () => `<p class="legal-links"><a href="#/soukromi">Privacy policy</a> · <a href="#/pravidla">Community rules</a></p>`;
+function renderPrivacyEn() {
+  $("soukromi").innerHTML = `<div data-noi18n><h1 class="page-title">Privacy policy</h1>
+  <p class="lead">How JAI Tracker handles your data. Effective from ${LEGAL_DATE}.</p>
+  <h2>Who processes your data</h2>
+  <p>The JAI Tracker website and app are run by the virtual airline Jáchym Air (“we”). It's a community project for Microsoft Flight Simulator players, not a commercial service. For anything about your data, contact us: ${contactHtmlEn()}.</p>
+  <h2>What data we process</h2>
+  <ul>
+    <li><b>Account:</b> email, username and password. We never store your password in readable form, only as an encrypted hash.</li>
+    <li><b>Profile (if you fill it in):</b> profile picture, stream link, SimBrief username, virtual airline.</li>
+    <li><b>Flights:</b> position, altitude, speed and heading of your <b>virtual aircraft in the simulator</b> during the flight, route, airports, times, aircraft type and registration, fuel burn and landing data. This is not your real-world location.</li>
+    <li><b>Community:</b> friendships, messages between friends, reactions to flights, blocks and reports.</li>
+    <li><b>Technical data:</b> time of your last connection. Infrastructure providers (see below) keep operational logs including IP addresses.</li>
+    <li><b>On your device:</b> your browser remembers map settings and your sign-in. The app stores your sign-in, settings and optionally your crew centre API key on your computer. It doesn't send these to us, except for a one-time key check when linking the crew centre.</li>
+  </ul>
+  <h2>Why and on what legal basis</h2>
+  <ul>
+    <li><b>Running the service</b> (flight tracking, map, profile, leaderboards, friends and messages): performance of a contract, i.e. what you signed up for (Art. 6(1)(b) GDPR).</li>
+    <li><b>Security and moderation</b> (abuse prevention, handling reports): legitimate interest (Art. 6(1)(f) GDPR).</li>
+    <li><b>Emails:</b> only the necessary ones – sign-up confirmation, password reset and email change. No advertising or newsletters.</li>
+  </ul>
+  <h2>Who can see your data</h2>
+  <ul>
+    <li><b>Public</b> (even without signing in): username, profile picture, stream link, virtual airline, your flights including position during the flight, routes and landings, statistics and reactions.</li>
+    <li><b>Only you and the recipient:</b> messages. The site admin may view a message that has been reported, for moderation.</li>
+    <li><b>Nobody else:</b> your email and password.</li>
+  </ul>
+  <h2>Services we use</h2>
+  <div class="table-wrap"><table><thead><tr><th>Service</th><th>Purpose</th><th>Where</th></tr></thead><tbody>
+    <tr><td>Supabase</td><td>database, sign-in, photo storage, server functions</td><td>EU (Frankfurt)</td></tr>
+    <tr><td>GitHub (Pages, Releases)</td><td>website hosting and app downloads</td><td>USA*</td></tr>
+    <tr><td>jachymair.com hosting</td><td>sending emails</td><td>depends on the hosting provider</td></tr>
+    <tr><td>OpenStreetMap, Esri</td><td>map and satellite imagery (loaded by your browser)</td><td>EU / USA*</td></tr>
+    <tr><td>RainViewer</td><td>precipitation radar, only when you turn it on</td><td>outside the EU*</td></tr>
+    <tr><td>aviationweather.gov</td><td>weather (METAR/TAF), via our server, without your data</td><td>USA</td></tr>
+    <tr><td>Planespotters.net</td><td>aircraft photos by registration (via our server, with your browser as a fallback)</td><td>outside the EU*</td></tr>
+    <tr><td>SimBrief</td><td>flight plan, only when you load it in the app</td><td>USA*</td></tr>
+    <tr><td>Jáchym Air crew centre</td><td>bookings and flight filing, only when you link it</td><td>depends on the provider (TFDi)</td></tr>
+  </tbody></table></div>
+  <p class="muted" style="font-size:14px">* Transfers outside the EU rely on the EU standard contractual clauses or the EU–US Data Privacy Framework. The website's fonts are hosted by us, so they don't connect you anywhere else.</p>
+  <h2>How long we keep data</h2>
+  <ul><li>Account, profile, flights, friendships and messages for as long as your account exists, or until you delete them.</li>
+    <li>The position of a flight in progress is continuously overwritten. After the flight only the saved flight remains.</li><li>Reports until an admin has handled them.</li></ul>
+  <h2>Your rights</h2>
+  <ul>
+    <li><b>Access and portability:</b> in My account you can download all your data (“Download my data” button).</li>
+    <li><b>Correction:</b> edit your profile in My account.</li>
+    <li><b>Erasure:</b> delete individual flights in their detail, and your whole account with all data in My account (“Delete account permanently”).</li>
+    <li><b>Objection and restriction:</b> write to us (contact above).</li>
+    <li><b>Complaint:</b> you can contact the Czech Office for Personal Data Protection, <a href="https://uoou.gov.cz" target="_blank" rel="noopener">uoou.gov.cz</a>, or the data protection authority in your country.</li>
+  </ul>
+  <h2>Children</h2>
+  <p>Any aviation fan can use JAI Tracker. If you are under <b>15</b>, you need consent from a parent or guardian to sign up. Please show them this page and the community rules.</p>
+  <h2>Security</h2>
+  <p>All communication is encrypted (HTTPS). Access to data is enforced by rules directly in the database, so for example only the sender and recipient can see messages, and only the pilot and an admin can delete a flight.</p>
+  <h2>Changes</h2>
+  <p>If we change this policy, we'll update the date above and announce significant changes in the News.</p>
+  ${legalLinksEn()}</div>`;
+}
+function renderRulesEn() {
+  $("pravidla").innerHTML = `<div data-noi18n><h1 class="page-title">Community rules</h1>
+  <p class="lead">JAI Tracker is a place for everyone who loves flying. A few simple rules keep it a good place for all.</p>
+  <h2>Be decent</h2>
+  <ul><li>Treat others the way you want to be treated.</li>
+    <li>No insults, bullying, harassment, threats or hateful remarks (about origin, religion, gender, orientation, appearance or anything else).</li>
+    <li>No sexual, violent or otherwise inappropriate content in messages, names or photos.</li></ul>
+  <h2>Protect yourself and others</h2>
+  <ul><li>Never send anyone your password or API key. An admin will never ask for them.</li>
+    <li>Don't share personal information, yours or anyone else's: address, phone, school, photos of people and so on.</li>
+    <li>If someone harasses you or sends you something unpleasant, <b>block and report them</b> (buttons in the messages). An admin will see the report.</li>
+    <li>If you're under 18, don't arrange to meet people from the internet without your parents knowing.</li></ul>
+  <h2>Fly fair</h2>
+  <ul><li>No cheating on the leaderboards, such as submitting made-up flights or editing data.</li>
+    <li>Only upload photos that are yours (e.g. MSFS screenshots) or that you're allowed to use.</li><li>No spam or advertising.</li></ul>
+  <h2>If someone breaks the rules</h2>
+  <p>Admins can remove inappropriate content and, for serious or repeated violations, the account. Questions and feedback: ${contactHtmlEn()}.</p>
+  ${legalLinksEn()}</div>`;
 }
 
 /* ---------- nové heslo (odkaz z e-mailu) ---------- */
