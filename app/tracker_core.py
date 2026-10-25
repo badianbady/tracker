@@ -1144,8 +1144,9 @@ class FlightRecorder:
         agl = info.get("agl")
         # Při načítání letu hlásí MSFS chvíli „ve vzduchu“ i na stání. Za let se počítá jen opravdový pohyb:
         # rychlost nad 30 kt nebo výška nad 100 ft nad zemí. Jinak se letadlo bere jako na zemi.
-        if not on_ground and gs < 30 and (agl is None or agl < 100) and (self.was_on_ground or self.was_on_ground is None):
-            on_ground = True
+        if not on_ground and (self.was_on_ground or self.was_on_ground is None) and gs < 30 and \
+                ((agl is None or agl < 100) or abs(vs_fpm) < 200):
+            on_ground = True       # načítání letu: letadlo „visí“ ve vzduchu bez rychlosti – není to vzlet
         if not on_ground and agl is not None:
             self.max_agl = max(getattr(self, "max_agl", None) or 0, agl)
         if self.was_on_ground is None:
@@ -1172,6 +1173,15 @@ class FlightRecorder:
                 stopped = self.stopped_since and t - self.stopped_since > 30
                 if stopped or time.time() - self.post["t"] > 15 * 60:
                     self.finalize(lat, lon)
+            elif self.takeoff and not self.takeoff.get("landed") and not self.takeoff.get("icao") \
+                    and self.stopped_since and t - self.stopped_since > 60:
+                # „vzlet“ z neznámého letiště a letadlo teď stojí na zemi = falešný vzlet (načítání letu) – zahodit
+                self.takeoff = None
+                self.path = []
+                self._publish([])
+                with lock:
+                    state["dep"] = None
+                log("Falešný vzlet při načítání letu zahozen, čekám na skutečný vzlet.")
             elif not self.pending:
                 # pojíždění před vzletem
                 if gs > 3:
@@ -1195,6 +1205,7 @@ class FlightRecorder:
                     self._start(t, gp[0], gp[1], known=True)
                     self.last_pos = (lat, lon)
             self.last_air_vs = vs_fpm
+            self.recent_vs = [(tt, v) for tt, v in getattr(self, "recent_vs", []) if t - tt < 1.0] + [(t, vs_fpm)]
             self.recent_g.append((t, g))
             self._maybe_point(t, lat, lon, alt, hdg, 15, 8)
             if self.last_pos:
@@ -1209,7 +1220,10 @@ class FlightRecorder:
             self.max_agl = None
             if airborne > 15 and real_flight and t - self.last_landing_t > 10:
                 gmax = max([gg for tt, gg in self.recent_g if t - tt < 0.6] + [g])
-                self.pending = {"t": t, "fpm": -abs(self.last_air_vs), "g": gmax, "info": dict(info), "bounces": 0}
+                # rychlost klesání v okamžiku dosednutí: nejprudší hodnota z poslední ~0,6 s před dotykem
+                pre = [v for tt, v in getattr(self, "recent_vs", []) if t - tt < 0.6] or [self.last_air_vs]
+                vs_td = min(pre + [-abs(self.last_air_vs)])
+                self.pending = {"t": t, "fpm": -abs(min(vs_td, 0)), "g": gmax, "info": dict(info), "bounces": 0}
                 self.last_landing_t = t
                 self._add_point(t, lat, lon, 0, hdg)
 
@@ -1326,7 +1340,9 @@ class FlightRecorder:
         if self.touchdown_reader:
             try:
                 td = self.touchdown_reader()
-                if td and abs(td) > 0.1:
+                # „touchdown normal velocity“ je kolmo k povrchu dráhy – na nerovné nebo skloněné dráze (scenérie)
+                # vychází mírněji. Bereme proto prudší z obou měření, jako ostatní trackery.
+                if td and abs(td) > 0.1 and -abs(td) * 60.0 < fpm:
                     fpm, source = -abs(td) * 60.0, "touchdown"
             except Exception:
                 pass
@@ -1471,6 +1487,7 @@ def sim_loop():
             else:
                 rec.touchdown_reader = read_td
             title, title_t = "", 0.0
+            last_vals = {}
             wind_dir = wind_kt = None
             slow_t = 0.0
             fails = 0
@@ -1486,13 +1503,23 @@ def sim_loop():
                     continue
                 fails = 0
                 on_ground = bool(og)
-                vs = aq.get("VERTICAL_SPEED") or 0          # knihovna vrací rovnou stopy za minutu
-                g = aq.get("G_FORCE") or 1.0
-                alt = aq.get("PLANE_ALTITUDE") or 0
-                agl = aq.get("PLANE_ALT_ABOVE_GROUND") or 0
-                ias = aq.get("AIRSPEED_INDICATED") or 0
-                gs = aq.get("GROUND_VELOCITY") or 0
-                hdg = aq.get("PLANE_HEADING_DEGREES_TRUE") or 0
+                def rd(key, default):
+                    """Hodnota ze simulátoru; když nestihne odpovědět, použít poslední známou (ne nulu)."""
+                    v = aq.get(key)
+                    if v is None:
+                        return last_vals.get(key, default)
+                    last_vals[key] = v
+                    return v
+                vs = rd("VERTICAL_SPEED", 0)                 # knihovna vrací rovnou stopy za minutu
+                g = rd("G_FORCE", 1.0)
+                # výška jako na výškoměru (u letových hladin tlaková výška), ne skutečná nadmořská
+                alt = rd("INDICATED_ALTITUDE", None)
+                if alt is None:
+                    alt = rd("PLANE_ALTITUDE", 0)
+                agl = rd("PLANE_ALT_ABOVE_GROUND", 0)
+                ias = rd("AIRSPEED_INDICATED", 0)
+                gs = rd("GROUND_VELOCITY", 0)
+                hdg = rd("PLANE_HEADING_DEGREES_TRUE", 0)
                 if abs(hdg) <= 2 * math.pi + 0.01:
                     hdg = math.degrees(hdg)
                 lat = aq.get("PLANE_LATITUDE")
