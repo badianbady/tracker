@@ -717,7 +717,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "a pak": "and then", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
 EN_PAT.push(
@@ -2752,13 +2752,15 @@ async function renderAdmin(editId, msg) {
       <div class="card" style="grid-column:1/-1"><h2 class="section-title">Linky z crew centra</h2>
         <p class="muted" style="margin-top:0">Zkopíruje linky a flotilu z crew.jachymair.com, aby byly vidět na mapě. Spusť po každé změně linek v crew centru.</p>
         <p id="syncInfo">${jaiRoutes.length ? `Teď je na webu <b>${jaiRoutes.length}</b> linek a <b>${jaiFleet.length}</b> letadel (naposledy ${fmtDT(jaiRoutes[0]?.synced_at)}).` : "Zatím žádné linky."}</p>
-        <button class="btn" id="syncBtn" type="button">Synchronizovat linky</button></div>
+        <button class="btn" id="syncBtn" type="button">Synchronizovat linky</button>
+        <button class="btn ghost" id="mgmtExport" type="button">Export pro JAI Management</button></div>
       <div class="card"><h2 class="section-title">Všechny položky</h2>
         ${list.length ? list.map(x => `<div class="adm-row"><div><div class="ev-kind">${KIND_TXT[x.kind]}${x.starts_at ? " · " + fmtDT(x.starts_at) : ""}${isNow(x) && x.kind === "let_tydne" ? " · <b style='color:var(--green)'>právě běží</b>" : ""}</div>
           <b>${esc(x.title)}</b>${x.dep ? ` <span class="muted">${esc(x.dep)} → ${esc(x.arr || "")}</span>` : ""}</div>
           <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-edit="${x.id}">Upravit</button><button class="link-btn danger" data-del="${x.id}">Smazat</button></div></div>`).join("")
           : '<p class="muted">Zatím nic. Vytvoř první let týdne!</p>'}
       </div></div>`;
+  if ($("mgmtExport")) $("mgmtExport").onclick = exportForManagement;
   renderAdminPhotos(); renderAdminReports(); renderAdminFleet(); renderAdminApNotes(); renderAdminRoster(); renderAdminDefects();
   el.querySelectorAll("[data-delva]").forEach(b => b.onclick = async () => {
     if (!confirm("Smazat virtuálku?")) return;
@@ -3720,6 +3722,19 @@ async function renderAdminRoster(msg) {
     const { error } = await sb.from("rotations").delete().eq("status", "open").gte("service_day", today);
     renderAdminRoster(error ? { ok: false, text: error.message } : { ok: true, text: "Volné rotace smazány." });
   };
+}
+
+/* ---------- export pro manažerskou hru ---------- */
+async function exportForManagement() {
+  await Promise.all([routesReady, airportsReady, basesReady]);
+  const fleet = await loadFleetDetails();
+  const icaos = new Set([...jaiRoutes.flatMap(r => [r.dep, r.arr]), ...basesList.map(b => b.icao)]);
+  const aps = {};
+  for (const i of icaos) { const a = apByCode(i); if (a) aps[i] = [a[2], a[3], a[1]]; }
+  const data = { exported: new Date().toISOString(), routes: jaiRoutes.map(r => ({ id: r.id, flight_no: fltNo(r), dep: r.dep, arr: r.arr, dpt_time: r.dpt_time, arr_time: r.arr_time,
+    flight_time_min: r.flight_time_min, load_factor: r.load_factor, days: r.days, subfleets: r.subfleets })), fleet, bases: basesList.map(b => b.icao), airports: aps };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "jai-management-export.json"; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- správa: flotila a poznámky k letištím ---------- */
