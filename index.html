@@ -3732,7 +3732,9 @@ async function exportForManagement() {
   const aps = {};
   for (const i of icaos) { const a = apByCode(i); if (a) aps[i] = [a[2], a[3], a[1]]; }
   const data = { exported: new Date().toISOString(), routes: jaiRoutes.map(r => ({ id: r.id, flight_no: fltNo(r), dep: r.dep, arr: r.arr, dpt_time: r.dpt_time, arr_time: r.arr_time,
-    flight_time_min: r.flight_time_min, load_factor: r.load_factor, days: r.days, subfleets: r.subfleets })), fleet, bases: basesList.map(b => b.icao), airports: aps };
+    flight_time_min: r.flight_time_min, load_factor: r.load_factor, days: r.days, subfleets: r.subfleets })), fleet, bases: basesList.map(b => b.icao), airports: aps,
+    // všechna velká a střední letiště v Evropě, Africe a na Blízkém východě (pro návrhy minihubů a nových linek)
+    allAirports: airports.filter(a => /^[ELDGHO][A-Z]{3}$/.test(a[0])).map(a => [a[0], Math.round(a[2] * 1000) / 1000, Math.round(a[3] * 1000) / 1000, String(a[1]).slice(0, 40), a[4]]) };
   const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "jai-management-export.json"; document.body.appendChild(a); a.click(); a.remove();
 }
