@@ -1438,7 +1438,7 @@ function initMap() {
   routesReady.then(drawAirports);
   setInterval(renderHighlights, 120000);
   refreshLive();
-  liveTimer = setInterval(refreshLive, 8000);
+  liveTimer = setInterval(refreshLive, 10000);
 }
 
 function drawAirports() {
@@ -1697,15 +1697,37 @@ function timeAgo(d) {
   return fmtDate(d);
 }
 
+// Úspora dat: všechna letadla se načítají „nalehko“ (bez tras a celého plánu). Celé údaje jen u mého
+// a právě vybraného letadla. Když je web na pozadí, mapa se neobnovuje.
+const LIVE_PROF = "profiles(username, avatar_url, stream_url, eq_name_color, eq_title, eq_plane_color)";
+const LIVE_LITE = "user_id, callsign, aircraft, ac_icao, reg, va, lat, lon, alt, gs, vs, hdg, phase, dep_icao, squawk, landing, takeoff_at, updated_at, "
+  + "plan_dep:plan->>dep, plan_arr:plan->>arr, plan_altn:plan->>altn, plan_cs:plan->>callsign, plan_no:plan->>flight_no, plan_reg:plan->>reg, plan_ac:plan->>aircraft, " + LIVE_PROF;
+let liteFailed = false;
 async function refreshLive() {
+  if (document.hidden && liveRows.length) return;          // web na pozadí: šetřit data
   if (liveTick % 8 === 0) refreshTouchdowns();
   if (liveTick++ % 2 === 0) refreshRecent();
   const since = new Date(Date.now() - 120000).toISOString();
-  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url, eq_name_color, eq_title, eq_plane_color)").gte("updated_at", since);
-  if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
+  let { data, error } = liteFailed ? { error: true } : await sb.from("live").select(LIVE_LITE).gte("updated_at", since);
+  if (error) {   // záloha, kdyby databáze některý sloupec neměla
+    liteFailed = true;
+    ({ data, error } = await sb.from("live").select("*, " + LIVE_PROF).gte("updated_at", since));
+    if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
+  } else {
+    for (const r of data || []) {
+      r.plan = r.plan_dep || r.plan_arr || r.plan_cs ? { dep: r.plan_dep, arr: r.plan_arr, altn: r.plan_altn, callsign: r.plan_cs, flight_no: r.plan_no, reg: r.plan_reg, aircraft: r.plan_ac } : null;
+    }
+    // celé údaje (trasa, plán s body) jen pro mé letadlo a vybrané letadlo
+    const full = [...new Set([me?.user?.id, focus?.type === "live" ? focus.id : null].filter(Boolean))].filter(id => (data || []).some(r => r.user_id === id));
+    if (full.length) {
+      const { data: rows } = await sb.from("live").select("*").in("user_id", full);
+      for (const fr of rows || []) { const i = data.findIndex(r => r.user_id === fr.user_id); if (i >= 0) data[i] = { ...fr, profiles: data[i].profiles }; }
+    }
+  }
   liveRows = data || [];
   renderLive();
 }
+document.addEventListener("visibilitychange", () => { if (!document.hidden && map) refreshLive(); });
 
 function renderLive() {
   if (!map) return;
@@ -1968,6 +1990,7 @@ async function openFocus(parts) {
     focus = { type: "live", id: parts[2], centered: false };
     focusLayer.clearLayers();
     renderFlightPanel();
+    refreshLive();          // dotáhnout celou trasu a plán vybraného letadla
     return;
   }
   const id = Number(parts[1]);
