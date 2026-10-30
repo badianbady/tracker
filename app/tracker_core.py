@@ -1020,29 +1020,50 @@ def flush_queue():
         log(f"Odesláno {len(data) - len(left)} dříve neodeslaných letů ✔")
 
 
+def live_interval(s):
+    """Jak často posílat polohu (s): v cestovní hladině řidčeji, při vzletu a přistání často."""
+    alt, gs, vs = s.get("alt") or 0, s.get("gs") or 0, abs(s.get("vs") or 0)
+    on_ground = s.get("on_ground") or s.get("phase") in ("Na zemi", "Pojíždění") or (gs < 40 and alt < 15000 and vs < 100 and (s.get("agl") or 0) < 50)
+    if on_ground:
+        return 60 if gs < 1 else 20          # stání / pojíždění
+    if alt < 10000:
+        return 10                            # vzlet, přiblížení, přistání
+    if vs < 300:
+        return 60                            # cestovní let – udržování výšky
+    return 20                                # stoupání / klesání ve výšce
+
+
 def upload_loop():
     last_flush = 0
     sent_trail_ver, last_trail_t = -1, 0
     sent_plan_ver = -1
+    last_sent, last_phase, last_landing = 0.0, None, None
     while True:
-        time.sleep(5)
+        time.sleep(2)
         if not state["online"] or state["demo"]:
             continue
         with lock:
             s = dict(state)
         if s["connected"]:
-            try:
-                with_trail = s["trail_ver"] != sent_trail_ver and (time.time() - last_trail_t > 20 or not s["trail"])
-                with_plan = s["plan_ver"] != sent_plan_ver
-                code, res = cloud.send_live(s, with_trail, with_plan)
-                if with_trail and code in (200, 201, 204):
-                    sent_trail_ver, last_trail_t = s["trail_ver"], time.time()
-                if with_plan and code in (200, 201, 204):
-                    sent_plan_ver = s["plan_ver"]
-                if code not in (200, 201, 204):
-                    log("Web odmítl polohu:", code, (res or {}).get("message"))
-            except Exception as e:
-                log("Polohu se nepodařilo odeslat:", e)
+            now = time.time()
+            interval = live_interval(s)
+            changed = s.get("phase") != last_phase or bool(s.get("live_landing")) != bool(last_landing) or s["plan_ver"] != sent_plan_ver
+            if changed or now - last_sent >= interval:
+                try:
+                    trail_every = 120 if interval >= 60 else 30
+                    with_trail = s["trail_ver"] != sent_trail_ver and (now - last_trail_t > trail_every or not s["trail"] or changed)
+                    with_plan = s["plan_ver"] != sent_plan_ver
+                    code, res = cloud.send_live(s, with_trail, with_plan)
+                    if code in (200, 201, 204):
+                        last_sent, last_phase, last_landing = now, s.get("phase"), s.get("live_landing")
+                    if with_trail and code in (200, 201, 204):
+                        sent_trail_ver, last_trail_t = s["trail_ver"], now
+                    if with_plan and code in (200, 201, 204):
+                        sent_plan_ver = s["plan_ver"]
+                    if code not in (200, 201, 204):
+                        log("Web odmítl polohu:", code, (res or {}).get("message"))
+                except Exception as e:
+                    log("Polohu se nepodařilo odeslat:", e)
         if time.time() - last_flush > 60:
             last_flush = time.time()
             try:
