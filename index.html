@@ -2661,7 +2661,7 @@ async function renderHighlights() {
   if (!sb) return;
   const list = await loadEvents();
   const w = currentWeekFlight(list), y = nextYoutube(list);
-  $("highlights").innerHTML = (HALLOWEEN ? `<div class="hl-card boo"><span class="hl-ic">🎃</span><div><div class="hl-k">Halloweenský event</div><b>Šťastný Halloween, piloti! 🦇</b><div class="muted" style="font-size:13px;color:#E9CDB8">Letadla Jáchym Air dnes létají v dýňové barvě.</div></div></div>` : "") + (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
+  $("highlights").innerHTML = (HALLOWEEN ? `<div class="hl-card boo" style="padding:8px 12px"><span class="hl-ic" style="width:30px;height:30px;font-size:16px">🎃</span><b style="font-size:15px">Šťastný Halloween, piloti! 🦇</b></div>` : "") + (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
       <div class="hl-t">${w.dep && w.arr ? `${esc(w.dep)} → ${esc(w.arr)}` : esc(w.title)}</div><div class="hl-s">${esc(w.aircraft || w.title)}</div></div></a>` : "")
     + (y ? `<a class="hl-card yt" href="#/novinky/${y.id}"><span class="hl-ic">▶</span><div><div class="hl-k">${ytLive(y) ? "Živě teď na YouTube" : "YouTube " + relTime(y.starts_at)}</div>
       <div class="hl-t">${esc(y.title)}</div><div class="hl-s">${fmtDT(y.starts_at)}</div></div></a>` : "");
