@@ -48,6 +48,21 @@
   button, input { font: inherit; }
   :focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 
+  /* ---------- Halloween (30. 10. – 2. 11., zapíná a vypíná se samo) ---------- */
+  html.halloween { --green: #E26A12; --green-deep: #8A3A06; --green-soft: #FCE7D3; }
+  @media (prefers-color-scheme: dark) { html.halloween { --green-soft: #3A2210; } }
+  html.halloween header { background: linear-gradient(90deg, #24123A 0%, #3B1A52 55%, #5A2A12 100%); }
+  html.halloween nav a.active { color: #8A3A06; }
+  .bat { position: absolute; top: 6px; width: 36px; height: 18px; pointer-events: none; opacity: .85; animation: batfly 26s linear infinite; z-index: 0; }
+  .bat svg { width: 100%; height: 100%; animation: flap .35s ease-in-out infinite alternate; transform-origin: center; }
+  .bat.b2 { top: 30px; width: 22px; animation-duration: 34s; animation-delay: -12s; opacity: .7; }
+  .bat.b3 { top: 14px; width: 18px; animation-duration: 41s; animation-delay: -25s; opacity: .6; }
+  @keyframes batfly { 0% { left: -40px; transform: translateY(0); } 25% { transform: translateY(6px); } 50% { transform: translateY(-4px); } 75% { transform: translateY(5px); } 100% { left: calc(100% + 40px); transform: translateY(0); } }
+  @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.45); } }
+  @media (prefers-reduced-motion: reduce) { .bat, .bat svg { animation: none; } .bat { left: 40%; } .bat.b2 { left: 55%; } .bat.b3 { left: 70%; } }
+  header > a, header > nav { position: relative; z-index: 1; }
+  .hl-card.boo { background: #2A1838; color: #FDE7D3; } .hl-card.boo .hl-k { color: #F9A15A; } .hl-card.boo .hl-ic { background: #E26A12; }
+
   /* ---------- hlavička ---------- */
   header { background: var(--green); color: #fff; display: flex; align-items: center; gap: 18px; padding: 0 18px; height: 60px; flex: none; position: relative; z-index: 1000; }
   .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-family: var(--display); font-weight: 800; font-size: 23px; white-space: nowrap; }
@@ -466,6 +481,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
+/* ---------- Halloween ---------- */
+const HALLOWEEN = (() => { const d = new Date(), m = d.getMonth(), day = d.getDate(); return (m === 9 && day >= 30) || (m === 10 && day <= 2); })();
+if (HALLOWEEN) {
+  document.documentElement.classList.add("halloween");
+  document.addEventListener("DOMContentLoaded", () => {
+    const bat = '<svg viewBox="0 0 60 28" aria-hidden="true"><path fill="#F6A15A" d="M30 10c2-4 5-6 5-6l1 4 3-2c1 5 6 7 11 6-4 2-6 6-6 9-3-3-7-3-9 0-1-3-3-4-5-4s-4 1-5 4c-2-3-6-3-9 0 0-3-2-7-6-9 5 1 10-1 11-6l3 2 1-4s3 2 5 6z"/></svg>';
+    const h = document.querySelector("header");
+    if (h) ["b1", "b2", "b3"].forEach(c => h.insertAdjacentHTML("afterbegin", `<span class="bat ${c}">${bat}</span>`));
+    const name = document.getElementById("appName"); if (name) name.textContent = "JAI Tracker 🎃";
+  });
+}
+
 /* ---------- angličtina: překladová vrstva ---------- */
 // Stránky se vykreslují česky; v angličtině se texty přeloží podle slovníku. Obsah od lidí (.ugc) se nepřekládá.
 const LANG = (() => { try { const v = localStorage.getItem("jai_lang"); if (v === "cs" || v === "en") return v; } catch { }
@@ -717,7 +744,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "a pak": "and then", "Halloweenský event": "Halloween event", "Šťastný Halloween, piloti! 🦇": "Happy Halloween, pilots! 🦇", "Letadla Jáchym Air dnes létají v dýňové barvě.": "Jáchym Air planes are flying in pumpkin colours today.", "JAI Tracker 🎃": "JAI Tracker 🎃", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
 EN_PAT.push(
@@ -1392,7 +1419,7 @@ function acCategory(icao, title) {
   return "narrow";
 }
 function planeIcon(hdg, isJai, sel, cat = "narrow", custom = null) {
-  const col = custom || (isJai ? "#1E9B36" : "#66788A");
+  const col = custom || (isJai ? (HALLOWEEN ? "#E26A12" : "#1E9B36") : "#66788A");
   const shape = AC_SHAPES[cat] || AC_SHAPES.narrow;
   const size = Math.round(shape.size * (isJai ? 1.12 : 1));
   const rotor = shape.rotor ? `<circle cx="12" cy="10" r="8.2" fill="none" stroke="${col}" stroke-width="1.3" opacity=".75"/><circle cx="12" cy="10" r="8.2" fill="none" stroke="#fff" stroke-width=".5" opacity=".6"/>` : "";
@@ -1707,7 +1734,7 @@ async function refreshLive() {
   if (document.hidden && liveRows.length) return;          // web na pozadí: šetřit data
   if (liveTick % 8 === 0) refreshTouchdowns();
   if (liveTick++ % 2 === 0) refreshRecent();
-  const since = new Date(Date.now() - 120000).toISOString();
+  const since = new Date(Date.now() - 180000).toISOString();     // v cestovní hladině posílá aplikace polohu jednou za minutu
   let { data, error } = liteFailed ? { error: true } : await sb.from("live").select(LIVE_LITE).gte("updated_at", since);
   if (error) {   // záloha, kdyby databáze některý sloupec neměla
     liteFailed = true;
@@ -2634,7 +2661,7 @@ async function renderHighlights() {
   if (!sb) return;
   const list = await loadEvents();
   const w = currentWeekFlight(list), y = nextYoutube(list);
-  $("highlights").innerHTML = (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
+  $("highlights").innerHTML = (HALLOWEEN ? `<div class="hl-card boo"><span class="hl-ic">🎃</span><div><div class="hl-k">Halloweenský event</div><b>Šťastný Halloween, piloti! 🦇</b><div class="muted" style="font-size:13px;color:#E9CDB8">Letadla Jáchym Air dnes létají v dýňové barvě.</div></div></div>` : "") + (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
       <div class="hl-t">${w.dep && w.arr ? `${esc(w.dep)} → ${esc(w.arr)}` : esc(w.title)}</div><div class="hl-s">${esc(w.aircraft || w.title)}</div></div></a>` : "")
     + (y ? `<a class="hl-card yt" href="#/novinky/${y.id}"><span class="hl-ic">▶</span><div><div class="hl-k">${ytLive(y) ? "Živě teď na YouTube" : "YouTube " + relTime(y.starts_at)}</div>
       <div class="hl-t">${esc(y.title)}</div><div class="hl-s">${fmtDT(y.starts_at)}</div></div></a>` : "");
