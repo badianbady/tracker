@@ -1158,6 +1158,57 @@ def _extrapolate(o, now):
     return lat, lon
 
 
+NATO = {"A": "Alpha", "B": "Bravo", "C": "Charlie", "D": "Delta", "E": "Echo", "F": "Foxtrot", "G": "Golf", "H": "Hotel", "I": "India",
+        "J": "Juliett", "K": "Kilo", "L": "Lima", "M": "Mike", "N": "November", "O": "Oscar", "P": "Papa", "Q": "Quebec", "R": "Romeo",
+        "S": "Sierra", "T": "Tango", "U": "Uniform", "V": "Victor", "W": "Whiskey", "X": "X-ray", "Y": "Yankee", "Z": "Zulu"}
+DIGITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "niner"]
+TELEPHONY = {"JAI": "Jachym", "TVS": "Skytravel", "SWG": "Sunwing", "RYR": "Ryanair", "WZZ": "Wizz Air", "DLH": "Lufthansa", "EZY": "Easy",
+             "CSA": "C-S-A", "AFR": "Air France", "BAW": "Speedbird", "KLM": "K-L-M", "UAE": "Emirates", "THY": "Turkish", "DAH": "Air Algerie"}
+
+
+def say_digits(txt):
+    return " ".join(DIGITS[int(c)] if c.isdigit() else NATO.get(c.upper(), c) for c in str(txt) if c.strip())
+
+
+def say_callsign(cs):
+    """Callsign tak, jak ho řekne věž: JAI127 -> Jachym one two seven."""
+    cs = (cs or "").upper().replace(" ", "").replace("-", "")
+    m = re.match(r"^([A-Z]{3})(\d.*)$", cs)
+    if m:
+        return f"{TELEPHONY.get(m.group(1), say_digits(m.group(1)))} {say_digits(m.group(2))}"
+    return say_digits(cs)
+
+
+def say_runway(rw):
+    m = re.match(r"^(\d{1,2})([LRC]?)$", str(rw or "").upper())
+    if not m:
+        return say_digits(rw)
+    side = {"L": " left", "R": " right", "C": " center"}.get(m.group(2), "")
+    return say_digits(m.group(1).zfill(2)) + side
+
+
+def say_wind(s):
+    d, k = s.get("wind_dir"), s.get("wind_kt")
+    if d is None or k is None:
+        return ""
+    if k < 3:
+        return "wind calm, "
+    return f"wind {say_digits(str(int(round(d / 10) * 10) % 360 or 360).zfill(3))} degrees, {int(round(k))} knots, "
+
+
+def runway_end_aligned(lat, lon, hdg, rws):
+    """Na které dráze stojím a kterým směrem (konec, ze kterého vzlétám)."""
+    for apt, a, b, width in rws:
+        for thr, end in ((a, b), (b, a)):
+            f = _rwy_frame(lat, lon, thr, end)
+            if not f:
+                continue
+            along, cross, length, brg = f
+            if -60 <= along <= length + 60 and abs(cross) <= width * 0.3048 / 2 + 15 and abs((hdg - brg + 180) % 360 - 180) < 30:
+                return thr[0], f"{a[0]}/{b[0]}", apt
+    return None
+
+
 def tower_alerts(s, others):
     """Seznam upozornění pro mé letadlo. Úrovně: danger (hned reagovat), warn, info."""
     alerts = []
@@ -1197,26 +1248,37 @@ def tower_alerts(s, others):
                 out.append((f[2], t["cs"], f[1]))
         return sorted(out)
 
+    me = say_callsign(((s.get("plan") or {}).get("callsign")) or s.get("callsign"))
     if on_ground:
         mine = runway_occupied_by(lat, lon, rws)
         if mine:
             occ = occ_text(mine[0])
             fin = finals(mine[0])
+            aligned = runway_end_aligned(lat, lon, hdg, rws)
             if occ:
-                alerts.append({"level": "danger" if gs > 30 else "warn", "text": f"Dráha {mine[0]} v {mine[1]} je obsazená – {occ[0]} {occ[1]}."})
+                alerts.append({"level": "danger" if gs > 30 else "warn", "text": f"Dráha {mine[0]} v {mine[1]} je obsazená – {occ[0]} {occ[1]}.",
+                               "sid": f"occ-{mine[0]}-{occ[0]}", "say": f"{me}, hold position, runway occupied."})
             if fin and fin[0][0] < 5:
                 d, cs, end = fin[0]
                 lvl = "danger" if gs > 30 or d < 2.5 else "warn"
-                alerts.append({"level": lvl, "text": f"{cs} na finále RWY {end}, {d:.1f} nm – {'pozor při vzletu!' if gs > 30 else 'uvolni dráhu.'}"})
+                alerts.append({"level": lvl, "text": f"{cs} na finále RWY {end}, {d:.1f} nm – {'pozor při vzletu!' if gs > 30 else 'uvolni dráhu.'}",
+                               "sid": f"fin-{end}-{cs}-{'roll' if gs > 30 else 'rw'}",
+                               "say": f"{me}, stop immediately, I say again, stop immediately, traffic on short final." if gs > 30 and gs < 110
+                               else f"{me}, vacate runway without delay, traffic on final."})
+            if aligned and not occ and not (fin and fin[0][0] < 5) and gs < 40:
+                alerts.append({"level": "ok", "text": f"Dráha {aligned[0]} v {aligned[2]} je volná – můžeš vzlétnout.",
+                               "sid": f"to-{aligned[0]}", "say": f"{me}, {say_wind(s)}runway {say_runway(aligned[0])}, cleared for takeoff."})
         else:
             edge = runway_near_edge(lat, lon, rws)
             if edge:
                 occ = occ_text(edge[0])
                 fin = finals(edge[0])
                 if occ:
-                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {occ[0]} je na dráze."})
+                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {occ[0]} je na dráze.",
+                                   "sid": f"hs-{edge[0]}-{occ[0]}", "say": f"{me}, hold short of the runway, traffic on the runway."})
                 elif fin and fin[0][0] < 6:
-                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {fin[0][1]} na finále RWY {fin[0][2]}, {fin[0][0]:.1f} nm."})
+                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {fin[0][1]} na finále RWY {fin[0][2]}, {fin[0][0]:.1f} nm.",
+                                   "sid": f"hs-{edge[0]}-{fin[0][1]}", "say": f"{me}, hold short runway {say_runway(fin[0][2])}, traffic on final."})
                 else:
                     alerts.append({"level": "ok", "text": f"Dráha {edge[0]} je volná."})
             # střet při pojíždění
@@ -1229,19 +1291,25 @@ def tower_alerts(s, others):
                     d = math.hypot(dn, de)
                     ahead = abs((math.degrees(math.atan2(de, dn)) % 360 - hdg + 180) % 360 - 180) < 50
                     if d < 160 and ahead:
-                        alerts.append({"level": "warn", "text": f"Pozor, {t['cs']} je {round(d / 10) * 10} m před tebou."})
+                        alerts.append({"level": "warn", "text": f"Pozor, {t['cs']} je {round(d / 10) * 10} m před tebou.",
+                                       "sid": f"tx-{t['cs']}", "say": f"{me}, caution, traffic ahead."})
     else:
         mf = on_final(lat, lon, hdg, agl, rws)
         if mf:
             pair, end, d, apt = mf
             occ = occ_text(pair)
             if occ:
-                alerts.append({"level": "danger" if d < 2.5 else "warn", "text": f"RWY {end} v {apt} je obsazená – {occ[0]} {occ[1]}." + (" Připrav se na opakování přiblížení!" if d < 2.5 else "")})
+                ga = d < 2.5
+                alerts.append({"level": "danger" if ga else "warn", "text": f"RWY {end} v {apt} je obsazená – {occ[0]} {occ[1]}." + (" Připrav se na opakování přiblížení!" if ga else ""),
+                               "sid": f"{'ga' if ga else 'cont'}-{end}", "say": f"{me}, go around, I say again, go around, runway occupied." if ga
+                               else f"{me}, continue approach, runway occupied, expect late landing clearance."})
             ahead = [x for x in finals(pair) if x[0] < d]
             if ahead:
-                alerts.append({"level": "info", "text": f"Jsi číslo {len(ahead) + 1} na finále RWY {end}, před tebou {ahead[-1][1]} ({d - ahead[-1][0]:.1f} nm)."})
+                alerts.append({"level": "info", "text": f"Jsi číslo {len(ahead) + 1} na finále RWY {end}, před tebou {ahead[-1][1]} ({d - ahead[-1][0]:.1f} nm).",
+                               "sid": f"seq-{end}-{len(ahead) + 1}", "say": f"{me}, number {len(ahead) + 1}, follow {say_callsign(ahead[-1][1])} on final."})
             elif not occ:
-                alerts.append({"level": "ok", "text": f"Dráha {end} v {apt} je volná."})
+                alerts.append({"level": "ok", "text": f"Dráha {end} v {apt} je volná." + (" Povoleno přistání." if d <= 4.5 else ""),
+                               **({"sid": f"ctl-{end}", "say": f"{me}, {say_wind(s)}runway {say_runway(end)}, cleared to land."} if d <= 4.5 else {})})
         else:
             # pořadí na přiblížení do cíle podle vzdálenosti
             arr = ((s.get("plan") or {}).get("arr") or "").upper()
@@ -1799,6 +1867,8 @@ def sim_loop():
                         pass
 
                 push(on_ground, alt, agl, ias, gs, vs, hdg, g, lat, lon, title)
+                with lock:
+                    state["wind_dir"], state["wind_kt"] = wind_dir, wind_kt
                 rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "ias": ias,
                                                  "alt": alt, "agl": agl, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
                 time.sleep(0.05)
