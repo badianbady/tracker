@@ -757,7 +757,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Automatická věž": "Automatic tower", "🗼 Automatická věž": "🗼 Automatic tower",
+  "a pak": "and then", "Hlas věže (anglicky)": "Tower voice", "Vyzkoušet hlas": "Test voice", "Automatická věž": "Automatic tower", "🗼 Automatická věž": "🗼 Automatic tower",
   "Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.": "Switches on by itself at airports and on approach (below 12,000 ft). Watches for occupied runways, approach sequence and other aircraft while taxiing.", "Halloweenský event": "Halloween event", "Šťastný Halloween, piloti! 🦇": "Happy Halloween, pilots! 🦇", "Letadla Jáchym Air dnes létají v dýňové barvě.": "Jáchym Air planes are flying in pumpkin colours today.", "JAI Tracker 🎃": "JAI Tracker 🎃", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
@@ -834,7 +834,8 @@ EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
   [/^Čekej před dráhou (\S+): (\S+) je na dráze\.$/, "Hold short of runway $1: $2 is on the runway."],
   [/^Čekej před dráhou (\S+): (\S+) na finále RWY (\S+), ([\d.]+) nm\.$/, "Hold short of runway $1: $2 on final RWY $3, $4 nm."],
-  [/^Dráha (\S+)(?: v (\w+))? je volná\.$/, (m, a, b) => `Runway ${a}${b ? " at " + b : ""} is clear.`],
+  [/^Dráha (\S+)(?: v (\w+))? je volná\.( Povoleno přistání\.)?$/, (m, a, b, c) => `Runway ${a}${b ? " at " + b : ""} is clear.${c ? " Cleared to land." : ""}`],
+  [/^Dráha (\S+) v (\w+) je volná – můžeš vzlétnout\.$/, "Runway $1 at $2 is clear – cleared for takeoff."],
   [/^Dráha (\S+) v (\w+) je obsazená – (\S+) na dráze\.$/, "Runway $1 at $2 is occupied – $3 on the runway."],
   [/^(\S+) na finále RWY (\S+), ([\d.]+) nm – (pozor při vzletu!|uvolni dráhu\.)$/, (m, a, b, c, d) => `${a} on final RWY ${b}, ${c} nm – ${d.startsWith("pozor") ? "caution on takeoff!" : "vacate the runway."}`],
   [/^RWY (\S+) v (\w+) je obsazená – (\S+) na dráze\.( Připrav se na opakování přiblížení!)?$/, (m, a, b, c, d) => `RWY ${a} at ${b} is occupied – ${c} on the runway.${d ? " Prepare to go around!" : ""}`],
@@ -2381,7 +2382,33 @@ function towerBeep() {
     o.type = "square"; o.frequency.value = 880; g.gain.value = .06; o.connect(g); g.connect(ctx.destination); o.start();
     setTimeout(() => { o.frequency.value = 660; }, 180); setTimeout(() => { o.stop(); ctx.close(); }, 420); } catch { }
 }
+// hlas věže: anglická frazeologie přes hlasy Windows (Web Speech API)
+const towerSpoken = new Map();
+const towerVoiceOn = () => { try { return localStorage.getItem("jai_tower_voice") !== "0"; } catch { return true; } };
+function towerVoice() {
+  const vs = window.speechSynthesis?.getVoices?.() || [];
+  return vs.find(v => /en-GB/i.test(v.lang) && /natural|online/i.test(v.name)) || vs.find(v => /en-US/i.test(v.lang) && /natural|online/i.test(v.name))
+    || vs.find(v => /en-GB/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang)) || null;
+}
+function towerSay(text) {
+  if (!window.speechSynthesis || !text) return;
+  const u = new SpeechSynthesisUtterance(text); const v = towerVoice(); if (v) u.voice = v;
+  u.lang = v?.lang || "en-GB"; u.rate = 1.05; u.pitch = .95; speechSynthesis.speak(u);
+}
+function towerSpeak(alerts) {
+  if (!towerVoiceOn()) return;
+  const now = Date.now();
+  const order = ["danger", "warn", "info", "ok"];
+  for (const a of [...alerts].sort((x, y) => order.indexOf(x.level) - order.indexOf(y.level))) {
+    if (!a.say || !a.sid) continue;
+    if (now - (towerSpoken.get(a.sid) || 0) < 10 * 60000) continue;      // stejnou hlášku nejdřív za 10 minut
+    towerSpoken.set(a.sid, now);
+    if (a.level === "danger") speechSynthesis?.cancel();
+    towerSay(a.say);
+  }
+}
 function renderTowerBar(t) {
+  towerSpeak(t?.alerts || []);
   let bar = $("towerBar");
   const top = (t?.alerts || []).filter(a => a.level === "danger" || a.level === "warn" || a.level === "info")
     .sort((a, b) => ["danger", "warn", "info"].indexOf(a.level) - ["danger", "warn", "info"].indexOf(b.level))[0];
@@ -2394,12 +2421,25 @@ function renderTowerBar(t) {
 }
 function renderTowerCard(t) {
   const box = $("towerCard"); if (!box) return;
+  const key = JSON.stringify(t?.alerts || []) + (t?.active ? 1 : 0) + (t?.traffic || 0);
+  if (box.dataset.key === key) return;            // nepřekreslovat zbytečně (a nerušit klikání)
+  box.dataset.key = key;
   const al = t?.alerts || [];
-  box.innerHTML = `<h2 class="section-title" style="margin-bottom:6px">🗼 Automatická věž</h2>
-    ${!t?.active ? '<p class="muted" style="margin:0">Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.</p>'
-      : al.length ? al.map(a => `<div class="tower-line ${a.level}">${TOWER_ICON[a.level]} ${esc(a.text)}</div>`).join("")
-      : `<p class="muted" style="margin:0">Hlídám provoz. ${t.traffic ? `V okolí ${t.traffic} ${t.traffic === 1 ? "letadlo" : t.traffic < 5 ? "letadla" : "letadel"} s JAI Trackerem.` : "V okolí žádné další letadlo s JAI Trackerem."}</p>`}`;
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2 class="section-title" style="margin:0">🗼 Automatická věž</h2>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label style="display:flex;gap:6px;align-items:center;font-weight:600;font-size:14px"><input type="checkbox" id="towerVoice" ${towerVoiceOn() ? "checked" : ""}> Hlas věže (anglicky)</label>
+      <button class="btn ghost" type="button" id="towerTest" style="padding:5px 12px;font-size:14px">Vyzkoušet hlas</button></div></div>
+    ${!t?.active ? '<p class="muted" style="margin:6px 0 0">Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.</p>'
+      : al.length ? al.map(a => `<div class="tower-line ${a.level}">${TOWER_ICON[a.level]} ${esc(a.text)}${a.say ? `<div style="font-weight:400;font-size:13px;opacity:.85;margin-top:2px">🔊 „${esc(a.say)}“</div>` : ""}</div>`).join("")
+      : `<p class="muted" style="margin:6px 0 0">Hlídám provoz. ${t.traffic ? `V okolí ${t.traffic} ${t.traffic === 1 ? "letadlo" : t.traffic < 5 ? "letadla" : "letadel"} s JAI Trackerem.` : "V okolí žádné další letadlo s JAI Trackerem."}</p>`}`;
 }
+
+document.addEventListener("change", e => { if (e.target?.id === "towerVoice") { try { localStorage.setItem("jai_tower_voice", e.target.checked ? "1" : "0"); } catch { } if (!e.target.checked) speechSynthesis?.cancel(); } });
+document.addEventListener("click", e => { if (e.target?.id === "towerTest") {
+  const cs = appState?.plan?.callsign || appState?.callsign || "JAI127";
+  const m = String(cs).toUpperCase().match(/^([A-Z]{3})(\d.*)$/), DG = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "niner"];
+  const spoken = m ? `${m[1] === "JAI" ? "Jachym" : m[1].split("").join(" ")} ${m[2].split("").map(c => /\d/.test(c) ? DG[+c] : c).join(" ")}` : cs;
+  towerSay(`${spoken}, wind two four zero degrees, eight knots, runway two four, cleared to land.`); } });
+if (window.speechSynthesis) speechSynthesis.onvoiceschanged = () => { };
 
 /* ---------- detail vlastní rotace ---------- */
 async function renderTrip(id) {
