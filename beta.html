@@ -48,6 +48,34 @@
   button, input { font: inherit; }
   :focus-visible { outline: 3px solid var(--green); outline-offset: 2px; }
 
+  /* ---------- Halloween (30. 10. – 2. 11., zapíná a vypíná se samo) ---------- */
+  html.halloween { --green: #E26A12; --green-deep: #8A3A06; --green-soft: #FCE7D3; }
+  @media (prefers-color-scheme: dark) { html.halloween { --green-soft: #3A2210; } }
+  html.halloween header { background: linear-gradient(90deg, #24123A 0%, #3B1A52 55%, #5A2A12 100%); }
+  html.halloween nav a.active { color: #8A3A06; }
+  .bat { position: absolute; top: 6px; width: 36px; height: 18px; pointer-events: none; opacity: .85; animation: batfly 26s linear infinite; z-index: 0; }
+  .bat svg { width: 100%; height: 100%; animation: flap .35s ease-in-out infinite alternate; transform-origin: center; }
+  .bat.b2 { top: 30px; width: 22px; animation-duration: 34s; animation-delay: -12s; opacity: .7; }
+  .bat.b3 { top: 14px; width: 18px; animation-duration: 41s; animation-delay: -25s; opacity: .6; }
+  @keyframes batfly { 0% { left: -40px; transform: translateY(0); } 25% { transform: translateY(6px); } 50% { transform: translateY(-4px); } 75% { transform: translateY(5px); } 100% { left: calc(100% + 40px); transform: translateY(0); } }
+  @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(.45); } }
+  @media (prefers-reduced-motion: reduce) { .bat, .bat svg { animation: none; } .bat { left: 40%; } .bat.b2 { left: 55%; } .bat.b3 { left: 70%; } }
+  header > a, header > nav { position: relative; z-index: 1; }
+  .hl-card.boo { background: #2A1838; color: #FDE7D3; } .hl-card.boo .hl-k { color: #F9A15A; } .hl-card.boo .hl-ic { background: #E26A12; }
+
+  /* ---------- automatická věž ---------- */
+  .tower-bar { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 1200; max-width: min(760px, 94vw);
+    padding: 9px 16px; border-radius: 0 0 12px 12px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25); display: flex; gap: 10px; align-items: baseline; }
+  .tower-bar > b { white-space: nowrap; }
+  .tower-bar.danger { background: #B91C1C; color: #fff; animation: towerPulse 1s ease-in-out infinite alternate; }
+  .tower-bar.warn { background: #F59E0B; color: #1F1300; } .tower-bar.info { background: #1E3A5F; color: #fff; }
+  @keyframes towerPulse { from { filter: brightness(1); } to { filter: brightness(1.25); } }
+  @media (prefers-reduced-motion: reduce) { .tower-bar.danger { animation: none; } }
+  .tower-line { padding: 8px 12px; border-radius: 8px; margin-top: 6px; font-weight: 600; }
+  .tower-line.danger { background: #FDE2E2; color: #8A1111; } .tower-line.warn { background: #FEF3C7; color: #7A4B00; }
+  .tower-line.info { background: #E0ECFA; color: #1E3A5F; } .tower-line.ok { background: var(--green-soft); color: var(--green-deep); }
+  @media (prefers-color-scheme: dark) { .tower-line.danger { background: #4A1414; color: #FECACA; } .tower-line.warn { background: #3A2A08; color: #FDE68A; } .tower-line.info { background: #16263A; color: #BFDBFE; } }
+
   /* ---------- hlavička ---------- */
   header { background: var(--green); color: #fff; display: flex; align-items: center; gap: 18px; padding: 0 18px; height: 60px; flex: none; position: relative; z-index: 1000; }
   .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-family: var(--display); font-weight: 800; font-size: 23px; white-space: nowrap; }
@@ -466,6 +494,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
+/* ---------- Halloween ---------- */
+const HALLOWEEN = (() => { const d = new Date(), m = d.getMonth(), day = d.getDate(); return (m === 9 && day >= 30) || (m === 10 && day <= 2); })();
+if (HALLOWEEN) {
+  document.documentElement.classList.add("halloween");
+  document.addEventListener("DOMContentLoaded", () => {
+    const bat = '<svg viewBox="0 0 60 28" aria-hidden="true"><path fill="#F6A15A" d="M30 10c2-4 5-6 5-6l1 4 3-2c1 5 6 7 11 6-4 2-6 6-6 9-3-3-7-3-9 0-1-3-3-4-5-4s-4 1-5 4c-2-3-6-3-9 0 0-3-2-7-6-9 5 1 10-1 11-6l3 2 1-4s3 2 5 6z"/></svg>';
+    const h = document.querySelector("header");
+    if (h) ["b1", "b2", "b3"].forEach(c => h.insertAdjacentHTML("afterbegin", `<span class="bat ${c}">${bat}</span>`));
+    const name = document.getElementById("appName"); if (name) name.textContent = "JAI Tracker 🎃";
+  });
+}
+
 /* ---------- angličtina: překladová vrstva ---------- */
 // Stránky se vykreslují česky; v angličtině se texty přeloží podle slovníku. Obsah od lidí (.ugc) se nepřekládá.
 const LANG = (() => { try { const v = localStorage.getItem("jai_lang"); if (v === "cs" || v === "en") return v; } catch { }
@@ -717,7 +757,8 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
+  "a pak": "and then", "Automatická věž": "Automatic tower", "🗼 Automatická věž": "🗼 Automatic tower",
+  "Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.": "Switches on by itself at airports and on approach (below 12,000 ft). Watches for occupied runways, approach sequence and other aircraft while taxiing.", "Halloweenský event": "Halloween event", "Šťastný Halloween, piloti! 🦇": "Happy Halloween, pilots! 🦇", "Letadla Jáchym Air dnes létají v dýňové barvě.": "Jáchym Air planes are flying in pumpkin colours today.", "JAI Tracker 🎃": "JAI Tracker 🎃", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
 EN_PAT.push(
@@ -791,6 +832,16 @@ Object.assign(EN, {
 });
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
+  [/^Čekej před dráhou (\S+): (\S+) je na dráze\.$/, "Hold short of runway $1: $2 is on the runway."],
+  [/^Čekej před dráhou (\S+): (\S+) na finále RWY (\S+), ([\d.]+) nm\.$/, "Hold short of runway $1: $2 on final RWY $3, $4 nm."],
+  [/^Dráha (\S+)(?: v (\w+))? je volná\.$/, (m, a, b) => `Runway ${a}${b ? " at " + b : ""} is clear.`],
+  [/^Dráha (\S+) v (\w+) je obsazená – (\S+) na dráze\.$/, "Runway $1 at $2 is occupied – $3 on the runway."],
+  [/^(\S+) na finále RWY (\S+), ([\d.]+) nm – (pozor při vzletu!|uvolni dráhu\.)$/, (m, a, b, c, d) => `${a} on final RWY ${b}, ${c} nm – ${d.startsWith("pozor") ? "caution on takeoff!" : "vacate the runway."}`],
+  [/^RWY (\S+) v (\w+) je obsazená – (\S+) na dráze\.( Připrav se na opakování přiblížení!)?$/, (m, a, b, c, d) => `RWY ${a} at ${b} is occupied – ${c} on the runway.${d ? " Prepare to go around!" : ""}`],
+  [/^Jsi číslo (\d+) na finále RWY (\S+), před tebou (\S+) \(([\d.]+) nm\)\.$/, "You're number $1 on final RWY $2, behind $3 ($4 nm)."],
+  [/^Jsi číslo (\d+) na přiblížení do (\w+), před tebou (\S+) \(([\d.]+) nm\)\.$/, "You're number $1 for $2, behind $3 ($4 nm)."],
+  [/^Pozor, (\S+) je (\d+) m před tebou\.$/, "Caution, $1 is $2 m ahead of you."],
+  [/^Hlídám provoz\. (.*)$/, (m, a) => "Watching traffic. " + a.replace(/V okolí (\d+) (letadlo|letadla|letadel) s JAI Trackerem\./, "$1 aircraft with JAI Tracker nearby.").replace("V okolí žádné další letadlo s JAI Trackerem.", "No other JAI Tracker aircraft nearby.")],
   [/^MEL: (.+?) – (.+)$/, (m, a, b) => `MEL: ${tr(a)} – ${tr(b)}`],
   [/^rosný bod (-?\d+) °C$/, "dew point $1 °C"],
   [/^(skoro jasno|polojasno|oblačno|zataženo|nebe neviditelné|jasno)\b(.*)$/, m => m.replace(/skoro jasno/g, "few").replace(/polojasno/g, "scattered").replace(/oblačno/g, "broken").replace(/zataženo/g, "overcast").replace(/nebe neviditelné/g, "sky obscured").replace(/jasno/g, "clear")],
@@ -1022,7 +1073,7 @@ let appStale = false, appFails = 0;
 async function pollApp() {
   let st = null;
   try { st = await appApi.get_state(); } catch { st = null; }
-  if (st && st.version) { appState = st; appFails = 0; appStale = false; }
+  if (st && st.version) { appState = st; appFails = 0; appStale = false; renderTowerBar(st.tower); }
   else {
     // Zastaralá aplikace odpovídá vždy hláškou „Nepovolená stránka“. Když aplikace jen chvíli neodpovídá
     // (vytížený počítač, simulátor), nic se nehlásí – zůstanou poslední známé údaje.
@@ -1092,6 +1143,7 @@ function renderTracker(full) {
         <div class="card tr-landing"><div class="big" id="trScore">–</div><div class="info">
           <h3 id="trVerdict" style="font-size:22px">Zatím žádné přistání</h3><div id="trLand" class="muted">Přistání se tu ukáže automaticky.</div></div></div>
         <div class="card tr-wide save-card" id="saveCard"></div>
+        <div class="card tr-wide" id="towerCard"></div>
         <div class="card tr-wide save-card" id="tripCard"></div>
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
           <div><b id="trAlt">–</b><span>Výška ft</span></div><div><b id="trIas">–</b><span>IAS kt</span></div>
@@ -1171,6 +1223,7 @@ function renderTracker(full) {
       if (obs.pos) q.set("pozice", obs.pos);
       if (obs.color.toLowerCase() !== "#1e9b36") q.set("barva", obs.color.slice(1));
       if (obs.scale !== 100) q.set("scale", (obs.scale / 100).toFixed(2));
+      if (LANG === "en") q.set("lang", "en");
       const qs = q.toString(); return s.obs_url + "/" + (qs ? "?" + qs : ""); };
     const syncObs = () => { settings.obs = obs; saveSettings(); $("obsUrl").textContent = obsUrl(); $("obsScaleV").textContent = obs.scale; };
     $("obsStyl").value = obs.styl; $("obsPos").value = obs.pos; $("obsColor").value = obs.color; $("obsScale").value = obs.scale; syncObs();
@@ -1246,6 +1299,7 @@ function renderTracker(full) {
   if ($("trUpdBtn") && flying && s.update_progress == null) { $("trUpdBtn").disabled = true; $("trUpdBtn").textContent = "Aktualizovat po přistání"; }
   if ($("trUpdBtn")) $("trUpdBtn").onclick = async () => { const r = await appApi.do_update(); if (r && r.ok === false) alert(r.msg); };
   if ($("tripCard") && !$("tripCard").dataset.done) renderTripCard();
+  renderTowerCard(s.tower);
   const sc = $("saveCard");
   if (sc) {
     const st = s.flight_state || "idle";
@@ -1391,7 +1445,7 @@ function acCategory(icao, title) {
   return "narrow";
 }
 function planeIcon(hdg, isJai, sel, cat = "narrow", custom = null) {
-  const col = custom || (isJai ? "#1E9B36" : "#66788A");
+  const col = custom || (isJai ? (HALLOWEEN ? "#E26A12" : "#1E9B36") : "#66788A");
   const shape = AC_SHAPES[cat] || AC_SHAPES.narrow;
   const size = Math.round(shape.size * (isJai ? 1.12 : 1));
   const rotor = shape.rotor ? `<circle cx="12" cy="10" r="8.2" fill="none" stroke="${col}" stroke-width="1.3" opacity=".75"/><circle cx="12" cy="10" r="8.2" fill="none" stroke="#fff" stroke-width=".5" opacity=".6"/>` : "";
@@ -1437,7 +1491,7 @@ function initMap() {
   routesReady.then(drawAirports);
   setInterval(renderHighlights, 120000);
   refreshLive();
-  liveTimer = setInterval(refreshLive, 8000);
+  liveTimer = setInterval(refreshLive, 10000);
 }
 
 function drawAirports() {
@@ -1696,15 +1750,37 @@ function timeAgo(d) {
   return fmtDate(d);
 }
 
+// Úspora dat: všechna letadla se načítají „nalehko“ (bez tras a celého plánu). Celé údaje jen u mého
+// a právě vybraného letadla. Když je web na pozadí, mapa se neobnovuje.
+const LIVE_PROF = "profiles(username, avatar_url, stream_url, eq_name_color, eq_title, eq_plane_color)";
+const LIVE_LITE = "user_id, callsign, aircraft, ac_icao, reg, va, lat, lon, alt, gs, vs, hdg, phase, dep_icao, squawk, landing, takeoff_at, updated_at, "
+  + "plan_dep:plan->>dep, plan_arr:plan->>arr, plan_altn:plan->>altn, plan_cs:plan->>callsign, plan_no:plan->>flight_no, plan_reg:plan->>reg, plan_ac:plan->>aircraft, " + LIVE_PROF;
+let liteFailed = false;
 async function refreshLive() {
+  if (document.hidden && liveRows.length) return;          // web na pozadí: šetřit data
   if (liveTick % 8 === 0) refreshTouchdowns();
   if (liveTick++ % 2 === 0) refreshRecent();
-  const since = new Date(Date.now() - 120000).toISOString();
-  const { data, error } = await sb.from("live").select("*, profiles(username, avatar_url, stream_url, eq_name_color, eq_title, eq_plane_color)").gte("updated_at", since);
-  if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
+  const since = new Date(Date.now() - 180000).toISOString();     // v cestovní hladině posílá aplikace polohu jednou za minutu
+  let { data, error } = liteFailed ? { error: true } : await sb.from("live").select(LIVE_LITE).gte("updated_at", since);
+  if (error) {   // záloha, kdyby databáze některý sloupec neměla
+    liteFailed = true;
+    ({ data, error } = await sb.from("live").select("*, " + LIVE_PROF).gte("updated_at", since));
+    if (error) { $("airList").innerHTML = `<div class="empty">Mapu se nepodařilo načíst: ${esc(error.message)}</div>`; return; }
+  } else {
+    for (const r of data || []) {
+      r.plan = r.plan_dep || r.plan_arr || r.plan_cs ? { dep: r.plan_dep, arr: r.plan_arr, altn: r.plan_altn, callsign: r.plan_cs, flight_no: r.plan_no, reg: r.plan_reg, aircraft: r.plan_ac } : null;
+    }
+    // celé údaje (trasa, plán s body) jen pro mé letadlo a vybrané letadlo
+    const full = [...new Set([me?.user?.id, focus?.type === "live" ? focus.id : null].filter(Boolean))].filter(id => (data || []).some(r => r.user_id === id));
+    if (full.length) {
+      const { data: rows } = await sb.from("live").select("*").in("user_id", full);
+      for (const fr of rows || []) { const i = data.findIndex(r => r.user_id === fr.user_id); if (i >= 0) data[i] = { ...fr, profiles: data[i].profiles }; }
+    }
+  }
   liveRows = data || [];
   renderLive();
 }
+document.addEventListener("visibilitychange", () => { if (!document.hidden && map) refreshLive(); });
 
 function renderLive() {
   if (!map) return;
@@ -1967,6 +2043,7 @@ async function openFocus(parts) {
     focus = { type: "live", id: parts[2], centered: false };
     focusLayer.clearLayers();
     renderFlightPanel();
+    refreshLive();          // dotáhnout celou trasu a plán vybraného letadla
     return;
   }
   const id = Number(parts[1]);
@@ -2296,6 +2373,34 @@ async function renderTripCard() {
   if ($("trTripEnd")) $("trTripEnd").onclick = async () => { await sb.from("trips").update({ active: false }).eq("id", a.id); renderTripCard(); };
 }
 
+/* ---------- automatická věž ---------- */
+const TOWER_ICON = { danger: "⛔", warn: "⚠️", info: "ℹ️", ok: "✅" };
+let towerLastDanger = "";
+function towerBeep() {
+  try { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "square"; o.frequency.value = 880; g.gain.value = .06; o.connect(g); g.connect(ctx.destination); o.start();
+    setTimeout(() => { o.frequency.value = 660; }, 180); setTimeout(() => { o.stop(); ctx.close(); }, 420); } catch { }
+}
+function renderTowerBar(t) {
+  let bar = $("towerBar");
+  const top = (t?.alerts || []).filter(a => a.level === "danger" || a.level === "warn" || a.level === "info")
+    .sort((a, b) => ["danger", "warn", "info"].indexOf(a.level) - ["danger", "warn", "info"].indexOf(b.level))[0];
+  if (!top) { if (bar) bar.remove(); towerLastDanger = ""; return; }
+  if (!bar) { bar = document.createElement("div"); bar.id = "towerBar"; bar.setAttribute("role", "alert"); document.body.appendChild(bar); }
+  bar.className = "tower-bar " + top.level;
+  bar.innerHTML = `<b>🗼 ${esc(tr("Automatická věž"))}</b> <span>${TOWER_ICON[top.level]} ${esc(tr(top.text))}</span>`;
+  if (top.level === "danger" && top.text !== towerLastDanger) towerBeep();
+  towerLastDanger = top.level === "danger" ? top.text : "";
+}
+function renderTowerCard(t) {
+  const box = $("towerCard"); if (!box) return;
+  const al = t?.alerts || [];
+  box.innerHTML = `<h2 class="section-title" style="margin-bottom:6px">🗼 Automatická věž</h2>
+    ${!t?.active ? '<p class="muted" style="margin:0">Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.</p>'
+      : al.length ? al.map(a => `<div class="tower-line ${a.level}">${TOWER_ICON[a.level]} ${esc(a.text)}</div>`).join("")
+      : `<p class="muted" style="margin:0">Hlídám provoz. ${t.traffic ? `V okolí ${t.traffic} ${t.traffic === 1 ? "letadlo" : t.traffic < 5 ? "letadla" : "letadel"} s JAI Trackerem.` : "V okolí žádné další letadlo s JAI Trackerem."}</p>`}`;
+}
+
 /* ---------- detail vlastní rotace ---------- */
 async function renderTrip(id) {
   const el = $("rotace");
@@ -2610,7 +2715,7 @@ async function renderHighlights() {
   if (!sb) return;
   const list = await loadEvents();
   const w = currentWeekFlight(list), y = nextYoutube(list);
-  $("highlights").innerHTML = (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
+  $("highlights").innerHTML = (HALLOWEEN ? `<div class="hl-card boo" style="padding:8px 12px"><span class="hl-ic" style="width:30px;height:30px;font-size:16px">🎃</span><b style="font-size:15px">Šťastný Halloween, piloti! 🦇</b></div>` : "") + (w ? `<a class="hl-card" href="#/novinky/${w.id}"><span class="hl-ic">★</span><div><div class="hl-k">Let týdne · končí ${relTime(w.ends_at || Date.now())}</div>
       <div class="hl-t">${w.dep && w.arr ? `${esc(w.dep)} → ${esc(w.arr)}` : esc(w.title)}</div><div class="hl-s">${esc(w.aircraft || w.title)}</div></div></a>` : "")
     + (y ? `<a class="hl-card yt" href="#/novinky/${y.id}"><span class="hl-ic">▶</span><div><div class="hl-k">${ytLive(y) ? "Živě teď na YouTube" : "YouTube " + relTime(y.starts_at)}</div>
       <div class="hl-t">${esc(y.title)}</div><div class="hl-s">${fmtDT(y.starts_at)}</div></div></a>` : "");
@@ -2751,13 +2856,15 @@ async function renderAdmin(editId, msg) {
       <div class="card" style="grid-column:1/-1"><h2 class="section-title">Linky z crew centra</h2>
         <p class="muted" style="margin-top:0">Zkopíruje linky a flotilu z crew.jachymair.com, aby byly vidět na mapě. Spusť po každé změně linek v crew centru.</p>
         <p id="syncInfo">${jaiRoutes.length ? `Teď je na webu <b>${jaiRoutes.length}</b> linek a <b>${jaiFleet.length}</b> letadel (naposledy ${fmtDT(jaiRoutes[0]?.synced_at)}).` : "Zatím žádné linky."}</p>
-        <button class="btn" id="syncBtn" type="button">Synchronizovat linky</button></div>
+        <button class="btn" id="syncBtn" type="button">Synchronizovat linky</button>
+        <button class="btn ghost" id="mgmtExport" type="button">Export pro JAI Management</button></div>
       <div class="card"><h2 class="section-title">Všechny položky</h2>
         ${list.length ? list.map(x => `<div class="adm-row"><div><div class="ev-kind">${KIND_TXT[x.kind]}${x.starts_at ? " · " + fmtDT(x.starts_at) : ""}${isNow(x) && x.kind === "let_tydne" ? " · <b style='color:var(--green)'>právě běží</b>" : ""}</div>
           <b>${esc(x.title)}</b>${x.dep ? ` <span class="muted">${esc(x.dep)} → ${esc(x.arr || "")}</span>` : ""}</div>
           <div style="display:flex;gap:12px;flex:none"><button class="link-btn" data-edit="${x.id}">Upravit</button><button class="link-btn danger" data-del="${x.id}">Smazat</button></div></div>`).join("")
           : '<p class="muted">Zatím nic. Vytvoř první let týdne!</p>'}
       </div></div>`;
+  if ($("mgmtExport")) $("mgmtExport").onclick = exportForManagement;
   renderAdminPhotos(); renderAdminReports(); renderAdminFleet(); renderAdminApNotes(); renderAdminRoster(); renderAdminDefects();
   el.querySelectorAll("[data-delva]").forEach(b => b.onclick = async () => {
     if (!confirm("Smazat virtuálku?")) return;
@@ -3719,6 +3826,21 @@ async function renderAdminRoster(msg) {
     const { error } = await sb.from("rotations").delete().eq("status", "open").gte("service_day", today);
     renderAdminRoster(error ? { ok: false, text: error.message } : { ok: true, text: "Volné rotace smazány." });
   };
+}
+
+/* ---------- export pro manažerskou hru ---------- */
+async function exportForManagement() {
+  await Promise.all([routesReady, airportsReady, basesReady]);
+  const fleet = await loadFleetDetails();
+  const icaos = new Set([...jaiRoutes.flatMap(r => [r.dep, r.arr]), ...basesList.map(b => b.icao)]);
+  const aps = {};
+  for (const i of icaos) { const a = apByCode(i); if (a) aps[i] = [a[2], a[3], a[1]]; }
+  const data = { exported: new Date().toISOString(), routes: jaiRoutes.map(r => ({ id: r.id, flight_no: fltNo(r), dep: r.dep, arr: r.arr, dpt_time: r.dpt_time, arr_time: r.arr_time,
+    flight_time_min: r.flight_time_min, load_factor: r.load_factor, days: r.days, subfleets: r.subfleets })), fleet, bases: basesList.map(b => b.icao), airports: aps,
+    // všechna velká a střední letiště v Evropě, Africe a na Blízkém východě (pro návrhy minihubů a nových linek)
+    allAirports: airports.filter(a => /^[ELDGHO][A-Z]{3}$/.test(a[0])).map(a => [a[0], Math.round(a[2] * 1000) / 1000, Math.round(a[3] * 1000) / 1000, String(a[1]).slice(0, 40), a[4]]) };
+  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "jai-management-export.json"; document.body.appendChild(a); a.click(); a.remove();
 }
 
 /* ---------- správa: flotila a poznámky k letištím ---------- */
