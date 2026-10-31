@@ -1072,6 +1072,221 @@ def upload_loop():
                 pass
 
 
+# ---------------- Automatická věž ----------------
+# Z poloh ostatních pilotů v okolí hlídá obsazenou dráhu, pořadí na přiblížení a střety při pojíždění.
+TOWER_FT_PER_NM = 6076.12
+
+
+def _rwy_frame(lat, lon, thr, end):
+    coslat = math.cos(math.radians(thr[1]))
+    ex, ey = (end[2] - thr[2]) * coslat * 111320, (end[1] - thr[1]) * 110540
+    length = math.hypot(ex, ey)
+    if length < 100:
+        return None
+    px, py = (lon - thr[2]) * coslat * 111320, (lat - thr[1]) * 110540
+    along = (px * ex + py * ey) / length
+    cross = (px * ey - py * ex) / length
+    brg = math.degrees(math.atan2(ex, ey)) % 360
+    return along, cross, length, brg
+
+
+def runways_near(lat, lon):
+    return [r for r in RUNWAYS if abs(r[1][1] - lat) < 0.08 and abs(r[1][2] - lon) < 0.12]
+
+
+def runway_occupied_by(lat, lon, rws, margin=15):
+    """Dráha (název obou konců), na které bod leží, nebo None."""
+    for apt, a, b, width in rws:
+        f = _rwy_frame(lat, lon, a, b)
+        if not f:
+            continue
+        along, cross, length, _ = f
+        if -60 <= along <= length + 60 and abs(cross) <= width * 0.3048 / 2 + margin:
+            return f"{a[0]}/{b[0]}", apt
+    return None
+
+
+def runway_near_edge(lat, lon, rws, dist=120):
+    """Letadlo je u dráhy (např. na čekacím místě), ale ne na ní."""
+    for apt, a, b, width in rws:
+        f = _rwy_frame(lat, lon, a, b)
+        if not f:
+            continue
+        along, cross, length, _ = f
+        half = width * 0.3048 / 2
+        if -80 <= along <= length + 80 and half + 10 < abs(cross) <= half + dist:
+            return f"{a[0]}/{b[0]}", apt
+    return None
+
+
+def on_final(lat, lon, hdg, agl, rws, max_nm=8):
+    """Letadlo na finále: před prahem, v ose, ve správném směru, nízko. Vrací (dráha, konec, vzdálenost nm)."""
+    if agl is None or agl > 3500:
+        return None
+    best = None
+    for apt, a, b, width in rws_big(lat, lon):
+        for thr, end in ((a, b), (b, a)):
+            f = _rwy_frame(lat, lon, thr, end)
+            if not f:
+                continue
+            along, cross, length, brg = f
+            dist_m = -along
+            if not (0 < dist_m < max_nm * 1852):
+                continue
+            if abs(cross) > 250 + dist_m * 0.08 or abs((hdg - brg + 180) % 360 - 180) > 25:
+                continue
+            nm = dist_m / 1852
+            if best is None or nm < best[2]:
+                best = (f"{a[0]}/{b[0]}", thr[0], nm, apt)
+    return best
+
+
+def rws_big(lat, lon):
+    return [r for r in RUNWAYS if abs(r[1][1] - lat) < 0.25 and abs(r[1][2] - lon) < 0.35]
+
+
+def _extrapolate(o, now):
+    """Ostatní posílají polohu jen občas – dopočítat, kde asi jsou teď."""
+    try:
+        age = min(20.0, max(0.0, now - datetime.fromisoformat(str(o["updated_at"]).replace("Z", "+00:00")).timestamp()))
+    except Exception:
+        age = 0.0
+    gs, hdg = o.get("gs") or 0, math.radians(o.get("hdg") or 0)
+    d_m = gs * 0.514444 * age
+    lat = o["lat"] + d_m * math.cos(hdg) / 110540
+    lon = o["lon"] + d_m * math.sin(hdg) / (111320 * math.cos(math.radians(o["lat"])))
+    return lat, lon
+
+
+def tower_alerts(s, others):
+    """Seznam upozornění pro mé letadlo. Úrovně: danger (hned reagovat), warn, info."""
+    alerts = []
+    lat, lon, hdg, gs = s.get("lat"), s.get("lon"), s.get("hdg") or 0, s.get("gs") or 0
+    agl = s.get("agl") or 0
+    if lat is None or not RUNWAYS:
+        return alerts
+    elev = (s.get("alt") or 0) - agl                     # nadmořská výška terénu pod námi ≈ letiště
+    on_ground = bool(s.get("on_ground"))
+    rws = runways_near(lat, lon)
+    now = time.time()
+    traffic = []
+    for o in others:
+        if o.get("lat") is None:
+            continue
+        olat, olon = _extrapolate(o, now)
+        cs = o.get("plan_cs") or o.get("callsign") or "?"
+        o_agl = max(0, (o.get("alt") or 0) - elev)
+        o_ground = o.get("phase") in ("Na zemi", "Pojíždění", "Vzlet") and o_agl < 200 or ((o.get("gs") or 0) < 40 and o_agl < 150)
+        traffic.append({"cs": cs, "lat": olat, "lon": olon, "agl": o_agl, "ground": o_ground, "gs": o.get("gs") or 0, "hdg": o.get("hdg") or 0, "arr": o.get("plan_arr")})
+
+    def occ_text(rwy):
+        for t in traffic:
+            if t["ground"]:
+                hit = runway_occupied_by(t["lat"], t["lon"], rws)
+                if hit and hit[0] == rwy:
+                    return t["cs"], "na dráze"
+        return None
+
+    def finals(rwy_pair):
+        out = []
+        for t in traffic:
+            if t["ground"]:
+                continue
+            f = on_final(t["lat"], t["lon"], t["hdg"], t["agl"], rws)
+            if f and f[0] == rwy_pair:
+                out.append((f[2], t["cs"], f[1]))
+        return sorted(out)
+
+    if on_ground:
+        mine = runway_occupied_by(lat, lon, rws)
+        if mine:
+            occ = occ_text(mine[0])
+            fin = finals(mine[0])
+            if occ:
+                alerts.append({"level": "danger" if gs > 30 else "warn", "text": f"Dráha {mine[0]} v {mine[1]} je obsazená – {occ[0]} {occ[1]}."})
+            if fin and fin[0][0] < 5:
+                d, cs, end = fin[0]
+                lvl = "danger" if gs > 30 or d < 2.5 else "warn"
+                alerts.append({"level": lvl, "text": f"{cs} na finále RWY {end}, {d:.1f} nm – {'pozor při vzletu!' if gs > 30 else 'uvolni dráhu.'}"})
+        else:
+            edge = runway_near_edge(lat, lon, rws)
+            if edge:
+                occ = occ_text(edge[0])
+                fin = finals(edge[0])
+                if occ:
+                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {occ[0]} je na dráze."})
+                elif fin and fin[0][0] < 6:
+                    alerts.append({"level": "warn", "text": f"Čekej před dráhou {edge[0]}: {fin[0][1]} na finále RWY {fin[0][2]}, {fin[0][0]:.1f} nm."})
+                else:
+                    alerts.append({"level": "ok", "text": f"Dráha {edge[0]} je volná."})
+            # střet při pojíždění
+            if gs > 3:
+                for t in traffic:
+                    if not t["ground"]:
+                        continue
+                    dn = (t["lat"] - lat) * 110540
+                    de = (t["lon"] - lon) * 111320 * math.cos(math.radians(lat))
+                    d = math.hypot(dn, de)
+                    ahead = abs((math.degrees(math.atan2(de, dn)) % 360 - hdg + 180) % 360 - 180) < 50
+                    if d < 160 and ahead:
+                        alerts.append({"level": "warn", "text": f"Pozor, {t['cs']} je {round(d / 10) * 10} m před tebou."})
+    else:
+        mf = on_final(lat, lon, hdg, agl, rws)
+        if mf:
+            pair, end, d, apt = mf
+            occ = occ_text(pair)
+            if occ:
+                alerts.append({"level": "danger" if d < 2.5 else "warn", "text": f"RWY {end} v {apt} je obsazená – {occ[0]} {occ[1]}." + (" Připrav se na opakování přiblížení!" if d < 2.5 else "")})
+            ahead = [x for x in finals(pair) if x[0] < d]
+            if ahead:
+                alerts.append({"level": "info", "text": f"Jsi číslo {len(ahead) + 1} na finále RWY {end}, před tebou {ahead[-1][1]} ({d - ahead[-1][0]:.1f} nm)."})
+            elif not occ:
+                alerts.append({"level": "ok", "text": f"Dráha {end} v {apt} je volná."})
+        else:
+            # pořadí na přiblížení do cíle podle vzdálenosti
+            arr = ((s.get("plan") or {}).get("arr") or "").upper()
+            ap = next((a for a in AIRPORTS if a[0] == arr), None) if arr else None
+            if ap and agl < 15000:
+                my_d = haversine_nm(lat, lon, ap[2], ap[3])
+                if my_d < 40:
+                    ahead = sorted((haversine_nm(t["lat"], t["lon"], ap[2], ap[3]), t["cs"]) for t in traffic
+                                   if not t["ground"] and (t["arr"] or "").upper() == arr and haversine_nm(t["lat"], t["lon"], ap[2], ap[3]) < my_d)
+                    if ahead:
+                        alerts.append({"level": "info", "text": f"Jsi číslo {len(ahead) + 1} na přiblížení do {arr}, před tebou {ahead[-1][1]} ({my_d - ahead[-1][0]:.0f} nm)."})
+    return alerts
+
+
+def tower_loop():
+    """Každých pár sekund vyhodnotí provoz kolem. Polohy ostatních stahuje jen u letiště a při přiblížení."""
+    others, last_fetch = [], 0.0
+    while True:
+        time.sleep(3)
+        try:
+            with lock:
+                s = dict(state)
+            relevant = s.get("connected") and s.get("online") and not s.get("demo") and (s.get("on_ground") or (s.get("agl") or 0) < 12000)
+            if not relevant:
+                with lock:
+                    state["tower"] = {"alerts": [], "traffic": 0, "active": False}
+                continue
+            now = time.time()
+            if now - last_fetch > (6 if (s.get("agl") or 0) < 3000 else 15):
+                last_fetch = now
+                lat, lon = s["lat"], s["lon"]
+                since = datetime.fromtimestamp(now - 120, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+                q = (f"/rest/v1/live?select=user_id,callsign,lat,lon,alt,gs,vs,hdg,phase,updated_at,plan_arr:plan->>arr,plan_cs:plan->>callsign"
+                     f"&lat=gte.{lat - 0.6:.3f}&lat=lte.{lat + 0.6:.3f}&lon=gte.{lon - 0.9:.3f}&lon=lte.{lon + 0.9:.3f}&updated_at=gte.{since}&user_id=neq.{cloud.user_id}")
+                code, res = cloud.request("GET", q)
+                if code == 200 and isinstance(res, list):
+                    others = res
+            alerts = tower_alerts(s, others)
+            with lock:
+                state["tower"] = {"alerts": alerts, "traffic": len(others), "active": True}
+        except Exception as e:
+            with lock:
+                state["tower"] = {"alerts": [], "traffic": 0, "active": False, "error": str(e)[:120]}
+
+
 # ---------------- Hodnocení přistání ----------------
 def landing_score(fpm, g):
     f = abs(fpm)
@@ -1815,6 +2030,7 @@ def start_background(demo=False):
     threading.Thread(target=web_login, daemon=True).start()
     threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
     threading.Thread(target=upload_loop, daemon=True).start()
+    threading.Thread(target=tower_loop, daemon=True).start()
     threading.Thread(target=check_update, daemon=True).start()
 
     def bids_loop():

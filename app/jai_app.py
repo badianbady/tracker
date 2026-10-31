@@ -36,6 +36,20 @@ def message_box(text, title="Jáchym Air Tracker"):
         pass
 
 
+def _json_safe(v):
+    """Hodnoty, které umí web přečíst: NaN/nekonečno -> None, neznámé typy -> text."""
+    import math
+    if isinstance(v, float):
+        return None if math.isnan(v) or math.isinf(v) else v
+    if isinstance(v, dict):
+        return {str(k): _json_safe(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_json_safe(x) for x in v]
+    if v is None or isinstance(v, (str, int, bool)):
+        return v
+    return str(v)
+
+
 def _trusted():
     """Funkce aplikace smí volat jen náš web – ne cizí stránka, kdyby se do okna nějak dostala."""
     try:
@@ -61,6 +75,14 @@ class Api:
 
     @guarded
     def get_state(self):
+        """Stav pro web. Odpovídá vždy (aspoň s číslem verze), aby web nehlásil zastaralou aplikaci."""
+        try:
+            return _json_safe(self._state())
+        except Exception as e:
+            return {"version": core.VERSION, "connected": bool(core.state.get("connected")), "online": bool(core.state.get("online")),
+                    "status": core.state.get("status"), "beta": core.BETA, "state_error": str(e)[:200]}
+
+    def _state(self):
         with core.lock:
             s = {k: v for k, v in core.state.items() if k not in ("trail", "log", "plan", "sb_plan", "last_flight", "crew")}
             s["has_sb_plan"] = bool(core.state.get("sb_plan"))
