@@ -63,6 +63,21 @@
   header > a, header > nav { position: relative; z-index: 1; }
   .hl-card.boo { background: #2A1838; color: #FDE7D3; } .hl-card.boo .hl-k { color: #F9A15A; } .hl-card.boo .hl-ic { background: #E26A12; }
 
+  /* ---------- plánované lety a odznaky ---------- */
+  .plan-grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .plan-grid label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
+  .plan-table .day-row td { background: var(--green-soft); color: var(--green-deep); font-weight: 700; font-size: 14px; text-transform: capitalize; }
+  .chip-st { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--bg, #EEF2EF); white-space: nowrap; }
+  .chip-st.ok { background: #DCF5E3; color: #0F6A27; } .chip-st.wait { background: #FEF3C7; color: #8A5A00; } .chip-st.no { background: #FDE2E2; color: #9B1C1C; }
+  @media (prefers-color-scheme: dark) { .chip-st { background: #1C2A22; } .chip-st.ok { background: #143A20; color: #8BE3A0; } .chip-st.wait { background: #3A2A08; color: #FDE68A; } .chip-st.no { background: #4A1414; color: #FECACA; } }
+  .pb-row { display: grid; grid-template-columns: 44px 64px 1fr auto; gap: 6px; align-items: center; font-size: 13px; padding: 3px 0; border-bottom: 1px solid rgba(127,127,127,.18); }
+  .bdg-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-bottom: 8px; }
+  .bdg { border: 1px solid var(--line, #DCE3DE); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; background: var(--card, #fff); opacity: .62; filter: grayscale(.9); }
+  .bdg.on { opacity: 1; filter: none; border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+  .bdg .b-ic { font-size: 28px; line-height: 1; } .badge b { font-size: 15px; } .bdg .b-d { font-size: 12px; color: var(--muted, #5C6E63); }
+  .bdg .b-ok { font-size: 12px; font-weight: 700; color: var(--green-deep); }
+  .bdg .b-p { width: 100%; height: 6px; border-radius: 3px; background: var(--line, #DCE3DE); overflow: hidden; margin-top: 4px; } .bdg .b-p i { display: block; height: 100%; background: var(--green); }
+
   /* ---------- automatická věž ---------- */
   .tower-bar { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 1200; max-width: min(760px, 94vw);
     padding: 9px 16px; border-radius: 0 0 12px 12px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25); display: flex; gap: 10px; align-items: baseline; }
@@ -447,6 +462,7 @@
     <a href="#/novinky" data-r="novinky">Novinky</a>
     <a href="#/rozpis" data-r="rozpis" id="navRoster" style="display:none">Rozpis</a>
     <a href="#/obchod" data-r="obchod" id="navShop" style="display:none">Obchod</a>
+    <a href="#/plany" data-r="plany">Plány</a>
     <a href="#/fotky" data-r="fotky">Fotky</a>
     <a href="#/pratele" data-r="pratele" id="navFriends">Přátelé</a>
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
@@ -481,6 +497,7 @@
   <section class="view" id="view-chat"><div class="page" id="chat"></div></section>
   <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
   <section class="view" id="view-rotace"><div class="page" id="rotace"></div></section>
+  <section class="view" id="view-plany"><div class="page" id="plany"></div></section>
   <section class="view" id="view-obchod"><div class="page" id="obchod"></div></section>
   <section class="view" id="view-briefing"><div class="page" id="briefing"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
@@ -757,7 +774,24 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "V počítači chybí anglický hlas, proto je věži špatně rozumět. Přidej ho ve Windows: Nastavení → Čas a jazyk → Řeč → Spravovat hlasy → Přidat hlasy → English (United Kingdom). Pak aplikaci restartuj.": "No English voice is installed, so the tower is hard to understand. Add one in Windows: Settings → Time & language → Speech → Manage voices → Add voices → English (United Kingdom). Then restart the app.", "pomalu": "slow", "normálně": "normal", "rychle": "fast", "výchozí hlas": "default voice", "Hlas věže (anglicky)": "Tower voice", "Vyzkoušet hlas": "Test voice", "Automatická věž": "Automatic tower", "🗼 Automatická věž": "🗼 Automatic tower",
+  "a pak": "and then", "Plány": "Planned", "Plánované lety": "Planned flights", "Plánované lety pilotů": "Pilots' planned flights", "Všechny plánované lety →": "All planned flights →",
+  "Naplánovat let": "Plan a flight", "Naplánovat": "Plan", "Nadcházející lety": "Upcoming flights", "@Filtr letiště (ICAO)": "@Filter airport (ICAO)",
+  "Kdo kdy a kam poletí. Přidej se ke kamarádům, nebo naplánuj vlastní let. Stav se mění sám: plánováno, zpožděno, ve vzduchu, přistál.": "Who's flying where and when. Join your friends or plan your own flight. The status updates itself: scheduled, delayed, airborne, landed.",
+  "Časy zadávej v místním čase (podle tvého počítače). Ostatní je uvidí přepočítané na svůj čas.": "Enter times in your local time. Others will see them converted to theirs.",
+  "Den": "Day", "Z (ICAO)": "From (ICAO)", "Do (ICAO)": "To (ICAO)", "Typ letadla": "Aircraft type", "Poznámka (nepovinné)": "Note (optional)", "@Např. stream na YouTube, přidejte se!": "@E.g. streaming on YouTube, join me!",
+  "Plánováno": "Scheduled", "Brzy odlet": "Departing soon", "Zrušeno": "Cancelled", "Neuskutečněno": "Not operated", "Připravuje se k odletu": "Preparing for departure", "Let naplánován ✔": "Flight planned ✔",
+  "Zatím žádné plánované lety.": "No planned flights yet.", "Zrušit tento plánovaný let?": "Cancel this planned flight?", "Smazat tento plánovaný let?": "Delete this planned flight?",
+  "Zadej platné kódy letišť (ICAO).": "Enter valid airport codes (ICAO).", "Odlet a přílet nemůžou být na stejném letišti.": "Departure and arrival can't be the same airport.",
+  "Plánované lety zatím nejsou zapnuté v databázi.": "Planned flights aren't enabled in the database yet.", "Let nejde naplánovat do minulosti.": "You can't plan a flight in the past.",
+  "Let jde naplánovat nejvýš 30 dní dopředu.": "Flights can be planned at most 30 days ahead.", "Najednou můžeš mít nejvýš 15 naplánovaných letů.": "You can have at most 15 planned flights at once.",
+  "Odznaky": "Badges", "Získáno ✔": "Earned ✔", "První let": "First flight", "Dokonči první let.": "Complete your first flight.", "Pravidelný pilot": "Regular pilot", "10 dokončených letů.": "10 completed flights.",
+  "Veterán": "Veteran", "100 dokončených letů.": "100 completed flights.", "10 hodin": "10 hours", "Nalétej 10 hodin.": "Fly 10 hours.", "100 hodin": "100 hours", "Nalétej 100 hodin.": "Fly 100 hours.",
+  "Máslo": "Butter", "Přistání se známkou 9,5 a víc.": "A landing scored 9.5 or more.", "Mistr másla": "Butter master", "10 přistání se známkou 9,5 a víc.": "10 landings scored 9.5 or more.",
+  "Noční pták": "Night owl", "Přistání mezi půlnocí a pátou ráno.": "A landing between midnight and 5 am.", "Cestovatel": "Traveller", "Navštiv 20 různých letišť.": "Visit 20 different airports.",
+  "Světoběžník": "Globetrotter", "Navštiv 50 různých letišť.": "Visit 50 different airports.", "Všechny minihuby": "All minihubs", "Přistaň na všech minihubech Jáchym Air.": "Land at every Jáchym Air minihub.",
+  "Linkový pilot": "Line pilot", "5 letů z Rozpisu.": "5 roster flights.", "Dochvilný": "Punctual", "10 letů z Rozpisu načas.": "10 roster flights on time.", "Dálkový let": "Long haul",
+  "Let delší než 5 hodin.": "A flight longer than 5 hours.", "Týden v kuse": "Week streak", "Leť 7 dní po sobě.": "Fly 7 days in a row.", "Kontrola podvozku": "Gear inspection",
+  "Přistání tvrdší než −900 fpm. Gratulujeme? 😅": "A landing harder than −900 fpm. Congratulations? 😅", "V počítači chybí anglický hlas, proto je věži špatně rozumět. Přidej ho ve Windows: Nastavení → Čas a jazyk → Řeč → Spravovat hlasy → Přidat hlasy → English (United Kingdom). Pak aplikaci restartuj.": "No English voice is installed, so the tower is hard to understand. Add one in Windows: Settings → Time & language → Speech → Manage voices → Add voices → English (United Kingdom). Then restart the app.", "pomalu": "slow", "normálně": "normal", "rychle": "fast", "výchozí hlas": "default voice", "Hlas věže (anglicky)": "Tower voice", "Vyzkoušet hlas": "Test voice", "Automatická věž": "Automatic tower", "🗼 Automatická věž": "🗼 Automatic tower",
   "Zapne se sama na letišti a při přiblížení (pod 12 000 ft). Hlídá obsazenou dráhu, pořadí na přiblížení a ostatní letadla při pojíždění.": "Switches on by itself at airports and on approach (below 12,000 ft). Watches for occupied runways, approach sequence and other aircraft while taxiing.", "Halloweenský event": "Halloween event", "Šťastný Halloween, piloti! 🦇": "Happy Halloween, pilots! 🦇", "Letadla Jáchym Air dnes létají v dýňové barvě.": "Jáchym Air planes are flying in pumpkin colours today.", "JAI Tracker 🎃": "JAI Tracker 🎃", "Export pro JAI Management": "Export for JAI Management", "Najdu volnou rotaci s odletem z místa, kde jsi, v příštích 4 hodinách.": "I'll find a free rotation departing from where you are in the next 4 hours.", "let": "flight", "Foto ©": "Photo ©", "Foto": "Photo", "Pilot": "Pilot", "squawk": "squawk", "10 km a více": "10 km or more", "bez oblačnosti": "no clouds", "Jevy": "Weather", "bezvětří": "calm",
   "Velmi špatné (LIFR)": "Very poor (LIFR)", "Špatné (IFR)": "Poor (IFR)", "Zhoršené (MVFR)": "Marginal (MVFR)", "Dobré (VFR)": "Good (VFR)", "← Rozpis": "← Roster", "@Přepnout do češtiny": "@Přepnout do češtiny",
 });
@@ -832,6 +866,8 @@ Object.assign(EN, {
 });
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
+  [/^Přistál (\S+)$/, "Landed $1"], [/^Ve vzduchu · přílet (\S+)$/, "Airborne · arriving $1"], [/^Zpožděno · odhad (\S+)$/, "Delayed · est. $1"],
+  [/^vzlet (\S+)$/, "departed $1"], [/^odhad (\S+)$/, "est. $1"], [/^skutečně (\S+)$/, "actual $1"],
   [/^Čekej před dráhou (\S+): (\S+) je na dráze\.$/, "Hold short of runway $1: $2 is on the runway."],
   [/^Čekej před dráhou (\S+): (\S+) na finále RWY (\S+), ([\d.]+) nm\.$/, "Hold short of runway $1: $2 on final RWY $3, $4 nm."],
   [/^Dráha (\S+)(?: v (\w+))? je volná\.( Povoleno přistání\.)?$/, (m, a, b, c) => `Runway ${a}${b ? " at " + b : ""} is clear.${c ? " Cleared to land." : ""}`],
@@ -1323,7 +1359,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod", "rotace"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod", "rotace", "plany"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -1353,6 +1389,7 @@ async function router() {
   if (view === "briefing") renderBriefing(+parts[1], +(parts[2] || 0));
   if (view === "obchod") renderShop();
   if (view === "rotace") renderTrip(+parts[1]);
+  if (view === "plany") renderPlans();
 }
 window.addEventListener("hashchange", router);
 
@@ -1516,6 +1553,7 @@ function drawAirports() {
       return `<div class="pop-cs">${esc(icao)}</div><div><b>${esc(name)}</b></div>${city ? `<div class="muted">${esc(city)}</div>` : ""}
         ${here.length ? `<div style="margin-top:6px">Na letišti: ${here.map(r => esc(r.callsign || r.profiles?.username)).join(", ")}</div>` : ""}
         ${jai ? routesPopupHtml(icao) : ""}
+        ${plannedBoardHtml(icao)}
         ${metarCache.get(icao) ? metarHtml(metarCache.get(icao))
           : metarMissing.has(icao) ? '<div class="muted" style="margin-top:6px">Letiště nemá meteostanici, METAR tu není.</div>'
           : '<div class="muted" style="margin-top:6px">Načítám počasí…</div>'}`;
@@ -1760,6 +1798,7 @@ let liteFailed = false;
 async function refreshLive() {
   if (document.hidden && liveRows.length) return;          // web na pozadí: šetřit data
   if (liveTick % 8 === 0) refreshTouchdowns();
+  if (liveTick % 12 === 0) loadPlanned();
   if (liveTick++ % 2 === 0) refreshRecent();
   const since = new Date(Date.now() - 180000).toISOString();     // v cestovní hladině posílá aplikace polohu jednou za minutu
   let { data, error } = liteFailed ? { error: true } : await sb.from("live").select(LIVE_LITE).gte("updated_at", since);
@@ -2273,6 +2312,8 @@ async function renderPilot(username) {
       <div class="stat"><b>${p.best_score != null ? fmt1(p.best_score) : "–"}</b><span>Nejlepší přistání</span></div>
     </div>
     <div id="careerBox"></div>
+    <div id="badgesBox"></div>
+    <div id="plansBox"></div>
     <div id="tripsBox"></div>
     <h2 class="section-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">Historie letů
       ${own && fl?.length ? `<button class="btn ghost" id="tripSelBtn" style="padding:6px 12px;font-size:14px">Vytvořit rotaci z letů</button>` : ""}</h2>
@@ -2281,6 +2322,17 @@ async function renderPilot(username) {
     ${!fl?.length ? '<div class="card">Zatím žádné lety.</div>' : `<div class="table-wrap"><table id="histTable"><thead><tr><th class="sel-col" style="display:none"></th><th>Datum</th><th>Trasa</th><th>Letadlo</th><th>Doba</th><th>Vzdálenost</th><th>Dráha</th><th>FPM</th><th>G</th><th>Známka</th></tr></thead><tbody>
     ${historyRows(fl, trips)}</tbody></table></div>`}`;
   bindHistory(el, p, fl || [], trips, own);
+  renderBadges(p);
+  renderProfilePlans(p, own);
+}
+async function renderProfilePlans(p, own) {
+  const box = $("plansBox"); if (!box) return;
+  const c = await loadPlanned();
+  const list = c.list.filter(x => x.user_id === p.id && new Date(x.sta) > Date.now() - 12 * 3600e3);
+  if (!list.length && !own) { box.innerHTML = ""; return; }
+  box.innerHTML = `<h2 class="section-title" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Plánované lety ${own ? '<a class="btn ghost" href="#/plany" style="padding:6px 12px;font-size:14px">Naplánovat let</a>' : ""}</h2>
+    ${plannedTable(list, { noPilot: true, own, empty: "Zatím žádné plánované lety." })}`;
+  bindPlanActions(box, () => renderProfilePlans(p, own));
 }
 function flightRow(f, inTrip) {
   return `<tr class="clickable" data-fid="${f.id}" tabindex="0"><td class="sel-col" style="display:none"><input type="checkbox" class="sel-f" value="${f.id}" aria-label="Vybrat let"></td>
@@ -2434,6 +2486,8 @@ function renderTowerBar(t) {
 }
 function renderTowerCard(t) {
   const box = $("towerCard"); if (!box) return;
+  if (!t) { box.style.display = "none"; return; }     // starší aplikace bez automatické věže
+  box.style.display = "";
   const key = JSON.stringify(t?.alerts || []) + (t?.active ? 1 : 0) + (t?.traffic || 0);
   if (box.dataset.key === key) return;            // nepřekreslovat zbytečně (a nerušit klikání)
   box.dataset.key = key;
@@ -2463,6 +2517,169 @@ if (window.speechSynthesis) {
   const refreshVoices = () => { const b = $("towerCard"); if (b) { b.dataset.key = ""; renderTowerCard(appState?.tower); } };
   speechSynthesis.onvoiceschanged = refreshVoices;
   let tries = 0; const iv = setInterval(() => { if (allVoices().length || ++tries > 10) { clearInterval(iv); refreshVoices(); } }, 1000);   // některé počítače hlásí hlasy pozdě
+}
+
+/* ---------- plánované lety ---------- */
+let plannedCache = { list: [], flights: [], live: [], t: 0 };
+async function loadPlanned(force) {
+  if (!force && Date.now() - plannedCache.t < 120000) return plannedCache;
+  const from = new Date(Date.now() - 12 * 3600e3).toISOString(), to = new Date(Date.now() + 31 * 864e5).toISOString();
+  const { data: list, error } = await sb.from("planned_flights").select("*, profiles(username)").gte("sta", from).lte("std", to).order("std").limit(500);
+  if (error) { plannedCache = { list: [], flights: [], live: [], t: Date.now(), error: error.message }; return plannedCache; }
+  const ids = [...new Set((list || []).map(p => p.user_id))];
+  let flights = [], live = [];
+  if (ids.length) {
+    const [f, l] = await Promise.all([
+      sb.from("flights").select("user_id, dep_icao, arr_icao, takeoff_at, landed_at").in("user_id", ids).gte("landed_at", from),
+      sb.from("live").select("user_id, dep_icao, takeoff_at, phase, updated_at, plan_arr:plan->>arr").in("user_id", ids).gte("updated_at", new Date(Date.now() - 180000).toISOString())]);
+    flights = f.data || []; live = l.data || [];
+  }
+  plannedCache = { list: list || [], flights, live, t: Date.now() };
+  return plannedCache;
+}
+// stav letu jako na Flightradaru: plánováno / brzy odlet / zpožděno / ve vzduchu / přistál / zrušeno
+function planStatus(p, c = plannedCache) {
+  const std = new Date(p.std).getTime(), sta = new Date(p.sta).getTime(), now = Date.now();
+  if (p.cancelled) return { key: "cancel", txt: "Zrušeno", cls: "no" };
+  const f = c.flights.find(x => x.user_id === p.user_id && x.arr_icao === p.arr && (!x.dep_icao || x.dep_icao === p.dep)
+    && new Date(x.landed_at).getTime() >= std - 3 * 3600e3 && new Date(x.landed_at).getTime() <= sta + 8 * 3600e3);
+  if (f) { const late = Math.round((new Date(f.landed_at).getTime() - sta) / 60000); return { key: "landed", txt: `Přistál ${hm(f.landed_at)}`, cls: late > 15 ? "wait" : "ok", atd: f.takeoff_at, ata: f.landed_at, late }; }
+  const l = c.live.find(x => x.user_id === p.user_id && (x.dep_icao === p.dep || x.plan_arr === p.arr) && now >= std - 3 * 3600e3);
+  if (l) {
+    if (l.takeoff_at) { const eta = new Date(new Date(l.takeoff_at).getTime() + (sta - std)); return { key: "air", txt: `Ve vzduchu · přílet ${hm(eta)}`, cls: "ok", atd: l.takeoff_at, eta }; }
+    return { key: "board", txt: "Připravuje se k odletu", cls: "wait" };
+  }
+  if (now > sta + 2 * 3600e3) return { key: "none", txt: "Neuskutečněno", cls: "" };
+  if (now > std + 15 * 60000) return { key: "delayed", txt: `Zpožděno · odhad ${hm(now + 10 * 60000)}`, cls: "no" };
+  if (now > std - 30 * 60000) return { key: "soon", txt: "Brzy odlet", cls: "wait" };
+  return { key: "sched", txt: "Plánováno", cls: "" };
+}
+const planFlightNo = p => p.callsign || p.flight_no || "—";
+function plannedBoardHtml(icao) {
+  const now = Date.now(), h24 = now + 24 * 3600e3, list = plannedCache.list.filter(p => !p.cancelled || true);
+  const dep = list.filter(p => p.dep === icao && new Date(p.std) >= now - 3600e3 && new Date(p.std) <= h24).slice(0, 5);
+  const arr = list.filter(p => p.arr === icao && new Date(p.sta) >= now - 3600e3 && new Date(p.sta) <= h24).slice(0, 5);
+  if (!dep.length && !arr.length) return "";
+  const row = (p, kind) => { const st = planStatus(p); return `<div class="pb-row"><b>${hm(kind === "dep" ? p.std : p.sta)}</b><span>${esc(planFlightNo(p))}</span><span>${kind === "dep" ? "→ " + esc(p.arr) : esc(p.dep) + " →"}</span><span class="chip-st ${st.cls}">${esc(st.txt)}</span></div>`; };
+  return `<div class="rt-sec"><h5>Plánované lety pilotů</h5>
+    ${dep.length ? `<div class="muted" style="font-size:12px;font-weight:700">Odlety</div>${dep.map(p => row(p, "dep")).join("")}` : ""}
+    ${arr.length ? `<div class="muted" style="font-size:12px;font-weight:700;margin-top:4px">Přílety</div>${arr.map(p => row(p, "arr")).join("")}` : ""}
+    <a href="#/plany/${esc(icao)}" style="font-size:13px">Všechny plánované lety →</a></div>`;
+}
+function plannedTable(list, opts = {}) {
+  if (!list.length) return `<div class="card">${opts.empty || "Zatím žádné plánované lety."}</div>`;
+  let lastDay = "";
+  return `<div class="table-wrap"><table class="plan-table"><thead><tr><th>Odlet</th><th>Přílet</th><th>Let</th><th>Trasa</th><th>Letadlo</th>${opts.noPilot ? "" : "<th>Pilot</th>"}<th>Stav</th>${opts.own ? "<th></th>" : ""}</tr></thead><tbody>
+    ${list.map(p => { const st = planStatus(p), day = new Date(p.std).toLocaleDateString(LOCALE, { weekday: "long", day: "numeric", month: "numeric" });
+      const head = day !== lastDay ? `<tr class="day-row"><td colspan="9">${esc(day)}</td></tr>` : ""; lastDay = day;
+      return head + `<tr${p.cancelled ? ' style="opacity:.55"' : ""}><td><b>${hm(p.std)}</b>${st.atd ? `<div class="muted" style="font-size:12px">vzlet ${hm(st.atd)}</div>` : ""}</td>
+        <td><b>${hm(p.sta)}</b>${st.eta ? `<div class="muted" style="font-size:12px">odhad ${hm(st.eta)}</div>` : st.ata ? `<div class="muted" style="font-size:12px">skutečně ${hm(st.ata)}</div>` : ""}</td>
+        <td><b>${esc(planFlightNo(p))}</b>${p.callsign && p.flight_no ? `<div class="muted" style="font-size:12px">${esc(p.flight_no)}</div>` : ""}</td>
+        <td>${route({ dep_icao: p.dep, arr_icao: p.arr })}</td><td>${esc(p.ac_icao)} <span class="muted">${esc(p.reg)}</span></td>
+        ${opts.noPilot ? "" : `<td><a href="#/pilot/${encodeURIComponent(p.profiles?.username || "")}">${esc(p.profiles?.username || "")}</a></td>`}
+        <td><span class="chip-st ${st.cls}">${esc(st.txt)}</span>${p.note ? `<div class="muted ugc" style="font-size:12px;max-width:220px">${esc(p.note)}</div>` : ""}</td>
+        ${opts.own ? `<td style="white-space:nowrap">${!p.cancelled && new Date(p.std) > Date.now() ? `<button class="link-btn" data-pcancel="${p.id}">Zrušit</button> · ` : ""}<button class="link-btn danger" data-pdel="${p.id}">Smazat</button></td>` : ""}</tr>`; }).join("")}
+    </tbody></table></div>`;
+}
+function bindPlanActions(el, after) {
+  el.querySelectorAll("[data-pcancel]").forEach(b => b.onclick = async () => { if (!confirm("Zrušit tento plánovaný let?")) return; await sb.from("planned_flights").update({ cancelled: true }).eq("id", +b.dataset.pcancel); await loadPlanned(true); after(); });
+  el.querySelectorAll("[data-pdel]").forEach(b => b.onclick = async () => { if (!confirm("Smazat tento plánovaný let?")) return; await sb.from("planned_flights").delete().eq("id", +b.dataset.pdel); await loadPlanned(true); after(); });
+}
+const AC_TYPES = ["A319", "A320", "A20N", "A321", "A21N", "A339", "A359", "A35K", "B737", "B738", "B38M", "B739", "B39M", "B748", "B772", "B77W", "B788", "B789", "E190", "E195", "AT76", "DH8D", "CRJ7", "C172"];
+function planFormHtml() {
+  const d = new Date(Date.now() + 3600e3), pad = n => String(n).padStart(2, "0");
+  const today = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `<form class="card" id="planForm"><h2 class="section-title" style="margin-top:0">Naplánovat let</h2>
+    <p class="muted" style="margin-top:-6px">Časy zadávej v místním čase (podle tvého počítače). Ostatní je uvidí přepočítané na svůj čas.</p>
+    <div class="plan-grid">
+      <label>Den<input type="date" id="pfDay" value="${today}" required></label>
+      <label>Odlet<input type="time" id="pfStd" required></label>
+      <label>Přílet<input type="time" id="pfSta" required></label>
+      <label>Z (ICAO)<input id="pfDep" maxlength="4" placeholder="LKPR" required style="text-transform:uppercase"></label>
+      <label>Do (ICAO)<input id="pfArr" maxlength="4" placeholder="LEPA" required style="text-transform:uppercase"></label>
+      <label>Typ letadla<input id="pfAc" maxlength="4" list="pfAcList" placeholder="A320" required style="text-transform:uppercase"><datalist id="pfAcList">${AC_TYPES.map(t => `<option value="${t}">`).join("")}</datalist></label>
+      <label>Registrace<input id="pfReg" maxlength="10" placeholder="7T-JAF" required style="text-transform:uppercase"></label>
+      <label>Callsign<input id="pfCs" maxlength="10" placeholder="JAI127" style="text-transform:uppercase"></label>
+      <label>Číslo letu<input id="pfNo" maxlength="10" placeholder="JAI127" style="text-transform:uppercase"></label>
+      <label style="grid-column:1/-1">Poznámka (nepovinné)<input id="pfNote" maxlength="200" placeholder="Např. stream na YouTube, přidejte se!"></label>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px"><button class="btn">Naplánovat</button><span id="pfMsg" class="muted"></span></div></form>`;
+}
+function bindPlanForm(after) {
+  const f = $("planForm"); if (!f) return;
+  if (appState?.reg_now && !$("pfReg").value) $("pfReg").value = appState.reg_now;
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const day = $("pfDay").value, std = new Date(`${day}T${$("pfStd").value}`); let sta = new Date(`${day}T${$("pfSta").value}`);
+    if (sta <= std) sta = new Date(sta.getTime() + 864e5);          // přílet po půlnoci
+    const val = id => $(id).value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{3,4}$/.test(val("pfDep")) || !/^[A-Z0-9]{3,4}$/.test(val("pfArr"))) { $("pfMsg").textContent = "Zadej platné kódy letišť (ICAO)."; return; }
+    if (val("pfDep") === val("pfArr")) { $("pfMsg").textContent = "Odlet a přílet nemůžou být na stejném letišti."; return; }
+    $("pfMsg").textContent = "Ukládám…";
+    const { error } = await sb.from("planned_flights").insert({ dep: val("pfDep"), arr: val("pfArr"), std: std.toISOString(), sta: sta.toISOString(),
+      ac_icao: val("pfAc"), reg: val("pfReg"), callsign: val("pfCs") || null, flight_no: val("pfNo") || null, note: $("pfNote").value.trim() || null });
+    if (error) { $("pfMsg").textContent = error.message; return; }
+    toast("Let naplánován ✔"); await loadPlanned(true); after();
+  };
+}
+async function renderPlans() {
+  const el = $("plany");
+  el.innerHTML = '<h1 class="page-title">Plánované lety</h1><p class="muted">Načítám…</p>';
+  const c = await loadPlanned(true);
+  const q = (location.hash.split("/")[2] || "").toUpperCase();
+  const list = c.list.filter(p => new Date(p.sta) > Date.now() - 6 * 3600e3 && (!q || p.dep === q || p.arr === q));
+  el.innerHTML = `<h1 class="page-title">Plánované lety</h1>
+    <p class="lead">Kdo kdy a kam poletí. Přidej se ke kamarádům, nebo naplánuj vlastní let. Stav se mění sám: plánováno, zpožděno, ve vzduchu, přistál.</p>
+    ${c.error ? `<div class="card">Plánované lety zatím nejsou zapnuté v databázi.</div>` : ""}
+    ${me ? planFormHtml() : `<div class="card"><a href="#/ucet">Přihlas se</a> a naplánuj vlastní let.</div>`}
+    <div style="display:flex;gap:10px;align-items:center;margin:22px 0 10px;flex-wrap:wrap"><h2 class="section-title" style="margin:0">Nadcházející lety</h2>
+      <input id="plQ" maxlength="4" placeholder="Filtr letiště (ICAO)" value="${esc(q)}" style="width:170px;text-transform:uppercase"></div>
+    ${plannedTable(list, { own: false })}`;
+  bindPlanForm(renderPlans);
+  $("plQ").onchange = e => { const v = e.target.value.trim().toUpperCase(); location.hash = "#/plany" + (v ? "/" + v : ""); };
+}
+
+/* ---------- odznaky a úspěchy ---------- */
+const MINIHUBS = ["EKBI", "LZIB", "EPKT", "LKPD", "EDDN", "EDDC", "EDDS"];
+const BADGES = [
+  { id: "first", ic: "🛫", name: "První let", desc: "Dokonči první let.", goal: 1, val: s => s.flights },
+  { id: "f10", ic: "✈️", name: "Pravidelný pilot", desc: "10 dokončených letů.", goal: 10, val: s => s.flights },
+  { id: "f100", ic: "🏅", name: "Veterán", desc: "100 dokončených letů.", goal: 100, val: s => s.flights },
+  { id: "h10", ic: "⏱️", name: "10 hodin", desc: "Nalétej 10 hodin.", goal: 10, val: s => Math.floor(s.hours) },
+  { id: "h100", ic: "⌛", name: "100 hodin", desc: "Nalétej 100 hodin.", goal: 100, val: s => Math.floor(s.hours) },
+  { id: "butter", ic: "🧈", name: "Máslo", desc: "Přistání se známkou 9,5 a víc.", goal: 1, val: s => s.butter },
+  { id: "butter10", ic: "👨‍🍳", name: "Mistr másla", desc: "10 přistání se známkou 9,5 a víc.", goal: 10, val: s => s.butter },
+  { id: "night", ic: "🌙", name: "Noční pták", desc: "Přistání mezi půlnocí a pátou ráno.", goal: 1, val: s => s.night },
+  { id: "ap20", ic: "🌍", name: "Cestovatel", desc: "Navštiv 20 různých letišť.", goal: 20, val: s => s.airports },
+  { id: "ap50", ic: "🗺️", name: "Světoběžník", desc: "Navštiv 50 různých letišť.", goal: 50, val: s => s.airports },
+  { id: "hubs", ic: "🏠", name: "Všechny minihuby", desc: "Přistaň na všech minihubech Jáchym Air.", goal: MINIHUBS.length, val: s => s.hubs },
+  { id: "rot5", ic: "🔁", name: "Linkový pilot", desc: "5 letů z Rozpisu.", goal: 5, val: s => s.rotation },
+  { id: "punct", ic: "🕐", name: "Dochvilný", desc: "10 letů z Rozpisu načas.", goal: 10, val: s => s.punctual },
+  { id: "long", ic: "🧭", name: "Dálkový let", desc: "Let delší než 5 hodin.", goal: 1, val: s => s.long },
+  { id: "week", ic: "📅", name: "Týden v kuse", desc: "Leť 7 dní po sobě.", goal: 7, val: s => s.streak },
+  { id: "hard", ic: "💥", name: "Kontrola podvozku", desc: "Přistání tvrdší než −900 fpm. Gratulujeme? 😅", goal: 1, val: s => s.hard },
+];
+function badgeStats(fl) {
+  const ok = fl.filter(f => !f.incomplete);
+  const pragueHour = d => +new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Prague", hour: "2-digit", hour12: false }).format(new Date(d));
+  const days = [...new Set(ok.map(f => pragueDay(new Date(f.landed_at))))].sort();
+  let streak = 0, run = 0, prev = null;
+  for (const d of days) { const t = new Date(d + "T12:00:00Z").getTime(); run = prev && t - prev === 864e5 ? run + 1 : 1; streak = Math.max(streak, run); prev = t; }
+  const aps = new Set(ok.flatMap(f => [f.dep_icao, f.arr_icao]).filter(Boolean));
+  return { flights: ok.length, hours: ok.reduce((a, f) => a + (f.duration_min || 0), 0) / 60, butter: ok.filter(f => f.score >= 9.5).length,
+    night: ok.filter(f => { const h = pragueHour(f.landed_at); return h >= 0 && h < 5; }).length, airports: aps.size,
+    hubs: MINIHUBS.filter(h => ok.some(f => f.arr_icao === h)).length, rotation: ok.filter(f => f.rotation_id).length,
+    punctual: ok.filter(f => f.rotation_id && f.delay_min != null && f.delay_min >= -10 && f.delay_min <= 30).length,
+    long: ok.filter(f => (f.duration_min || 0) >= 300).length, streak, hard: ok.filter(f => f.fpm != null && f.fpm <= -900).length };
+}
+async function renderBadges(p) {
+  const box = $("badgesBox"); if (!box) return;
+  const { data } = await sb.from("flights").select("dep_icao, arr_icao, landed_at, score, duration_min, fpm, incomplete, rotation_id, delay_min").eq("user_id", p.id).limit(3000);
+  const s = badgeStats(data || []), got = BADGES.filter(b => b.val(s) >= b.goal).length;
+  box.innerHTML = `<h2 class="section-title">Odznaky <span class="muted" style="font-size:16px">${got}/${BADGES.length}</span></h2>
+    <div class="bdg-grid">${BADGES.map(b => { const v = Math.min(b.val(s), b.goal), done = v >= b.goal;
+      return `<div class="bdg ${done ? "on" : ""}" title="${esc(b.desc)}"><span class="b-ic">${b.ic}</span><b>${esc(b.name)}</b><span class="b-d">${esc(b.desc)}</span>
+        ${done ? '<span class="b-ok">Získáno ✔</span>' : `<span class="b-p"><i style="width:${Math.round(v / b.goal * 100)}%"></i></span><span class="b-d">${v} / ${b.goal}</span>`}</div>`; }).join("")}</div>`;
 }
 
 /* ---------- detail vlastní rotace ---------- */
