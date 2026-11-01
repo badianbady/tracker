@@ -255,6 +255,60 @@ def runway_at(lat, lon, hdg):
     return best
 
 
+def approach_analysis(buf, td_lat, td_lon, hdg):
+    """Rozbor přiblížení: profil posledních ~10 nm a kontrola stabilizace v 1000 a 500 ft nad zemí."""
+    if not buf or len(buf) < 8:
+        return None
+    thr = None
+    for apt, a, b, width in RUNWAYS:
+        if abs(a[1] - td_lat) > 0.06 or abs(a[2] - td_lon) > 0.1:
+            continue
+        for t0, t1 in ((a, b), (b, a)):
+            f = _rwy_frame(td_lat, td_lon, t0, t1)
+            if not f:
+                continue
+            along, cross, length, brg = f
+            if -150 <= along <= length + 50 and abs(cross) <= width * 0.3048 / 2 + 40 and abs((hdg - brg + 180) % 360 - 180) < 40:
+                thr = (t0, t1)
+    prof = []
+    for (t, lat, lon, agl, ias, gs, vs, h) in buf:
+        if thr:
+            f = _rwy_frame(lat, lon, thr[0], thr[1])
+            if not f:
+                continue
+            along, cross, _, _ = f
+            dist_nm = -along / 1852
+        else:
+            dist_nm, cross = haversine_nm(lat, lon, td_lat, td_lon), None
+        if 0 <= dist_nm <= 10.5:
+            prof.append([round(dist_nm, 2), int(agl), int(ias), int(vs), None if cross is None else round(cross)])
+    if len(prof) < 5:
+        return None
+    prof.sort(key=lambda x: -x[0])
+    finals = [x[2] for x in prof if 150 <= x[1] <= 500]
+    vapp = sorted(finals)[len(finals) // 2] if finals else None
+
+    def gate(ft):
+        near = min(prof, key=lambda x: abs(x[1] - ft))
+        if abs(near[1] - ft) > 250:
+            return None
+        dist, agl, ias, vs, cross = near
+        dev = round(agl - dist * 318.0)          # odchylka od 3° sestupové roviny nad prahem
+        checks = {
+            "vs": abs(vs) <= 1000,
+            "speed": vapp is None or abs(ias - vapp) <= (15 if ft >= 1000 else 10),
+            "path": abs(dev) <= (200 if ft >= 1000 else 120),
+            "lateral": cross is None or abs(cross) <= (200 if ft >= 1000 else 90),
+        }
+        return {"agl": agl, "dist": dist, "ias": ias, "vs": vs, "dev": dev, "cross": cross, "ok": all(checks.values()), "checks": checks}
+
+    g1000, g500 = gate(1000), gate(500)
+    while len(prof) > 160:
+        prof = prof[::2]
+    return {"profile": prof, "vapp": vapp, "g1000": g1000, "g500": g500,
+            "stable": bool(g500 and g500["ok"] and (g1000 is None or g1000["ok"])), "rwy_ok": thr is not None}
+
+
 def runway_text(info):
     if not info:
         return None
@@ -469,6 +523,9 @@ class Cloud:
     def send_flight(self, flight):
         body = clean_flight(flight)
         code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
+        if code not in (200, 201) and "approach" in str((res or {}).get("message", "")):
+            body.pop("approach", None)                 # databáze ještě nemá sloupec pro rozbor přiblížení
+            code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
         if code in (200, 201):
             return True, ""
         return False, str((res or {}).get("message") or code)
@@ -1429,7 +1486,9 @@ class FlightRecorder:
         pts = self.path if target is None else target
         if pts and haversine_nm(pts[-1][0], pts[-1][1], lat, lon) > 40:
             pts.clear()               # skok o desítky mil = přesun letadla v simulátoru, starou trasu zahodit
-        pts.append([round(lat, 5), round(lon, 5), int(alt)])
+        if not pts or getattr(self, "path_t0", None) is None:
+            self.path_t0 = t
+        pts.append([round(lat, 5), round(lon, 5), int(alt), int(t - self.path_t0), int(getattr(self, "cur_gs", 0) or 0)])
         if len(pts) > 2400:
             pts[:] = pts[:1] + pts[1:-1:2] + pts[-1:]
         self.last_pt_t = t
@@ -1446,6 +1505,7 @@ class FlightRecorder:
         lat, lon = info.get("lat", 0), info.get("lon", 0)
         gs, hdg, alt = info.get("gs", 0), info.get("hdg", 0), info.get("alt", 0)
         agl = info.get("agl")
+        self.cur_gs = gs
         # Při načítání letu hlásí MSFS chvíli „ve vzduchu“ i na stání. Za let se počítá jen opravdový pohyb:
         # rychlost nad 30 kt nebo výška nad 100 ft nad zemí. Jinak se letadlo bere jako na zemi.
         if not on_ground and (self.was_on_ground or self.was_on_ground is None) and gs < 30 and \
@@ -1508,6 +1568,16 @@ class FlightRecorder:
                     gp = self.ground_pos or (lat, lon)
                     self._start(t, gp[0], gp[1], known=True)
                     self.last_pos = (lat, lon)
+            if agl is not None and agl < 4000:
+                ab = getattr(self, "appr", None)
+                if ab is None:
+                    ab = self.appr = []
+                if not ab or t - ab[-1][0] >= 1.5:
+                    ab.append((t, lat, lon, agl, info.get("ias") or gs, gs, vs_fpm, hdg))
+                    if len(ab) > 600:
+                        del ab[:len(ab) - 600]
+            elif agl is not None and agl > 6000:
+                self.appr = []
             self.last_air_vs = vs_fpm
             self.recent_vs = [(tt, v) for tt, v in getattr(self, "recent_vs", []) if t - tt < 1.0] + [(t, vs_fpm)]
             self.recent_g.append((t, g))
@@ -1547,6 +1617,9 @@ class FlightRecorder:
         self.last_pos = (lat, lon)
         self.path = list(self.pre_path) if known else []
         self.pre_path = []
+        if not self.path:
+            self.path_t0 = None
+        self.appr = []
         self.last_pt_hdg = None
         self._add_point(t, lat, lon, 0)
         with lock:
@@ -1713,7 +1786,9 @@ class FlightRecorder:
             "reg": current_reg(state),
             "ac_icao": ((plan or {}).get("aircraft") or state.get("ac_model") or None),
             "va": current_va(state, dep=to.get("icao")),
+            "approach": approach_analysis(list(getattr(self, "appr", []) or []), info.get("lat", 0), info.get("lon", 0), hdg) if RUNWAYS else None,
         }
+        self.appr = []
         if plan and plan.get("callsign"):
             flight["callsign"] = plan["callsign"]
         with lock:
