@@ -255,6 +255,42 @@ def runway_at(lat, lon, hdg):
     return best
 
 
+def fetch_metars(ids):
+    """Aktuální METAR pro letiště (přes funkci trackeru). Vrací {ICAO: zkrácený záznam}."""
+    ids = [i for i in dict.fromkeys(i for i in ids if i and re.match(r"^[A-Z0-9]{4}$", i))]
+    if not ids:
+        return {}
+    try:
+        req = urllib.request.Request(f"{SUPABASE_URL.rstrip('/')}/functions/v1/metar?ids={','.join(ids)}", headers={"apikey": SUPABASE_KEY})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except Exception:
+        return {}
+    out = {}
+    for m in data if isinstance(data, list) else []:
+        icao = m.get("icaoId")
+        if icao in ids and icao not in out:
+            out[icao] = {k: m.get(k) for k in ("rawOb", "obsTime", "temp", "dewp", "wdir", "wspd", "wgst", "visib", "altim", "fltCat")}
+    return out
+
+
+def attach_weather(flight, dep_wx):
+    """Počasí k letu: odlet z doby vzletu, cíl a záloha z doby přistání (na pozadí, ať se nebrzdí záznam)."""
+    def run():
+        arr, altn = flight.get("arr_icao"), flight.get("plan_altn")
+        got = fetch_metars([arr, altn])
+        wx = {}
+        if dep_wx:
+            wx["dep"] = dep_wx
+        if arr in got:
+            wx["arr"] = dict(got[arr], icao=arr)
+        if altn in got:
+            wx["altn"] = dict(got[altn], icao=altn)
+        if wx:
+            flight["wx"] = wx
+    threading.Thread(target=run, daemon=True).start()
+
+
 def approach_analysis(buf, td_lat, td_lon, hdg):
     """Rozbor přiblížení: profil posledních ~10 nm a kontrola stabilizace v 1000 a 500 ft nad zemí."""
     if not buf or len(buf) < 8:
@@ -523,9 +559,10 @@ class Cloud:
     def send_flight(self, flight):
         body = clean_flight(flight)
         code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
-        if code not in (200, 201) and "approach" in str((res or {}).get("message", "")):
-            body.pop("approach", None)                 # databáze ještě nemá sloupec pro rozbor přiblížení
-            code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
+        for col in ("approach", "wx"):                 # databáze ještě nemá nový sloupec – uložit bez něj
+            if code not in (200, 201) and col in str((res or {}).get("message", "")):
+                body.pop(col, None)
+                code, res = self.request("POST", "/rest/v1/flights", body, "return=minimal")
         if code in (200, 201):
             return True, ""
         return False, str((res or {}).get("message") or code)
@@ -1626,6 +1663,13 @@ class FlightRecorder:
             state["dep"] = {"icao": self.takeoff["icao"], "iso": self.takeoff["iso"] if known else None}
         if known:
             log(f"🛫 Vzlet{' z ' + ap[0] if ap else ''}")
+            if ap:
+                to_ref, icao = self.takeoff, ap[0]
+                def dep_wx():
+                    got = fetch_metars([icao])
+                    if icao in got:
+                        to_ref["wx"] = dict(got[icao], icao=icao)
+                threading.Thread(target=dep_wx, daemon=True).start()
 
     def state_name(self):
         if self.post:
@@ -1789,6 +1833,7 @@ class FlightRecorder:
             "approach": approach_analysis(list(getattr(self, "appr", []) or []), info.get("lat", 0), info.get("lon", 0), hdg) if RUNWAYS else None,
         }
         self.appr = []
+        attach_weather(flight, (self.takeoff or {}).get("wx"))
         if plan and plan.get("callsign"):
             flight["callsign"] = plan["callsign"]
         with lock:
