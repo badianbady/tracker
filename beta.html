@@ -77,6 +77,11 @@
   .appr-table { font-size: 13px; } .appr-table td, .appr-table th { padding: 4px 6px; } .appr-table .ok { color: #0F6A27; } .appr-table .bad { color: #B91C1C; font-weight: 700; }
   @media (prefers-color-scheme: dark) { .appr-verdict.ok { background: #143A20; color: #8BE3A0; } .appr-verdict.bad { background: #4A1414; color: #FECACA; } .appr-table .ok { color: #8BE3A0; } .appr-table .bad { color: #FCA5A5; } }
 
+  .wx-row { padding: 8px 0; border-bottom: 1px solid rgba(127,127,127,.18); } .wx-row:last-child { border-bottom: 0; }
+  .wx-h { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .wx-k { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13px; margin-top: 3px; }
+  .cat-chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: #fff; }
+  .cat-chip.cat-VFR { background: #16A34A; } .cat-chip.cat-MVFR { background: #2563EB; } .cat-chip.cat-IFR { background: #DC2626; } .cat-chip.cat-LIFR { background: #C026D3; }
+
   /* ---------- plánované lety a odznaky ---------- */
   .plan-grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .plan-grid label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
@@ -788,7 +793,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "▶ Přehrát let": "▶ Replay flight", "Rozbor přiblížení": "Approach analysis", "✔ Stabilizované přiblížení": "✔ Stabilised approach", "✗ Nestabilizované přiblížení": "✗ Unstabilised approach",
+  "a pak": "and then", "Počasí v době letu": "Weather at flight time", "Záložní letiště": "Alternate", "Počasí se ukládá u letů z aplikace od verze 1.1.8.": "Weather is saved for flights from app version 1.1.8.", "▶ Přehrát let": "▶ Replay flight", "Rozbor přiblížení": "Approach analysis", "✔ Stabilizované přiblížení": "✔ Stabilised approach", "✗ Nestabilizované přiblížení": "✗ Unstabilised approach",
   "výška nad zemí": "height above ground", "sestupová rovina 3°": "3° glide path", "rychlost": "speed", "vzdálenost v nm": "distance in nm", "Klesání": "Descent", "Rychlost": "Speed", "Sestupová rovina": "Glide path", "Osa": "Centreline",
   "bez dat": "no data", "Rozbor přiblížení se ukládá u letů z aplikace od verze 1.1.6.": "Approach analysis is saved for flights from app version 1.1.6.",
   "Stabilizované přiblížení: v 1000 a 500 ft klesání do 1000 fpm, stálá rychlost, na sestupové rovině a v ose dráhy.": "Stabilised approach: at 1000 and 500 ft, descent rate up to 1000 fpm, steady speed, on the glide path and on the centreline.", "Plány": "Planned", "Plánované lety": "Planned flights", "Plánované lety pilotů": "Pilots' planned flights", "Všechny plánované lety →": "All planned flights →",
@@ -2200,6 +2205,7 @@ function renderFlightPanel() {
         ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
+    ${!live ? flightWxHtml(d) : ""}
     ${!live ? approachHtml(d) : ""}
     ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
     ${d.profiles?.stream_url ? `<div class="fp-sec"><a class="stream-btn" href="${esc(d.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}
@@ -2764,6 +2770,23 @@ function startReplay(f) {
   map.on("dragstart", () => { if (replay) replay.follow = false; });
   map.setView([pts[0][0], pts[0][1]], Math.max(map.getZoom(), 9));
   replay.raf = requestAnimationFrame(loop);
+}
+
+/* ---------- počasí v době letu ---------- */
+function flightWxHtml(f) {
+  const w = f.wx;
+  if (!w || !(w.dep || w.arr || w.altn)) return f.fpm != null ? `<div class="fp-sec"><h4>Počasí</h4><p class="muted" style="margin:0;font-size:13px">Počasí se ukládá u letů z aplikace od verze 1.1.8.</p></div>` : "";
+  const row = (m, label) => {
+    if (!m) return "";
+    const vis = m.visib == null ? "–" : (String(m.visib).includes("+") || Number(m.visib) >= 6 ? "10 km a více" : `${(Number(m.visib) * 1.609).toLocaleString(LOCALE, { maximumFractionDigits: 1 })} km`);
+    const wind = m.wspd == null ? "–" : m.wspd < 1 ? "bezvětří" : `${m.wdir === "VRB" ? "proměnlivý" : String(m.wdir).padStart(3, "0") + "°"} ${m.wspd} kt${m.wgst ? `, nárazy ${m.wgst} kt` : ""}`;
+    const qnh = m.altim == null ? "–" : `${Math.round(m.altim > 200 ? m.altim : m.altim * 33.8639)} hPa`;
+    return `<div class="wx-row"><div class="wx-h"><b>${esc(label)}</b> <span>${esc(m.icao || "")}</span>${m.fltCat ? `<span class="cat-chip cat-${esc(m.fltCat)}">${esc(m.fltCat)}</span>` : ""}
+        ${m.obsTime ? `<span class="muted" style="font-size:12px">${hm(new Date(m.obsTime * (m.obsTime < 1e12 ? 1000 : 1)))}</span>` : ""}</div>
+      <div class="wx-k"><span>Vítr <b>${esc(wind)}</b></span><span>Dohlednost <b>${esc(vis)}</b></span><span>Teplota <b>${m.temp != null ? Math.round(m.temp) + " °C" : "–"}</b></span><span>QNH <b>${qnh}</b></span></div>
+      ${m.rawOb ? `<code class="wx-raw" style="display:block;font-size:11px;margin-top:4px;white-space:normal">${esc(m.rawOb)}</code>` : ""}</div>`;
+  };
+  return `<div class="fp-sec"><h4>Počasí v době letu</h4>${row(w.dep, "Odlet")}${row(w.arr, "Přílet")}${row(w.altn, "Záložní letiště")}</div>`;
 }
 
 /* ---------- rozbor přiblížení ---------- */
