@@ -63,6 +63,20 @@
   header > a, header > nav { position: relative; z-index: 1; }
   .hl-card.boo { background: #2A1838; color: #FDE7D3; } .hl-card.boo .hl-k { color: #F9A15A; } .hl-card.boo .hl-ic { background: #E26A12; }
 
+  /* ---------- přehrání letu a rozbor přiblížení ---------- */
+  .replay-bar { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1000; display: flex; gap: 10px; align-items: center;
+    background: var(--card, #fff); color: var(--text, #13241A); border-radius: 14px; padding: 8px 12px; box-shadow: 0 8px 26px rgba(0,0,0,.28); width: min(620px, 92vw); }
+  .replay-bar button { border: 0; background: var(--green); color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; cursor: pointer; flex: none; }
+  .replay-bar #rpClose { background: transparent; color: inherit; font-size: 18px; }
+  .replay-bar input[type=range] { flex: 1; min-width: 80px; accent-color: var(--green); }
+  .rp-hud { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .appr-verdict { font-weight: 700; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; } .appr-verdict span { font-weight: 400; font-size: 13px; }
+  .appr-verdict.ok { background: #DCF5E3; color: #0F6A27; } .appr-verdict.bad { background: #FDE2E2; color: #9B1C1C; }
+  .appr-chart { width: 100%; height: auto; display: block; color: inherit; }
+  .appr-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; margin: 4px 0 8px; } .appr-legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 4px; }
+  .appr-table { font-size: 13px; } .appr-table td, .appr-table th { padding: 4px 6px; } .appr-table .ok { color: #0F6A27; } .appr-table .bad { color: #B91C1C; font-weight: 700; }
+  @media (prefers-color-scheme: dark) { .appr-verdict.ok { background: #143A20; color: #8BE3A0; } .appr-verdict.bad { background: #4A1414; color: #FECACA; } .appr-table .ok { color: #8BE3A0; } .appr-table .bad { color: #FCA5A5; } }
+
   /* ---------- plánované lety a odznaky ---------- */
   .plan-grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .plan-grid label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
@@ -774,7 +788,10 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Plány": "Planned", "Plánované lety": "Planned flights", "Plánované lety pilotů": "Pilots' planned flights", "Všechny plánované lety →": "All planned flights →",
+  "a pak": "and then", "▶ Přehrát let": "▶ Replay flight", "Rozbor přiblížení": "Approach analysis", "✔ Stabilizované přiblížení": "✔ Stabilised approach", "✗ Nestabilizované přiblížení": "✗ Unstabilised approach",
+  "výška nad zemí": "height above ground", "sestupová rovina 3°": "3° glide path", "rychlost": "speed", "vzdálenost v nm": "distance in nm", "Klesání": "Descent", "Rychlost": "Speed", "Sestupová rovina": "Glide path", "Osa": "Centreline",
+  "bez dat": "no data", "Rozbor přiblížení se ukládá u letů z aplikace od verze 1.1.6.": "Approach analysis is saved for flights from app version 1.1.6.",
+  "Stabilizované přiblížení: v 1000 a 500 ft klesání do 1000 fpm, stálá rychlost, na sestupové rovině a v ose dráhy.": "Stabilised approach: at 1000 and 500 ft, descent rate up to 1000 fpm, steady speed, on the glide path and on the centreline.", "Plány": "Planned", "Plánované lety": "Planned flights", "Plánované lety pilotů": "Pilots' planned flights", "Všechny plánované lety →": "All planned flights →",
   "Naplánovat let": "Plan a flight", "Naplánovat": "Plan", "Nadcházející lety": "Upcoming flights", "@Filtr letiště (ICAO)": "@Filter airport (ICAO)",
   "Kdo kdy a kam poletí. Přidej se ke kamarádům, nebo naplánuj vlastní let. Stav se mění sám: plánováno, zpožděno, ve vzduchu, přistál.": "Who's flying where and when. Join your friends or plan your own flight. The status updates itself: scheduled, delayed, airborne, landed.",
   "Časy zadávej v místním čase (podle tvého počítače). Ostatní je uvidí přepočítané na svůj čas.": "Enter times in your local time. Others will see them converted to theirs.",
@@ -866,6 +883,7 @@ Object.assign(EN, {
 });
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
+  [/^(\d+) m (vpravo|vlevo)$/, (m, a, b) => `${a} m ${b === "vpravo" ? "right" : "left"}`], [/^· rychlost na finále (\d+) kt$/, "· final approach speed $1 kt"],
   [/^Přistál (\S+)$/, "Landed $1"], [/^Ve vzduchu · přílet (\S+)$/, "Airborne · arriving $1"], [/^Zpožděno · odhad (\S+)$/, "Delayed · est. $1"],
   [/^vzlet (\S+)$/, "departed $1"], [/^odhad (\S+)$/, "est. $1"], [/^skutečně (\S+)$/, "actual $1"],
   [/^Čekej před dráhou (\S+): (\S+) je na dráze\.$/, "Hold short of runway $1: $2 is on the runway."],
@@ -2115,6 +2133,7 @@ function redrawFocus(fit) {
   }
 }
 function closeFocus() {
+  stopReplay();
   focus = null;
   if (focusLayer) focusLayer.clearLayers();
   $("view-map").querySelector(".air-panel").classList.remove("detail");
@@ -2177,9 +2196,11 @@ function renderFlightPanel() {
       : `${d.points != null ? `<div class="fp-sec"><h4>Body za let: ${nf.format(d.points)}</h4>
           <div class="muted" style="font-size:14px">${Object.entries(d.points_detail || {}).map(([k, v]) => `${{ let: "let z rotace", dochvilnost: "dochvilnost", pristani: "přistání", spokojenost: "spokojenost cestujících", jina_varianta_typu: "jiný typ z rodiny", volny_let: "volný let" }[k] || k}: <b>${typeof v === "number" && v > 0 ? "+" : ""}${esc(String(v))}</b>`).join(" · ")}</div>
           ${d.rotation_id ? `<div style="font-size:14px;margin-top:4px">Let z rotace · ${d.delay_min != null ? (d.delay_min <= 0 ? "včas" : `zpoždění ${d.delay_min} min`) : ""}${d.pax_sat != null ? ` · spokojenost cestujících ${d.pax_sat} %` : ""} · <a href="#/briefing/${d.rotation_id}/${d.leg_idx || 0}">briefing</a></div>` : ""}</div>` : ""}
+        ${(d.path || []).length > 5 ? `<div class="fp-sec"><button class="btn" id="fpReplay" style="width:100%">▶ Přehrát let</button></div>` : ""}
         ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
+    ${!live ? approachHtml(d) : ""}
     ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
     ${d.profiles?.stream_url ? `<div class="fp-sec"><a class="stream-btn" href="${esc(d.profiles.stream_url)}" target="_blank" rel="noopener">▶ Sledovat stream</a></div>` : ""}
     ${!live && d.crew_status ? `<div class="fp-sec muted" style="font-size:13px">Crew center: ${esc(d.crew_status)}</div>` : ""}
@@ -2187,6 +2208,7 @@ function renderFlightPanel() {
     ${!live ? `<div class="fp-sec"><h4>Reakce</h4><div id="fpReact"></div></div>` : ""}
     ${!live && me && (me.user.id === d.user_id || me.profile?.is_admin) ? `<div class="fp-sec"><button class="link-btn danger" id="fpDelete">Smazat tento let</button></div>` : ""}`;
   $("fpBack").onclick = closeFocus;
+  if ($("fpReplay")) $("fpReplay").onclick = () => startReplay(focus.data);
   friendButton($("fpFriend"), d.user_id, d.profiles?.username);
   if (!live) renderReactions($("fpReact"), d.id);
   renderFlightPhotos($("fpPhotos"), d, live);
@@ -2680,6 +2702,97 @@ async function renderBadges(p) {
     <div class="bdg-grid">${BADGES.map(b => { const v = Math.min(b.val(s), b.goal), done = v >= b.goal;
       return `<div class="bdg ${done ? "on" : ""}" title="${esc(b.desc)}"><span class="b-ic">${b.ic}</span><b>${esc(b.name)}</b><span class="b-d">${esc(b.desc)}</span>
         ${done ? '<span class="b-ok">Získáno ✔</span>' : `<span class="b-p"><i style="width:${Math.round(v / b.goal * 100)}%"></i></span><span class="b-d">${v} / ${b.goal}</span>`}</div>`; }).join("")}</div>`;
+}
+
+/* ---------- přehrání letu ---------- */
+let replay = null;
+function stopReplay() {
+  if (!replay) return;
+  cancelAnimationFrame(replay.raf);
+  replay.layer?.remove(); replay.bar?.remove();
+  replay = null;
+}
+function startReplay(f) {
+  stopReplay();
+  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]);
+  if (pts.length < 3) return;
+  // čas bodu: nové lety mají sekundy od začátku, u starších se dopočítá podle vzdálenosti
+  const timed = pts.filter(p => p.length >= 4).length > pts.length * .8;
+  let times;
+  if (timed) { times = pts.map((p, i) => p[3] ?? 0); for (let i = 1; i < times.length; i++) if (times[i] < times[i - 1]) times[i] = times[i - 1]; }
+  else {
+    const d = [0]; for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + map.distance([pts[i - 1][0], pts[i - 1][1]], [pts[i][0], pts[i][1]]));
+    const total = (f.duration_min || d[d.length - 1] / 1852 / 380 * 60) * 60; times = d.map(x => x / (d[d.length - 1] || 1) * total);
+  }
+  const T = times[times.length - 1] || 1;
+  const layer = L.layerGroup().addTo(map);
+  const done = L.polyline([], { color: "#F59E0B", weight: settings.trail + 2, opacity: .95, interactive: false }).addTo(layer);
+  const icon = deg => L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17], html: `<div style="transform:rotate(${deg}deg);width:34px;height:34px">${planeIcon(0, f.va === "JAI", true).options.html}</div>` });
+  const mk = L.marker([pts[0][0], pts[0][1]], { icon: icon(0), zIndexOffset: 3000, interactive: false }).addTo(layer);
+  const bar = document.createElement("div"); bar.className = "replay-bar";
+  bar.innerHTML = `<button id="rpPlay" aria-label="Přehrát">⏸</button><input type="range" id="rpPos" min="0" max="1000" value="0" aria-label="Pozice">
+    <select id="rpSpeed" aria-label="Rychlost">${[10, 30, 60, 120, 300].map(x => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x}×</option>`).join("")}</select>
+    <span id="rpHud" class="rp-hud"></span><button id="rpClose" aria-label="Zavřít">✕</button>`;
+  $("view-map").appendChild(bar);
+  replay = { raf: 0, layer, bar, t: 0, playing: true, last: performance.now() };
+  const hdgBetween = (a, b) => { const y = Math.sin((b[1] - a[1]) * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180), x = Math.cos(a[0] * Math.PI / 180) * Math.sin(b[0] * Math.PI / 180) - Math.sin(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.cos((b[1] - a[1]) * Math.PI / 180); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
+  let lastHdg = 0, idx = 0;
+  const draw = () => {
+    while (idx < times.length - 2 && times[idx + 1] < replay.t) idx++;
+    while (idx > 0 && times[idx] > replay.t) idx--;
+    const a = pts[idx], b = pts[Math.min(idx + 1, pts.length - 1)], span = (times[idx + 1] - times[idx]) || 1;
+    const k = Math.max(0, Math.min(1, (replay.t - times[idx]) / span));
+    const lat = a[0] + (b[0] - a[0]) * k, lon = a[1] + (b[1] - a[1]) * k, alt = Math.round((a[2] || 0) + ((b[2] || 0) - (a[2] || 0)) * k);
+    if (map.distance([a[0], a[1]], [b[0], b[1]]) > 30) lastHdg = hdgBetween(a, b);
+    mk.setLatLng([lat, lon]); mk.setIcon(icon(lastHdg));
+    done.setLatLngs(pts.slice(0, idx + 1).map(p => [p[0], p[1]]).concat([[lat, lon]]));
+    const gs = timed && a[4] != null ? Math.round((a[4] || 0) + ((b[4] ?? a[4]) - (a[4] || 0)) * k) : null;
+    const tt = Math.round(replay.t), hh = Math.floor(tt / 3600), mm = Math.floor(tt % 3600 / 60), ss = tt % 60;
+    $("rpHud").textContent = `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")} · ${alt > 0 ? nf.format(alt) + " ft" : tr("Na zemi")}${gs != null ? ` · ${gs} kt` : ""}`;
+    $("rpPos").value = Math.round(replay.t / T * 1000);
+    if (replay.follow !== false && !map.getBounds().pad(-0.2).contains([lat, lon])) map.panTo([lat, lon], { animate: false });
+  };
+  const loop = now => {
+    if (!replay) return;
+    const dt = (now - replay.last) / 1000; replay.last = now;
+    if (replay.playing) { replay.t = Math.min(T, replay.t + dt * Number($("rpSpeed").value)); if (replay.t >= T) { replay.playing = false; $("rpPlay").textContent = "▶"; } }
+    draw(); replay.raf = requestAnimationFrame(loop);
+  };
+  $("rpPlay").onclick = () => { if (replay.t >= T) replay.t = 0; replay.playing = !replay.playing; $("rpPlay").textContent = replay.playing ? "⏸" : "▶"; };
+  $("rpPos").oninput = e => { replay.t = Number(e.target.value) / 1000 * T; idx = 0; draw(); };
+  $("rpClose").onclick = stopReplay;
+  map.on("dragstart", () => { if (replay) replay.follow = false; });
+  map.setView([pts[0][0], pts[0][1]], Math.max(map.getZoom(), 9));
+  replay.raf = requestAnimationFrame(loop);
+}
+
+/* ---------- rozbor přiblížení ---------- */
+function approachHtml(f) {
+  const a = f.approach;
+  if (!a || !Array.isArray(a.profile) || a.profile.length < 3) return f.fpm != null ? `<div class="fp-sec"><h4>Rozbor přiblížení</h4><p class="muted" style="margin:0;font-size:13px">Rozbor přiblížení se ukládá u letů z aplikace od verze 1.1.6.</p></div>` : "";
+  const W = 300, H = 150, P = { l: 34, r: 30, t: 8, b: 20 }, maxD = 10, maxA = 3400;
+  const x = d => P.l + (maxD - Math.min(maxD, d)) / maxD * (W - P.l - P.r), y = h => P.t + (1 - Math.min(maxA, Math.max(0, h)) / maxA) * (H - P.t - P.b);
+  const vapp = a.vapp || 140, ys = s => P.t + (1 - (s - (vapp - 40)) / 80) * (H - P.t - P.b);
+  const prof = a.profile.filter(p => p[0] <= maxD);
+  const line = prof.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
+  const spd = prof.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${Math.max(P.t, Math.min(H - P.b, ys(p[2]))).toFixed(1)}`).join("");
+  const ideal = `M${x(maxD)},${y(maxD * 318)} L${x(0)},${y(0)}`;
+  const grid = [0, 1000, 2000, 3000].map(h => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(h)}" y2="${y(h)}" stroke="currentColor" opacity=".12"/><text x="${P.l - 4}" y="${y(h) + 3}" text-anchor="end" font-size="9" fill="currentColor" opacity=".6">${h ? h / 1000 + "k" : "0"}</text>`).join("")
+    + [10, 8, 6, 4, 2, 0].map(d => `<text x="${x(d)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="currentColor" opacity=".6">${d}</text>`).join("");
+  const gate = (g, ft) => !g ? `<tr><td>${ft} ft</td><td colspan="4" class="muted">bez dat</td></tr>` :
+    `<tr><td><b>${ft} ft</b></td><td class="${g.checks.vs ? "ok" : "bad"}">${nf.format(g.vs)} fpm</td><td class="${g.checks.speed ? "ok" : "bad"}">${g.ias} kt${a.vapp ? ` (${g.ias - a.vapp >= 0 ? "+" : ""}${g.ias - a.vapp})` : ""}</td>
+     <td class="${g.checks.path ? "ok" : "bad"}">${g.dev >= 0 ? "+" : ""}${g.dev} ft</td><td class="${g.checks.lateral ? "ok" : "bad"}">${g.cross == null ? "–" : `${Math.abs(g.cross)} m ${g.cross > 0 ? "vpravo" : g.cross < 0 ? "vlevo" : ""}`}</td></tr>`;
+  return `<div class="fp-sec"><h4>Rozbor přiblížení</h4>
+    <div class="appr-verdict ${a.stable ? "ok" : "bad"}">${a.stable ? "✔ Stabilizované přiblížení" : "✗ Nestabilizované přiblížení"}${a.vapp ? ` <span>· rychlost na finále ${a.vapp} kt</span>` : ""}</div>
+    <svg viewBox="0 0 ${W} ${H}" class="appr-chart" role="img" aria-label="Výškový profil přiblížení">${grid}
+      <path d="${ideal}" stroke="currentColor" stroke-dasharray="4 4" opacity=".55" fill="none"/>
+      <path d="${spd}" stroke="#2563EB" stroke-width="1.6" fill="none" opacity=".8"/>
+      <path d="${line}" stroke="var(--green)" stroke-width="2.6" fill="none"/>
+      ${[a.g1000, a.g500].filter(Boolean).map(g => `<circle cx="${x(g.dist)}" cy="${y(g.agl)}" r="4" fill="${g.ok ? "var(--green)" : "#DC2626"}" stroke="#fff" stroke-width="1.5"/>`).join("")}
+    </svg>
+    <div class="appr-legend"><span><i style="background:var(--green)"></i>výška nad zemí</span><span><i style="border-top:2px dashed currentColor;height:0;opacity:.6"></i>sestupová rovina 3°</span><span><i style="background:#2563EB"></i>rychlost</span><span class="muted">vzdálenost v nm</span></div>
+    <div class="table-wrap"><table class="appr-table"><thead><tr><th></th><th>Klesání</th><th>Rychlost</th><th>Sestupová rovina</th><th>Osa</th></tr></thead><tbody>${gate(a.g1000, 1000)}${gate(a.g500, 500)}</tbody></table></div>
+    <p class="muted" style="font-size:12px;margin:6px 0 0">Stabilizované přiblížení: v 1000 a 500 ft klesání do 1000 fpm, stálá rychlost, na sestupové rovině a v ose dráhy.</p></div>`;
 }
 
 /* ---------- detail vlastní rotace ---------- */
