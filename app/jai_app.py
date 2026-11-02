@@ -102,6 +102,28 @@ class Api:
         return s
 
     @guarded
+    def atc_toggle(self, on):
+        core.atc.enabled = bool(on)
+        if not on:
+            core.atc.reset()
+        return {"ok": True}
+
+    @guarded
+    def atc_settings(self, auto=None, simbrief=None):
+        if auto is not None:
+            core.atc.auto = bool(auto)
+        if simbrief is not None:
+            core.atc.simbrief = bool(simbrief)
+        core._save_settings()
+        return {"ok": True}
+
+    @guarded
+    def atc_respond(self, opt_id):
+        with core.lock:
+            s = dict(core.state)
+        return {"ok": core.atc.respond(str(opt_id), s)}
+
+    @guarded
     def login(self, email, password):
         ok, msg = core.cloud.login(email, password)
         return {"ok": ok, "msg": msg}

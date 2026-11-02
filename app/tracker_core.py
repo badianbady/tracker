@@ -583,6 +583,8 @@ def load_settings():
             state["va_choice"] = d.get("va")
             state["reg_override"] = d.get("reg")
         TAIL_SEEN.update(d.get("tails") or {})
+        atc.auto = bool(d.get("atc_auto", False))
+        atc.simbrief = bool(d.get("atc_simbrief", True))
     except Exception:
         pass
 
@@ -590,7 +592,8 @@ def load_settings():
 def _save_settings():
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override"), "tails": TAIL_SEEN}, f)
+            json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override"), "tails": TAIL_SEEN,
+                       "atc_auto": atc.auto, "atc_simbrief": atc.simbrief}, f)
     except Exception:
         pass
 
@@ -706,6 +709,7 @@ def fetch_simbrief(user):
         "aircraft": g(ofp, "aircraft", "icaocode"), "aircraft_name": g(ofp, "aircraft", "name"),
         "reg": g(ofp, "aircraft", "reg"),
         "cruise": g(ofp, "general", "initial_altitude"),
+        "dep_rwy": g(ofp, "origin", "plan_rwy"), "arr_rwy": g(ofp, "destination", "plan_rwy"),
         "distance_nm": g(ofp, "general", "route_distance"),
         "fuel_ramp": g(ofp, "fuel", "plan_ramp"), "units": g(ofp, "params", "units"),
         "ete_min": None,
@@ -1360,7 +1364,8 @@ def tower_alerts(s, others):
                                "say": f"{me}, stop immediately, I say again, stop immediately, traffic on short final." if gs > 30 and gs < 110
                                else f"{me}, vacate runway without delay, traffic on final."})
             # povolení ke vzletu jen před odletem – ne po přistání (backtrack, otáčení na dráze)
-            just_landed = bool(s.get("live_landing"))
+            just_landed = bool(s.get("live_landing")) or atc.enabled      # s ATC dává povolení ke vzletu ATC
+
             if aligned and not occ and not (fin and fin[0][0] < 5) and gs < 40 and not just_landed:
                 alerts.append({"level": "ok", "text": f"Dráha {aligned[0]} v {aligned[2]} je volná – můžeš vzlétnout.",
                                "sid": f"to-{aligned[0]}", "say": f"{me}, {say_wind(s)}runway {say_runway(aligned[0])}, cleared for takeoff."})
@@ -1418,6 +1423,374 @@ def tower_alerts(s, others):
                     if ahead:
                         alerts.append({"level": "info", "text": f"Jsi číslo {len(ahead) + 1} na přiblížení do {arr}, před tebou {ahead[-1][1]} ({my_d - ahead[-1][0]:.0f} nm)."})
     return alerts
+
+
+# ---------------- ATC (fáze 1) ----------------
+# Řízení celého letu podle SimBrief plánu. ATC mluví, pilot odpovídá tlačítky (1–4).
+# Hlasové zprávy jdou do state["atc"]["msgs"], web je přečte nahlas.
+CITY = {"LKPR": "Praha", "LKPD": "Pardubice", "LKMT": "Ostrava", "LKTB": "Brno", "LZIB": "Bratislava", "LZKZ": "Kosice", "EPKT": "Katowice",
+        "EPWA": "Warszawa", "EPKK": "Krakow", "EKBI": "Billund", "EKCH": "Kastrup", "EDDN": "Nuernberg", "EDDC": "Dresden", "EDDS": "Stuttgart",
+        "EDDM": "Muenchen", "EDDF": "Frankfurt", "EDDB": "Berlin", "EDDH": "Hamburg", "EDDL": "Duesseldorf", "LOWW": "Wien", "LHBP": "Budapest",
+        "DAAG": "Alger", "DAOO": "Oran", "GMFO": "Oujda", "GMMN": "Casablanca", "GMMX": "Marrakech", "DTTA": "Carthage", "LEPA": "Palma",
+        "LEBL": "Barcelona", "LEMD": "Madrid", "LFPG": "Paris", "LFMN": "Nice", "LIRF": "Roma", "LIMC": "Milano", "EGLL": "London", "EGKK": "Gatwick",
+        "EHAM": "Schiphol", "LSZH": "Zurich", "GCTS": "Tenerife", "LGAV": "Athinai", "LTFM": "Istanbul", "OMDB": "Dubai", "LCLK": "Larnaca"}
+ATC_PHASES = ["clearance", "ground", "tower_dep", "departure", "center", "approach", "tower_arr", "ground_arr", "done"]
+
+
+def station_name(icao, role):
+    city = CITY.get(icao)
+    if not city:
+        ap = next((a for a in AIRPORTS if a[0] == icao), None)
+        name = (ap[1] if ap else icao) or icao
+        name = re.sub(r"\b(International|Airport|Intl|Regional|Aeropuerto|Aéroport|Flughafen|Aeroporto|Letiště)\b", "", name).strip(" -/")
+        city = name.split()[0] if name else icao
+    return f"{city} {role}"
+
+
+def parse_procs(route):
+    """SID a STAR z textu trasy SimBriefu (např. LOMKI2B … KENOK2A)."""
+    toks = [t for t in str(route or "").upper().split() if t]
+    proc = re.compile(r"^[A-Z]{2,5}\d[A-Z]?$")
+    sid = toks[0] if toks and proc.match(toks[0]) else None
+    star = toks[-1] if len(toks) > 1 and proc.match(toks[-1]) else None
+    return sid, star
+
+
+def best_runway(icao, wind_dir):
+    """Dráha nejvíc proti větru (bez větru první dostupná)."""
+    best, best_d = None, None
+    for apt, a, b, width in RUNWAYS:
+        if apt != icao:
+            continue
+        for thr, end in ((a, b), (b, a)):
+            f = _rwy_frame(thr[1], thr[2], thr, end)
+            brg = math.degrees(math.atan2((end[2] - thr[2]) * math.cos(math.radians(thr[1])), end[1] - thr[1])) % 360
+            d = 0 if wind_dir is None else abs((brg - wind_dir + 180) % 360 - 180)
+            if best_d is None or d < best_d:
+                best, best_d = thr[0], d
+    return best
+
+
+def say_alt(ft):
+    ft = int(ft or 0)
+    if ft >= 10000:
+        return f"flight level {say_digits(str(round(ft / 100)).zfill(3))}"
+    th, hu = divmod(ft, 1000)
+    return f"{say_digits(str(th)) if th else ''} thousand{(' ' + say_digits(str(hu // 100)) + ' hundred') if hu else ''} feet".strip()
+
+
+SIM_CMDS = []          # (událost SimConnectu, hodnota) – zpracuje smyčka simulátoru
+
+
+def rwy_heading(icao, ident):
+    for apt, a, b, width in RUNWAYS:
+        if apt != icao:
+            continue
+        for thr, end in ((a, b), (b, a)):
+            if str(thr[0]).upper() == str(ident or "").upper():
+                return math.degrees(math.atan2((end[2] - thr[2]) * math.cos(math.radians(thr[1])), end[1] - thr[1])) % 360
+    return None
+
+
+def wind_on(icao, ident, wdir, wkt):
+    """(čelní, boční) složka větru na dráze v kt; čelní záporná = vítr zezadu."""
+    h = rwy_heading(icao, ident)
+    if h is None or wdir is None or wkt is None:
+        return None
+    d = math.radians((wdir - h + 540) % 360 - 180)
+    return round(wkt * math.cos(d)), round(abs(wkt * math.sin(d)))
+
+
+class AtcSession:
+    def __init__(self):
+        self.enabled = False
+        self.auto = False         # kopilot odpovídá sám
+        self.simbrief = True      # dráhy a procedury podle SimBriefu
+        self.reset()
+
+    def reset(self):
+        self.phase = "clearance"
+        self.msgs = []           # [{id, t, who, station, text, say}]
+        self.options = []        # [{id, label, say}]
+        self.squawk = None
+        self.dep_rwy = self.arr_rwy = None
+        self.cleared_alt = None
+        self.flags = set()
+        self.awaiting = None
+        self.last_sq_warn = 0
+        self.opts_t = 0
+        self.arr_wind = None
+        self.pending_rwy = None
+
+    # ---- pomocné ----
+    def _cs(self, s):
+        return say_callsign(((s.get("plan") or {}).get("callsign")) or s.get("callsign"))
+
+    def atc(self, station, text_say, key=None):
+        if key and key in self.flags:
+            return
+        if key:
+            self.flags.add(key)
+        self.msgs.append({"id": f"a{len(self.msgs)}-{int(time.time())}", "t": time.time(), "who": "atc", "station": station, "say": text_say, "text": text_say})
+        del self.msgs[:-30]
+
+    def pilot(self, text):
+        self.msgs.append({"id": f"p{len(self.msgs)}-{int(time.time())}", "t": time.time(), "who": "pilot", "text": text})
+        del self.msgs[:-30]
+
+    def opts(self, *items):
+        new = [{"id": i, "label": l, "say": y} for i, l, y in items]
+        if [o["id"] for o in new] != [o["id"] for o in self.options]:
+            self.opts_t = time.time()
+        self.options = new
+
+    def _rwy_check(self, icao, planned, wdir, wkt, station, cs, what):
+        """SimBrief dráha vs. vítr: při silném větru zezadu/zboku nabídne volbu. Vrací True, když čeká na pilota."""
+        wc = wind_on(icao, planned, wdir, wkt)
+        alt = best_runway(icao, wdir)
+        if not wc or not alt or alt == planned:
+            return False
+        head, cross = wc
+        if head >= -7 and cross <= 25:
+            return False
+        why = f"{-head} knots tailwind" if head < -7 else f"{cross} knots crosswind"
+        self.pending_rwy = (what, planned, alt)
+        self.atc(station, f"{cs}, be advised, runway {say_runway(planned)} has {why}, runway {say_runway(alt)} is in use. Confirm runway.")
+        self.opts(("rwy_keep", f"Ponechat RWY {planned} (SimBrief)", f"We'll keep runway {planned}, {cs}."),
+                  ("rwy_alt", f"Dráha {alt} (proti větru)", f"Runway {alt}, {cs}."))
+        return True
+
+    def _issue_clearance(self, s):
+        plan = s.get("plan") or {}
+        cs, dep, arr = self._cs(s), plan.get("dep") or "", plan.get("arr") or ""
+        sid, _ = parse_procs(plan.get("route"))
+        if self.dep_rwy and plan.get("dep_rwy") and self.dep_rwy != plan.get("dep_rwy"):
+            sid = None                          # jiná dráha než v plánu = SID ze SimBriefu nemusí sedět
+        via = f"via {sid[:-2]} {say_digits(sid[-2:])} departure" if sid else "via flight planned route"
+        self.atc(station_name(dep, "Delivery"), f"{cs}, cleared to {say_airport(arr)} {via}, runway {say_runway(self.dep_rwy)}, "
+                 f"{'climb via S I D' if sid else 'climb ' + say_alt(5000)}, squawk {say_digits(self.squawk)}.")
+        self.awaiting = "readback_clr"
+        self.opts(("rb", "Readback", f"Cleared to {arr}, runway {self.dep_rwy}, squawk {self.squawk}, {cs}."))
+        if self.auto:
+            SIM_CMDS.append(("XPNDR_SET", int(self.squawk, 16)))       # kopilot nastaví squawk v simulátoru
+
+    def _issue_approach(self, s):
+        plan = s.get("plan") or {}
+        cs, arr = self._cs(s), plan.get("arr") or ""
+        self.cleared_alt = 4000
+        self.atc(station_name(arr, "Approach"), f"{cs}, radar contact, descend {say_alt(4000)}, expect I L S approach runway {say_runway(self.arr_rwy)}.")
+
+    # ---- reakce na tlačítka ----
+    def respond(self, opt_id, s):
+        opt = next((o for o in self.options if o["id"] == opt_id), None)
+        if not opt:
+            return False
+        self.pilot(opt["say"])
+        self.options = []
+        plan = s.get("plan") or {}
+        cs, dep, arr = self._cs(s), plan.get("dep") or "", plan.get("arr") or ""
+        if opt_id == "clr":
+            self.squawk = self.squawk or f"{random.randint(2, 6)}{random.randint(0, 7)}{random.randint(0, 7)}{random.randint(0, 7)}"
+            planned = plan.get("dep_rwy") if self.simbrief else None
+            self.dep_rwy = planned or best_runway(dep, s.get("wind_dir")) or self.dep_rwy
+            if planned and self._rwy_check(dep, planned, s.get("wind_dir"), s.get("wind_kt"), station_name(dep, "Delivery"), cs, "dep"):
+                return True
+            self._issue_clearance(s)
+        elif opt_id in ("rwy_keep", "rwy_alt") and self.pending_rwy:
+            what, planned, alt = self.pending_rwy
+            self.pending_rwy = None
+            if what == "dep":
+                self.dep_rwy = planned if opt_id == "rwy_keep" else alt
+                self._issue_clearance(s)
+            else:
+                self.arr_rwy = planned if opt_id == "rwy_keep" else alt
+                self._issue_approach(s)
+        elif opt_id == "rb" and self.awaiting == "readback_clr":
+            self.atc(station_name(dep, "Delivery"), f"{cs}, readback correct, contact Ground when ready for pushback.")
+            self.phase, self.awaiting = "ground", None
+        elif opt_id == "push":
+            self.atc(station_name(dep, "Ground"), f"{cs}, pushback and start up approved.")
+            self.flags.add("pushed")
+        elif opt_id == "taxi":
+            self.atc(station_name(dep, "Ground"), f"{cs}, taxi to holding point runway {say_runway(self.dep_rwy)}.")
+            self.flags.add("taxi_ok")
+        elif opt_id == "ready":
+            self.flags.add("ready")
+            self.ready_t = time.time()
+        elif opt_id in ("checkin_dep", "checkin_ctr", "checkin_app"):
+            self.flags.add(opt_id)
+            if opt_id == "checkin_dep":
+                self.cleared_alt = min(int(plan.get("cruise") or 15000), 15000) if (plan.get("cruise") or 0) else 15000
+                self.atc(station_name(dep, "Departure"), f"{cs}, radar contact, climb {say_alt(self.cleared_alt)}.")
+            elif opt_id == "checkin_ctr":
+                self.cleared_alt = int(plan.get("cruise") or 35000)
+                self.atc("Control", f"{cs}, radar contact, climb {say_alt(self.cleared_alt)}.")
+            else:
+                wdir, wkt = self.arr_wind or (None, None)
+                planned = plan.get("arr_rwy") if self.simbrief else None
+                self.arr_rwy = planned or best_runway(arr, wdir) or self.arr_rwy
+                if planned and self._rwy_check(arr, planned, wdir, wkt, station_name(arr, "Approach"), cs, "arr"):
+                    return True
+                self._issue_approach(s)
+        elif opt_id == "wilco":
+            pass
+        elif opt_id == "taxi_in":
+            self.atc(station_name(arr, "Ground"), f"{cs}, taxi to the stand, welcome to {say_airport(arr)}.")
+            self.phase = "done"
+        return True
+
+    # ---- průběh letu ----
+    def update(self, s):
+        if not self.enabled:
+            return
+        plan = s.get("plan") or {}
+        dep, arr = plan.get("dep") or "", plan.get("arr") or ""
+        if not dep or not arr:
+            self.options = []
+            if not self.msgs:
+                self.atc("ATC", "Load your SimBrief flight plan to start A T C.", key="noplan")
+            return
+        cs = self._cs(s)
+        on_ground, agl, alt, gs = bool(s.get("on_ground")), s.get("agl") or 0, s.get("alt") or 0, s.get("gs") or 0
+        lat, lon = s.get("lat"), s.get("lon")
+        ap_arr = next((a for a in AIRPORTS if a[0] == arr), None)
+        d_arr = haversine_nm(lat, lon, ap_arr[2], ap_arr[3]) if ap_arr and lat is not None else None
+        ph = self.phase
+        if ph == "clearance":
+            if not self.options and self.awaiting is None:
+                self.opts(("clr", "Request IFR clearance", f"{station_name(dep, 'Delivery')}, {cs}, request I F R clearance to {say_airport(arr)}."))
+            if not on_ground:
+                self.phase = "departure"
+        elif ph == "ground":
+            items = []
+            if "pushed" not in self.flags and gs < 3:
+                items.append(("push", "Request pushback", f"{station_name(dep, 'Ground')}, {cs}, request pushback and start up."))
+            if "taxi_ok" not in self.flags:
+                items.append(("taxi", "Request taxi", f"{station_name(dep, 'Ground')}, {cs}, request taxi."))
+            self.options = [o for o in self.options if o["id"] in [i[0] for i in items]] or [{"id": i, "label": l, "say": y} for i, l, y in items]
+            # kontrola squawku
+            sq = str(s.get("squawk") or "")
+            if self.squawk and gs > 5 and sq and sq != self.squawk and time.time() - self.last_sq_warn > 120:
+                self.last_sq_warn = time.time()
+                self.atc(station_name(dep, "Ground"), f"{cs}, check squawk, should be {say_digits(self.squawk)}.")
+            edge = runway_near_edge(lat, lon, runways_near(lat, lon)) if lat is not None else None
+            if "taxi_ok" in self.flags and edge:
+                self.atc(station_name(dep, "Ground"), f"{cs}, contact Tower.", key="to_tower")
+                self.phase = "tower_dep"
+            if not on_ground:
+                self.phase = "departure"
+        elif ph == "tower_dep":
+            if "ready" not in self.flags:
+                self.opts(("ready", "Ready for departure", f"{station_name(dep, 'Tower')}, {cs}, holding point runway {self.dep_rwy or ''}, ready for departure."))
+            else:
+                self.options = []
+                alerts = (s.get("tower") or {}).get("alerts") or []
+                blocked = any(a.get("level") in ("warn", "danger") for a in alerts)
+                if blocked:
+                    self.atc(station_name(dep, "Tower"), f"{cs}, hold short runway {say_runway(self.dep_rwy)}, traffic.", key="hold_dep")
+                elif "to_clr" not in self.flags:
+                    self.atc(station_name(dep, "Tower"), f"{cs}, {say_wind(s)}runway {say_runway(self.dep_rwy)}, cleared for takeoff.", key="to_clr")
+            if not on_ground and agl > 1500:
+                self.atc(station_name(dep, "Tower"), f"{cs}, contact Departure, good day.", key="to_dep")
+                self.phase = "departure"
+        elif ph == "departure":
+            if "checkin_dep" not in self.flags:
+                self.opts(("checkin_dep", "Check in", f"{station_name(dep, 'Departure')}, {cs}, passing {say_alt(round(alt / 100) * 100)}, climbing."))
+            elif alt > 13000 or (d_arr is not None and d_arr < 60):
+                self.atc(station_name(dep, "Departure"), f"{cs}, contact Control, good day.", key="to_ctr")
+                self.phase, self.options = "center", []
+        elif ph == "center":
+            if "checkin_ctr" not in self.flags:
+                self.opts(("checkin_ctr", "Check in", f"Control, {cs}, {say_alt(round(alt / 100) * 100)}."))
+            elif d_arr is not None:
+                cruise = int(plan.get("cruise") or 35000)
+                tod = cruise / 1000 * 3 + 15
+                if d_arr < tod and "descend" not in self.flags:
+                    _, star = parse_procs(plan.get("route"))
+                    fl = 10000 if star else 7000
+                    self.cleared_alt = fl
+                    self.flags.add("descend")
+                    def _wx(icao=arr):
+                        m = fetch_metars([icao]).get(icao) or {}
+                        try:
+                            self.arr_wind = (None if m.get("wdir") in (None, "VRB") else float(m["wdir"]), float(m.get("wspd") or 0))
+                        except Exception:
+                            self.arr_wind = None
+                    threading.Thread(target=_wx, daemon=True).start()
+                    self.atc("Control", f"{cs}, descend {say_alt(fl)}{(', ' + star[:-2] + ' ' + say_digits(star[-2:]) + ' arrival') if star else ''}.")
+                    self.opts(("wilco", "Wilco", f"Descend {fl}, {cs}."))
+                if d_arr < 40 and alt < 16000:
+                    self.atc("Control", f"{cs}, contact {station_name(arr, 'Approach')}.", key="to_app")
+                    self.phase, self.options = "approach", []
+        elif ph == "approach":
+            if "checkin_app" not in self.flags:
+                self.opts(("checkin_app", "Check in", f"{station_name(arr, 'Approach')}, {cs}, {say_alt(round(alt / 100) * 100)}, information received."))
+            else:
+                fin = on_final(lat, lon, s.get("hdg") or 0, agl, rws_big(lat, lon), max_nm=14) if lat is not None else None
+                if fin:
+                    self.atc(station_name(arr, "Approach"), f"{cs}, cleared I L S approach runway {say_runway(fin[1])}, contact Tower.", key="ils")
+                    self.arr_rwy = fin[1]
+                    self.phase, self.options = "tower_arr", []
+        elif ph == "tower_arr":
+            # povolení k přistání dává automatická věž; po přistání předání na Ground
+            if s.get("live_landing") and on_ground and gs < 40:
+                self.atc(station_name(arr, "Tower"), f"{cs}, vacate when able, contact Ground.", key="vacate")
+                self.phase = "ground_arr"
+        elif ph == "ground_arr":
+            if not self.options:
+                self.opts(("taxi_in", "Request taxi to stand", f"{station_name(arr, 'Ground')}, {cs}, runway vacated, request taxi to the stand."))
+        # automatický kopilot: odpoví sám, když na to přijde čas
+        if self.auto and self.options and time.time() - self.opts_t > 3:
+            ids = [o["id"] for o in self.options]
+            moving, stopped = gs > 3, gs < 2
+            near_rwy = lat is not None and (runway_near_edge(lat, lon, runways_near(lat, lon)) or runway_occupied_by(lat, lon, runways_near(lat, lon)))
+            pick = None
+            for oid in ids:
+                if oid in ("clr", "rb", "checkin_dep", "checkin_ctr", "checkin_app", "wilco", "rwy_alt", "taxi_in"):
+                    pick = oid
+                elif oid == "push" and gs > 0.5:
+                    pick = oid
+                elif oid == "taxi" and moving:
+                    pick = oid
+                elif oid == "ready" and stopped and near_rwy:
+                    pick = oid
+                if pick:
+                    break
+            if pick:
+                self.respond(pick, s)
+        # restart po novém plánu nebo vzletu z jiného letiště
+        key = f"{dep}-{arr}-{plan.get('callsign')}"
+        if getattr(self, "plan_key", None) != key:
+            if getattr(self, "plan_key", None) is not None:
+                self.reset()
+            self.plan_key = key
+
+    def snapshot(self):
+        return {"enabled": self.enabled, "auto": self.auto, "simbrief": self.simbrief, "phase": self.phase, "msgs": self.msgs[-12:], "options": self.options, "squawk": self.squawk,
+                "dep_rwy": self.dep_rwy, "arr_rwy": self.arr_rwy, "cleared_alt": self.cleared_alt}
+
+
+def say_airport(icao):
+    city = CITY.get(icao)
+    return city or say_digits(icao)
+
+
+atc = AtcSession()
+
+
+def atc_loop():
+    while True:
+        time.sleep(2)
+        try:
+            with lock:
+                s = dict(state)
+            if s.get("connected") and not s.get("demo"):
+                atc.update(s)
+            with lock:
+                state["atc"] = atc.snapshot()
+        except Exception as e:
+            with lock:
+                state["atc"] = {**atc.snapshot(), "error": str(e)[:120]}
 
 
 def tower_loop():
@@ -1875,6 +2248,10 @@ def push(on_ground, alt, agl, ias, gs, vs, hdg, g, lat, lon, aircraft):
 def sim_loop():
     try:
         from SimConnect import SimConnect, AircraftRequests
+        try:
+            from SimConnect import AircraftEvents
+        except Exception:
+            AircraftEvents = None
     except ImportError:
         with lock:
             state["status"] = "Chybí knihovna SimConnect"
@@ -1893,6 +2270,7 @@ def sim_loop():
                 waiting_logged = True
             sm = SimConnect()
             aq = AircraftRequests(sm, _time=0)
+            ae = AircraftEvents(sm) if AircraftEvents else None
             log("Připojeno k MSFS ✔")
             was_connected = True
 
@@ -1993,6 +2371,15 @@ def sim_loop():
                     state["wind_dir"], state["wind_kt"] = wind_dir, wind_kt
                 rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "ias": ias,
                                                  "alt": alt, "agl": agl, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
+                # příkazy pro simulátor (např. squawk od ATC kopilota)
+                while SIM_CMDS and ae is not None:
+                    name, val = SIM_CMDS.pop(0)
+                    try:
+                        ev = ae.find(name)
+                        if ev:
+                            ev(int(val))
+                    except Exception as e:
+                        log("Příkaz pro simulátor se nepovedl:", name, e)
                 time.sleep(0.05)
         except Exception as e:
             if "Did not find" not in str(e):
@@ -2223,6 +2610,7 @@ def start_background(demo=False):
     threading.Thread(target=demo_loop if demo else sim_loop, daemon=True).start()
     threading.Thread(target=upload_loop, daemon=True).start()
     threading.Thread(target=tower_loop, daemon=True).start()
+    threading.Thread(target=atc_loop, daemon=True).start()
     threading.Thread(target=check_update, daemon=True).start()
 
     def bids_loop():
