@@ -584,6 +584,7 @@ def load_settings():
             state["reg_override"] = d.get("reg")
         TAIL_SEEN.update(d.get("tails") or {})
         atc.auto = bool(d.get("atc_auto", False))
+        VOICE_PREFS.update(d.get("voices") or {})
         atc.simbrief = bool(d.get("atc_simbrief", True))
     except Exception:
         pass
@@ -593,7 +594,7 @@ def _save_settings():
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override"), "tails": TAIL_SEEN,
-                       "atc_auto": atc.auto, "atc_simbrief": atc.simbrief}, f)
+                       "atc_auto": atc.auto, "atc_simbrief": atc.simbrief, "voices": VOICE_PREFS}, f)
     except Exception:
         pass
 
@@ -1429,14 +1430,59 @@ def tower_alerts(s, others):
 # Stahují se až na vyžádání do složky aplikace. Piper (MIT) + hlasy z rhasspy/piper-voices.
 PIPER_DIR = os.path.join(DATA_DIR, "piper")
 PIPER_ZIP_URL = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip"
-PIPER_HF = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/"
-# role -> (soubor hlasu, cesta na Hugging Face, mluvčí u vícehlasových modelů)
-PIPER_VOICES = {
-    "tower": ("en_GB-northern_english_male-medium", "northern_english_male/medium", None),
-    "ground": ("en_GB-southern_english_female-low", "southern_english_female/low", None),
-    "radar": ("en_GB-alba-medium", "alba/medium", None),
-    "pilot": ("en_GB-vctk-medium", "vctk/medium", 6),
+PIPER_HF = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+# hlas -> (soubor, cesta na Hugging Face, velikost MB)
+VOICE_FILES = {
+    "north": ("en_GB-northern_english_male-medium", "en/en_GB/northern_english_male/medium", 63),
+    "south": ("en_GB-southern_english_female-low", "en/en_GB/southern_english_female/low", 20),
+    "alba": ("en_GB-alba-medium", "en/en_GB/alba/medium", 63),
+    "vctk": ("en_GB-vctk-medium", "en/en_GB/vctk/medium", 77),
+    # experimentální místní přízvuk (cizí hlas čte anglický text)
+    "es": ("es_ES-sharvard-medium", "es/es_ES/sharvard/medium", 63),
+    "de": ("de_DE-thorsten-medium", "de/de_DE/thorsten/medium", 63),
+    "fr": ("fr_FR-siwis-medium", "fr/fr_FR/siwis/medium", 63),
 }
+BASE_VOICES = ("north", "south", "alba", "vctk")
+# přízvuk -> role -> (hlas, mluvčí)  (mluvčí VCTK podle jejich přízvuku)
+ACCENTS = {
+    "uk": {"tower": ("north", None), "ground": ("south", None), "radar": ("alba", None)},
+    "sco": {"tower": ("vctk", "p237"), "ground": ("vctk", "p234"), "radar": ("alba", None)},
+    "ie": {"tower": ("vctk", "p245"), "ground": ("vctk", "p261"), "radar": ("vctk", "p245")},
+    "us": {"tower": ("vctk", "p311"), "ground": ("vctk", "p294"), "radar": ("vctk", "p360")},
+    "ca": {"tower": ("vctk", "p316"), "ground": ("vctk", "p294"), "radar": ("vctk", "p302")},
+    "in": {"tower": ("vctk", "p251"), "ground": ("vctk", "p248"), "radar": ("vctk", "p376")},
+    "za": {"tower": ("vctk", "p347"), "ground": ("vctk", "p314"), "radar": ("vctk", "p347")},
+    "au": {"tower": ("vctk", "p374"), "ground": ("vctk", "p335"), "radar": ("vctk", "p374")},
+    "es": {"tower": ("es", 0), "ground": ("es", 1), "radar": ("es", 0)},
+    "de": {"tower": ("de", None), "ground": ("de", None), "radar": ("de", None)},
+    "fr": {"tower": ("fr", None), "ground": ("fr", None), "radar": ("fr", None)},
+}
+PILOT_VOICE = ("vctk", "p226")
+LOCAL_ACCENT = {"LE": "es", "GC": "es", "ED": "de", "ET": "de", "LO": "de", "LS": "de", "LF": "fr", "DA": "fr", "DT": "fr", "GM": "fr"}
+
+
+def accent_for(icao, mode):
+    """Přízvuk podle země letiště. mode: off = britský všude, native = rodilé anglické přízvuky, local = i místní (experimentální)."""
+    icao = (icao or "").upper()
+    if mode == "off" or not icao:
+        return "uk"
+    if mode == "local" and icao[:2] in LOCAL_ACCENT:
+        return LOCAL_ACCENT[icao[:2]]
+    if icao.startswith(("EGP", "EGE")):
+        return "sco"
+    if icao.startswith(("EI", "EGA")):
+        return "ie"
+    if icao[:1] in ("K", "P"):
+        return "us"
+    if icao[:1] == "C":
+        return "ca"
+    if icao[:2] in ("VA", "VE", "VI", "VO"):
+        return "in"
+    if icao[:2] == "FA":
+        return "za"
+    if icao[:1] == "Y" or icao[:2] == "NZ":
+        return "au"
+    return "uk"
 piper_state = {"installed": False, "busy": False, "progress": 0, "step": "", "error": None}
 _piper_q = []
 _piper_lock = threading.Lock()
@@ -1449,10 +1495,68 @@ def _piper_exe():
     return None
 
 
+def _voice_ok(vid):
+    return os.path.exists(os.path.join(PIPER_DIR, VOICE_FILES[vid][0] + ".onnx"))
+
+
 def piper_check():
-    ok = bool(_piper_exe()) and all(os.path.exists(os.path.join(PIPER_DIR, v[0] + ".onnx")) for v in PIPER_VOICES.values())
+    ok = bool(_piper_exe()) and all(_voice_ok(v) for v in BASE_VOICES)
     piper_state["installed"] = ok
+    piper_state["custom"] = custom_voices()
     return ok
+
+
+CUSTOM_DIR = os.path.join(PIPER_DIR, "vlastni")
+
+
+def custom_voices():
+    """Vlastní hlasy (např. natrénovaný hlas pilota) – soubory .onnx + .onnx.json ve složce vlastni."""
+    try:
+        return sorted(f[:-5] for f in os.listdir(CUSTOM_DIR) if f.endswith(".onnx") and os.path.exists(os.path.join(CUSTOM_DIR, f + ".json")))
+    except Exception:
+        return []
+
+
+_spk_cache = {}
+
+
+def _speaker_id(vid, spk):
+    if spk is None or isinstance(spk, int):
+        return spk
+    if vid not in _spk_cache:
+        try:
+            with open(os.path.join(PIPER_DIR, VOICE_FILES[vid][0] + ".onnx.json"), encoding="utf-8") as f:
+                _spk_cache[vid] = json.load(f).get("speaker_id_map") or {}
+        except Exception:
+            _spk_cache[vid] = {}
+    return _spk_cache[vid].get(spk)
+
+
+_downloading = set()
+
+
+def _fetch_voice(vid):
+    """Stáhne jeden hlas (na pozadí), např. pro experimentální místní přízvuk."""
+    if vid in _downloading or _voice_ok(vid):
+        return
+    _downloading.add(vid)
+    def run():
+        name, hf, size = VOICE_FILES[vid]
+        try:
+            for ext in (".onnx", ".onnx.json"):
+                p = os.path.join(PIPER_DIR, name + ext)
+                if not os.path.exists(p):
+                    _download(f"{PIPER_HF}{hf}/{name}{ext}?download=true", p, 0, size)
+            try:
+                _download(f"{PIPER_HF}{hf}/MODEL_CARD?download=true", os.path.join(PIPER_DIR, name + ".MODEL_CARD.txt"), 0, 1)
+            except Exception:
+                pass
+            log(f"Hlas {name} stažen ✔")
+        except Exception as e:
+            log("Hlas se nepodařilo stáhnout:", name, e)
+        finally:
+            _downloading.discard(vid)
+    threading.Thread(target=run, daemon=True).start()
 
 
 def _download(url, path, done_mb, total_mb):
@@ -1478,7 +1582,7 @@ def piper_install():
         piper_state.update(busy=True, error=None, progress=0)
         try:
             os.makedirs(PIPER_DIR, exist_ok=True)
-            total, done = 20 + 63 * 2 + 20 + 77, 0
+            total, done = 20 + sum(VOICE_FILES[v][2] for v in BASE_VOICES), 0
             if not _piper_exe():
                 piper_state["step"] = "program Piper"
                 zp = os.path.join(PIPER_DIR, "piper.zip")
@@ -1487,8 +1591,8 @@ def piper_install():
                     z.extractall(PIPER_DIR)
                 os.remove(zp)
             done += 20
-            for role, (name, hf, spk) in PIPER_VOICES.items():
-                size = 77 if "vctk" in name else 20 if "low" in name else 63
+            for vid in BASE_VOICES:
+                name, hf, size = VOICE_FILES[vid]
                 piper_state["step"] = f"hlas {name}"
                 for ext in (".onnx", ".onnx.json"):
                     p = os.path.join(PIPER_DIR, name + ext)
@@ -1546,11 +1650,10 @@ def _piper_worker():
         if not job:
             time.sleep(0.15)
             continue
-        text, role, speed, radio = job
+        text, role, speed, radio, icao = job
         exe = _piper_exe()
-        name, hf, spk = PIPER_VOICES.get(role) or PIPER_VOICES["tower"]
-        model = os.path.join(PIPER_DIR, name + ".onnx")
-        if not exe or not os.path.exists(model):
+        model, spk = resolve_voice(role, icao)
+        if not exe or not model or not os.path.exists(model):
             continue
         out = os.path.join(tempfile.gettempdir(), f"jai_atc_{int(time.time() * 1000)}.wav")
         args = [exe, "--model", model, "--output_file", out, "--length_scale", str(speed)]
@@ -1572,13 +1675,36 @@ def _piper_worker():
                 pass
 
 
-def piper_say(text, role="tower", speed=1.0, radio=True, interrupt=False):
+VOICE_PREFS = {"accents": "native", "rules": {}}       # pravidla: {"LKPR:tower": "custom:Jachym", "LEPA:*": "accent:es"}
+
+
+def resolve_voice(role, icao):
+    """Vrátí (cesta k modelu, id mluvčího) pro roli a letiště."""
+    icao = (icao or "").upper()
+    rules = VOICE_PREFS.get("rules") or {}
+    rule = rules.get(f"{icao}:{role}") or rules.get(f"{icao}:*") if icao else None
+    if rule and rule.startswith("custom:"):
+        p = os.path.join(CUSTOM_DIR, rule[7:] + ".onnx")
+        if os.path.exists(p):
+            return p, None
+    if role == "pilot":
+        vid, spk = PILOT_VOICE
+    else:
+        acc = rule[7:] if rule and rule.startswith("accent:") and rule[7:] in ACCENTS else accent_for(icao, VOICE_PREFS.get("accents", "native"))
+        vid, spk = ACCENTS[acc].get(role) or ACCENTS[acc]["tower"]
+        if not _voice_ok(vid):                      # místní hlas ještě není stažený – stáhnout a zatím mluvit britsky
+            _fetch_voice(vid)
+            vid, spk = ACCENTS["uk"].get(role) or ACCENTS["uk"]["tower"]
+    return os.path.join(PIPER_DIR, VOICE_FILES[vid][0] + ".onnx"), _speaker_id(vid, spk)
+
+
+def piper_say(text, role="tower", speed=1.0, radio=True, interrupt=False, icao=None):
     if not piper_state["installed"]:
         return False
     with _piper_lock:
         if interrupt:
             _piper_q.clear()
-        _piper_q.append((str(text)[:600], role, max(0.7, min(1.5, float(speed))), bool(radio)))
+        _piper_q.append((str(text)[:600], role, max(0.7, min(1.5, float(speed))), bool(radio), icao))
     return True
 
 
@@ -1695,7 +1821,10 @@ class AtcSession:
             return
         if key:
             self.flags.add(key)
-        self.msgs.append({"id": f"a{len(self.msgs)}-{int(time.time())}", "t": time.time(), "who": "atc", "station": station, "say": text_say, "text": text_say})
+        icao = next((x for x in (getattr(self, "cur_dep", None), getattr(self, "cur_arr", None)) if x and station.startswith(station_name(x, "").strip())), None)
+        if station.startswith("Control"):
+            icao = None
+        self.msgs.append({"id": f"a{len(self.msgs)}-{int(time.time())}", "t": time.time(), "who": "atc", "station": station, "icao": icao, "say": text_say, "text": text_say})
         del self.msgs[:-30]
 
     def pilot(self, text):
@@ -1815,6 +1944,7 @@ class AtcSession:
                 self.atc("ATC", "Load your SimBrief flight plan to start A T C.", key="noplan")
             return
         cs = self._cs(s)
+        self.cur_dep, self.cur_arr = dep, arr
         on_ground, agl, alt, gs = bool(s.get("on_ground")), s.get("agl") or 0, s.get("alt") or 0, s.get("gs") or 0
         lat, lon = s.get("lat"), s.get("lon")
         ap_arr = next((a for a in AIRPORTS if a[0] == arr), None)
@@ -1957,6 +2087,14 @@ def atc_loop():
                 state["atc"] = {**atc.snapshot(), "error": str(e)[:120]}
 
 
+def _tag_apt(alerts, s):
+    if alerts and s.get("lat") is not None:
+        ap = nearest_airport(s["lat"], s["lon"], 15)
+        for a in alerts:
+            a.setdefault("apt", ap[0] if ap else None)
+    return alerts
+
+
 def tower_loop():
     """Každých pár sekund vyhodnotí provoz kolem. Polohy ostatních stahuje jen u letiště a při přiblížení."""
     others, last_fetch = [], 0.0
@@ -1980,7 +2118,7 @@ def tower_loop():
                 code, res = cloud.request("GET", q)
                 if code == 200 and isinstance(res, list):
                     others = res
-            alerts = tower_alerts(s, others)
+            alerts = _tag_apt(tower_alerts(s, others), s)
             with lock:
                 state["tower"] = {"alerts": alerts, "traffic": len(others), "active": True}
         except Exception as e:

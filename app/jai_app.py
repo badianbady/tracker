@@ -98,7 +98,7 @@ class Api:
         s["reg_now"] = core.current_reg(core.state)
         s["flight_state"] = core.flight_state()
         s["beta"] = core.BETA
-        s["piper"] = dict(core.piper_state)
+        s["piper"] = {**core.piper_state, "prefs": core.VOICE_PREFS}
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -129,8 +129,26 @@ class Api:
         return {"ok": True}
 
     @guarded
-    def piper_say(self, text, role="tower", speed=1.0, radio=True, interrupt=False):
-        return {"ok": core.piper_say(text, role, speed, radio, interrupt)}
+    def piper_say(self, text, role="tower", speed=1.0, radio=True, interrupt=False, icao=None):
+        return {"ok": core.piper_say(text, role, speed, radio, interrupt, icao)}
+
+    @guarded
+    def voice_settings(self, accents=None, rules=None):
+        if accents in ("off", "native", "local"):
+            core.VOICE_PREFS["accents"] = accents
+        if isinstance(rules, dict):
+            core.VOICE_PREFS["rules"] = {str(k)[:12].upper().replace(":*", ":*"): str(v)[:60] for k, v in rules.items() if v}
+        core._save_settings()
+        return {"ok": True}
+
+    @guarded
+    def open_voice_folder(self):
+        os.makedirs(core.CUSTOM_DIR, exist_ok=True)
+        try:
+            os.startfile(core.CUSTOM_DIR)
+        except Exception:
+            pass
+        return {"ok": True, "path": core.CUSTOM_DIR}
 
     @guarded
     def atc_respond(self, opt_id):
