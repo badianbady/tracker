@@ -97,6 +97,18 @@
   .bdg .b-ok { font-size: 12px; font-weight: 700; color: var(--green-deep); }
   .bdg .b-p { width: 100%; height: 6px; border-radius: 3px; background: var(--line, #DCE3DE); overflow: hidden; margin-top: 4px; } .bdg .b-p i { display: block; height: 100%; background: var(--green); }
 
+  /* ---------- ATC ---------- */
+  #atcDock { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 1150; width: min(360px, 92vw); background: #0F1F16; color: #F3F7F4;
+    border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 8px; }
+  #atcDock .atc-st { font-size: 12px; font-weight: 700; letter-spacing: .03em; color: #8BE3A0; }
+  #atcDock .atc-msg { font-size: 14px; line-height: 1.4; }
+  .atc-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  #atcDock .atc-opts button { border: 0; background: var(--green); color: #fff; font-weight: 700; border-radius: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+  .atc-opts kbd { font: 700 11px var(--display, sans-serif); background: rgba(255,255,255,.22); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
+  .atc-opts .btn kbd { background: var(--green-soft); color: var(--green-deep); }
+  .atc-log { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; font-size: 14px; }
+  .atc-line { padding: 6px 10px; border-radius: 8px; background: var(--green-soft); } .atc-line.pilot { background: transparent; border: 1px solid var(--line, #DCE3DE); }
+
   /* ---------- automatická věž ---------- */
   .tower-bar { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 1200; max-width: min(760px, 94vw);
     padding: 9px 16px; border-radius: 0 0 12px 12px; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,.25); display: flex; gap: 10px; align-items: baseline; }
@@ -793,7 +805,9 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Počasí v době letu": "Weather at flight time", "Záložní letiště": "Alternate", "Počasí se ukládá u letů z aplikace od verze 1.1.8.": "Weather is saved for flights from app version 1.1.8.", "▶ Přehrát let": "▶ Replay flight", "Rozbor přiblížení": "Approach analysis", "✔ Stabilizované přiblížení": "✔ Stabilised approach", "✗ Nestabilizované přiblížení": "✗ Unstabilised approach",
+  "a pak": "and then", "Automatický kopilot": "Automatic co-pilot", "(odpovídá sám a nastaví squawk)": "(replies by itself and sets the squawk)",
+  "Dráhy a procedury podle SimBriefu": "Runways and procedures from SimBrief", "(při silném větru se zeptá)": "(asks if the wind is strong)", "Zapnout ATC": "Enable ATC", "Konec letu": "End of flight", "Zatím ticho na frekvenci.": "Frequency is quiet for now.", "Ty": "You",
+  "Řízení celého letu podle SimBrief plánu: Delivery → Ground → Tower → Departure → Control → Approach → Tower → Ground. ATC mluví (hlasem věže) a ty odpovídáš tlačítky nebo klávesami 1–4. Před letem načti plán ze SimBriefu.": "ATC for the whole flight based on your SimBrief plan: Delivery → Ground → Tower → Departure → Control → Approach → Tower → Ground. ATC speaks (with the tower voice) and you reply with buttons or keys 1–4. Load your SimBrief plan before the flight.", "Počasí v době letu": "Weather at flight time", "Záložní letiště": "Alternate", "Počasí se ukládá u letů z aplikace od verze 1.1.8.": "Weather is saved for flights from app version 1.1.8.", "▶ Přehrát let": "▶ Replay flight", "Rozbor přiblížení": "Approach analysis", "✔ Stabilizované přiblížení": "✔ Stabilised approach", "✗ Nestabilizované přiblížení": "✗ Unstabilised approach",
   "výška nad zemí": "height above ground", "sestupová rovina 3°": "3° glide path", "rychlost": "speed", "vzdálenost v nm": "distance in nm", "Klesání": "Descent", "Rychlost": "Speed", "Sestupová rovina": "Glide path", "Osa": "Centreline",
   "bez dat": "no data", "Rozbor přiblížení se ukládá u letů z aplikace od verze 1.1.6.": "Approach analysis is saved for flights from app version 1.1.6.",
   "Stabilizované přiblížení: v 1000 a 500 ft klesání do 1000 fpm, stálá rychlost, na sestupové rovině a v ose dráhy.": "Stabilised approach: at 1000 and 500 ft, descent rate up to 1000 fpm, steady speed, on the glide path and on the centreline.", "Plány": "Planned", "Plánované lety": "Planned flights", "Plánované lety pilotů": "Pilots' planned flights", "Všechny plánované lety →": "All planned flights →",
@@ -888,6 +902,7 @@ Object.assign(EN, {
 });
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
+  [/^Teď:$/, "Now:"], [/^Ponechat RWY (\S+) \(SimBrief\)$/, "Keep RWY $1 (SimBrief)"], [/^Dráha (\S+) \(proti větru\)$/, "Runway $1 (into wind)"], [/^· odlet RWY$/, "· departure RWY"], [/^· přílet RWY$/, "· arrival RWY"],
   [/^(\d+) m (vpravo|vlevo)$/, (m, a, b) => `${a} m ${b === "vpravo" ? "right" : "left"}`], [/^· rychlost na finále (\d+) kt$/, "· final approach speed $1 kt"],
   [/^Přistál (\S+)$/, "Landed $1"], [/^Ve vzduchu · přílet (\S+)$/, "Airborne · arriving $1"], [/^Zpožděno · odhad (\S+)$/, "Delayed · est. $1"],
   [/^vzlet (\S+)$/, "departed $1"], [/^odhad (\S+)$/, "est. $1"], [/^skutečně (\S+)$/, "actual $1"],
@@ -1133,7 +1148,7 @@ let appStale = false, appFails = 0;
 async function pollApp() {
   let st = null;
   try { st = await appApi.get_state(); } catch { st = null; }
-  if (st && st.version) { appState = st; appFails = 0; appStale = false; renderTowerBar(st.tower); }
+  if (st && st.version) { appState = st; appFails = 0; appStale = false; renderTowerBar(st.tower); atcTick(st.atc); }
   else {
     // Zastaralá aplikace odpovídá vždy hláškou „Nepovolená stránka“. Když aplikace jen chvíli neodpovídá
     // (vytížený počítač, simulátor), nic se nehlásí – zůstanou poslední známé údaje.
@@ -1203,6 +1218,7 @@ function renderTracker(full) {
         <div class="card tr-landing"><div class="big" id="trScore">–</div><div class="info">
           <h3 id="trVerdict" style="font-size:22px">Zatím žádné přistání</h3><div id="trLand" class="muted">Přistání se tu ukáže automaticky.</div></div></div>
         <div class="card tr-wide save-card" id="saveCard"></div>
+        <div class="card tr-wide" id="atcCard"></div>
         <div class="card tr-wide" id="towerCard"></div>
         <div class="card tr-wide save-card" id="tripCard"></div>
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
@@ -1360,6 +1376,7 @@ function renderTracker(full) {
   if ($("trUpdBtn")) $("trUpdBtn").onclick = async () => { const r = await appApi.do_update(); if (r && r.ok === false) alert(r.msg); };
   if ($("tripCard") && !$("tripCard").dataset.done) renderTripCard();
   renderTowerCard(s.tower);
+  renderAtcCard(s.atc);
   const sc = $("saveCard");
   if (sc) {
     const st = s.flight_state || "idle";
@@ -2479,13 +2496,14 @@ function towerPhrase(text) {
     .replace(/, (wind|runway|hold|go around|continue|stop|vacate|caution|number|cleared|traffic|I say again|expect)/gi, ". $1")
     .replace(/(degrees), /g, "$1, ").replace(/\bniner\b/g, "niner");
 }
-function towerSay(text) {
+function towerSay(text, pilot = false) {
   if (!window.speechSynthesis || !text) return;
-  const v = towerVoice(), rate = Number(towerPref("jai_tower_rate", ".9")) || .9;
+  let v = towerVoice(); const rate = Number(towerPref("jai_tower_rate", ".9")) || .9;
+  if (pilot) { const other = enVoices().find(x => x.name !== v?.name && /en-US/i.test(x.lang)) || enVoices().find(x => x.name !== v?.name); if (other) v = other; }
   // každou větu zvlášť – mezi nimi vznikne přirozená pauza
   for (const part of towerPhrase(text).split(/(?<=\.)\s+/)) {
     const u = new SpeechSynthesisUtterance(part); if (v) u.voice = v;
-    u.lang = v?.lang || "en-GB"; u.rate = rate; u.pitch = 1; u.volume = 1; speechSynthesis.speak(u);
+    u.lang = v?.lang || "en-GB"; u.rate = rate; u.pitch = pilot ? 1.08 : 1; u.volume = 1; speechSynthesis.speak(u);
   }
 }
 function towerSpeak(alerts) {
@@ -2817,6 +2835,61 @@ function approachHtml(f) {
     <div class="table-wrap"><table class="appr-table"><thead><tr><th></th><th>Klesání</th><th>Rychlost</th><th>Sestupová rovina</th><th>Osa</th></tr></thead><tbody>${gate(a.g1000, 1000)}${gate(a.g500, 500)}</tbody></table></div>
     <p class="muted" style="font-size:12px;margin:6px 0 0">Stabilizované přiblížení: v 1000 a 500 ft klesání do 1000 fpm, stálá rychlost, na sestupové rovině a v ose dráhy.</p></div>`;
 }
+
+/* ---------- ATC (beta) ---------- */
+const atcSpoken = new Set();
+let atcFirst = true;
+const ATC_PHASE_TXT = { clearance: "Delivery", ground: "Ground", tower_dep: "Tower", departure: "Departure", center: "Control", approach: "Approach", tower_arr: "Tower", ground_arr: "Ground", done: "Konec letu" };
+function atcTick(a) {
+  if (!a) return;
+  // nové zprávy ATC přečíst nahlas (při prvním načtení jen označit jako přečtené)
+  for (const m of a.msgs || []) {
+    if (atcSpoken.has(m.id)) continue;
+    atcSpoken.add(m.id);
+    if (!atcFirst && a.enabled && towerVoiceOn() && (m.who === "atc" || a.auto)) towerSay(m.say || m.text, m.who === "pilot");
+  }
+  atcFirst = false;
+  renderAtcDock(a);
+  renderAtcCard(a);
+}
+function atcRespond(id) { appApi?.atc_respond?.(id).then(() => pollApp()); }
+function renderAtcDock(a) {
+  let d = $("atcDock");
+  if (!a?.enabled) { d?.remove(); return; }
+  if (!d) { d = document.createElement("div"); d.id = "atcDock"; d.setAttribute("aria-live", "polite"); document.body.appendChild(d); }
+  const last = [...(a.msgs || [])].reverse().find(m => m.who === "atc");
+  const key = JSON.stringify([last?.id, a.options]);
+  if (d.dataset.key === key) return; d.dataset.key = key;
+  d.innerHTML = `<div class="atc-st">🎧 ${esc(last?.station || ATC_PHASE_TXT[a.phase] || "ATC")}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}${a.auto ? " · kopilot 🤖" : ""}</div>
+    ${last ? `<div class="atc-msg">${esc(last.text)}</div>` : ""}
+    ${(a.options || []).length ? `<div class="atc-opts">${a.options.map((o, i) => `<button type="button" data-atc="${esc(o.id)}"><kbd>${i + 1}</kbd> ${esc(o.label)}</button>`).join("")}</div>` : ""}`;
+  d.querySelectorAll("[data-atc]").forEach(b => b.onclick = () => atcRespond(b.dataset.atc));
+}
+function renderAtcCard(a) {
+  const box = $("atcCard"); if (!box) return;
+  if (!a) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const key = JSON.stringify([a.enabled, a.auto, a.simbrief, a.phase, (a.msgs || []).map(m => m.id), a.options]);
+  if (box.dataset.key === key) return; box.dataset.key = key;
+  box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2 class="section-title" style="margin:0">🎧 ATC <span class="badge">beta</span></h2>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="atcOn" ${a.enabled ? "checked" : ""}> Zapnout ATC</label></div>
+    <div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:8px;font-size:14px">
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcAuto" ${a.auto ? "checked" : ""}> Automatický kopilot <span class="muted">(odpovídá sám a nastaví squawk)</span></label>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcSb" ${a.simbrief !== false ? "checked" : ""}> Dráhy a procedury podle SimBriefu <span class="muted">(při silném větru se zeptá)</span></label></div>
+    ${!a.enabled ? '<p class="muted" style="margin:6px 0 0">Řízení celého letu podle SimBrief plánu: Delivery → Ground → Tower → Departure → Control → Approach → Tower → Ground. ATC mluví (hlasem věže) a ty odpovídáš tlačítky nebo klávesami 1–4. Před letem načti plán ze SimBriefu.</p>'
+      : `<p class="muted" style="margin:6px 0 8px">Teď: <b>${esc(ATC_PHASE_TXT[a.phase] || a.phase)}</b>${a.squawk ? ` · squawk <b>${esc(a.squawk)}</b>` : ""}${a.dep_rwy ? ` · odlet RWY <b>${esc(a.dep_rwy)}</b>` : ""}${a.arr_rwy ? ` · přílet RWY <b>${esc(a.arr_rwy)}</b>` : ""}</p>
+      <div class="atc-log">${(a.msgs || []).slice(-8).map(m => `<div class="atc-line ${m.who}"><b>${m.who === "atc" ? esc(m.station || "ATC") : "Ty"}:</b> ${esc(m.text)}</div>`).join("") || '<p class="muted">Zatím ticho na frekvenci.</p>'}</div>
+      ${(a.options || []).length ? `<div class="atc-opts" style="margin-top:8px">${a.options.map((o, i) => `<button type="button" class="btn ghost" data-atc="${esc(o.id)}"><kbd>${i + 1}</kbd> ${esc(o.label)}</button>`).join("")}</div>` : ""}`}`;
+  box.querySelectorAll("[data-atc]").forEach(b => b.onclick = () => atcRespond(b.dataset.atc));
+  if ($("atcOn")) $("atcOn").onchange = e => appApi?.atc_toggle?.(e.target.checked).then(() => pollApp());
+  if ($("atcAuto")) $("atcAuto").onchange = e => appApi?.atc_settings?.(e.target.checked, null).then(() => pollApp());
+  if ($("atcSb")) $("atcSb").onchange = e => appApi?.atc_settings?.(null, e.target.checked).then(() => pollApp());
+}
+document.addEventListener("keydown", e => {
+  if (!appState?.atc?.enabled || e.ctrlKey || e.altKey || e.metaKey || /input|textarea|select/i.test(e.target?.tagName || "")) return;
+  const n = Number(e.key); const o = appState.atc.options?.[n - 1];
+  if (o) { e.preventDefault(); atcRespond(o.id); }
+});
 
 /* ---------- detail vlastní rotace ---------- */
 async function renderTrip(id) {
