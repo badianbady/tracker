@@ -1359,7 +1359,9 @@ def tower_alerts(s, others):
                                "sid": f"fin-{end}-{cs}-{'roll' if gs > 30 else 'rw'}",
                                "say": f"{me}, stop immediately, I say again, stop immediately, traffic on short final." if gs > 30 and gs < 110
                                else f"{me}, vacate runway without delay, traffic on final."})
-            if aligned and not occ and not (fin and fin[0][0] < 5) and gs < 40:
+            # povolení ke vzletu jen před odletem – ne po přistání (backtrack, otáčení na dráze)
+            just_landed = bool(s.get("live_landing"))
+            if aligned and not occ and not (fin and fin[0][0] < 5) and gs < 40 and not just_landed:
                 alerts.append({"level": "ok", "text": f"Dráha {aligned[0]} v {aligned[2]} je volná – můžeš vzlétnout.",
                                "sid": f"to-{aligned[0]}", "say": f"{me}, {say_wind(s)}runway {say_runway(aligned[0])}, cleared for takeoff."})
         else:
