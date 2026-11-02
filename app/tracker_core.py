@@ -1425,6 +1425,170 @@ def tower_alerts(s, others):
     return alerts
 
 
+# ---------------- Hlasy Piper (přirozené hlasy, offline) ----------------
+# Stahují se až na vyžádání do složky aplikace. Piper (MIT) + hlasy z rhasspy/piper-voices.
+PIPER_DIR = os.path.join(DATA_DIR, "piper")
+PIPER_ZIP_URL = "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_windows_amd64.zip"
+PIPER_HF = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/"
+# role -> (soubor hlasu, cesta na Hugging Face, mluvčí u vícehlasových modelů)
+PIPER_VOICES = {
+    "tower": ("en_GB-northern_english_male-medium", "northern_english_male/medium", None),
+    "ground": ("en_GB-southern_english_female-low", "southern_english_female/low", None),
+    "radar": ("en_GB-alba-medium", "alba/medium", None),
+    "pilot": ("en_GB-vctk-medium", "vctk/medium", 6),
+}
+piper_state = {"installed": False, "busy": False, "progress": 0, "step": "", "error": None}
+_piper_q = []
+_piper_lock = threading.Lock()
+
+
+def _piper_exe():
+    for root, dirs, files in os.walk(PIPER_DIR):
+        if "piper.exe" in files:
+            return os.path.join(root, "piper.exe")
+    return None
+
+
+def piper_check():
+    ok = bool(_piper_exe()) and all(os.path.exists(os.path.join(PIPER_DIR, v[0] + ".onnx")) for v in PIPER_VOICES.values())
+    piper_state["installed"] = ok
+    return ok
+
+
+def _download(url, path, done_mb, total_mb):
+    tmp = path + ".part"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "JAI-Tracker"}), timeout=60) as r, open(tmp, "wb") as f:
+        got = 0
+        while True:
+            chunk = r.read(256 * 1024)
+            if not chunk:
+                break
+            f.write(chunk)
+            got += len(chunk)
+            piper_state["progress"] = min(99, int((done_mb + got / 1e6) / total_mb * 100))
+    os.replace(tmp, path)
+
+
+def piper_install():
+    """Stáhne Piper a hlasy (~250 MB) na pozadí."""
+    if piper_state["busy"]:
+        return
+    def run():
+        import zipfile
+        piper_state.update(busy=True, error=None, progress=0)
+        try:
+            os.makedirs(PIPER_DIR, exist_ok=True)
+            total, done = 20 + 63 * 2 + 20 + 77, 0
+            if not _piper_exe():
+                piper_state["step"] = "program Piper"
+                zp = os.path.join(PIPER_DIR, "piper.zip")
+                _download(PIPER_ZIP_URL, zp, done, total)
+                with zipfile.ZipFile(zp) as z:
+                    z.extractall(PIPER_DIR)
+                os.remove(zp)
+            done += 20
+            for role, (name, hf, spk) in PIPER_VOICES.items():
+                size = 77 if "vctk" in name else 20 if "low" in name else 63
+                piper_state["step"] = f"hlas {name}"
+                for ext in (".onnx", ".onnx.json"):
+                    p = os.path.join(PIPER_DIR, name + ext)
+                    if not os.path.exists(p):
+                        _download(f"{PIPER_HF}{hf}/{name}{ext}?download=true", p, done, total)
+                card = os.path.join(PIPER_DIR, name + ".MODEL_CARD.txt")       # licence a autoři hlasu
+                if not os.path.exists(card):
+                    try:
+                        _download(f"{PIPER_HF}{hf}/MODEL_CARD?download=true", card, done, total)
+                    except Exception:
+                        pass
+                done += size
+            piper_state.update(progress=100, step="hotovo")
+            log("Hlasy Piper připravené ✔")
+        except Exception as e:
+            piper_state["error"] = str(e)[:200]
+            log("Hlasy Piper se nepodařilo stáhnout:", e)
+        finally:
+            piper_state["busy"] = False
+            piper_check()
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _radio_fx(path):
+    """Jednoduchý „rádiový“ zvuk: pásmová propust 300–3400 Hz a lehké zkreslení."""
+    import wave, array
+    try:
+        with wave.open(path, "rb") as w:
+            params = w.getparams()
+            data = array.array("h", w.readframes(w.getnframes()))
+        sr = params.framerate
+        a_hp = math.exp(-2 * math.pi * 300 / sr)
+        a_lp = math.exp(-2 * math.pi * 3400 / sr)
+        prev_x = prev_hp = lp = 0.0
+        out = array.array("h")
+        for x in data:
+            hp = a_hp * (prev_hp + x - prev_x)
+            prev_x, prev_hp = x, hp
+            lp = lp + (1 - a_lp) * (hp - lp)
+            v = max(-1.0, min(1.0, lp * 1.6 / 32768))
+            v = math.tanh(v * 1.4) + random.uniform(-0.006, 0.006)
+            out.append(int(max(-32767, min(32767, v * 30000))))
+        with wave.open(path, "wb") as w:
+            w.setparams(params)
+            w.writeframes(out.tobytes())
+    except Exception:
+        pass
+
+
+def _piper_worker():
+    import subprocess, tempfile
+    while True:
+        with _piper_lock:
+            job = _piper_q.pop(0) if _piper_q else None
+        if not job:
+            time.sleep(0.15)
+            continue
+        text, role, speed, radio = job
+        exe = _piper_exe()
+        name, hf, spk = PIPER_VOICES.get(role) or PIPER_VOICES["tower"]
+        model = os.path.join(PIPER_DIR, name + ".onnx")
+        if not exe or not os.path.exists(model):
+            continue
+        out = os.path.join(tempfile.gettempdir(), f"jai_atc_{int(time.time() * 1000)}.wav")
+        args = [exe, "--model", model, "--output_file", out, "--length_scale", str(speed)]
+        if spk is not None:
+            args += ["--speaker", str(spk)]
+        try:
+            subprocess.run(args, input=text.encode("utf-8"), capture_output=True, timeout=30,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if radio:
+                _radio_fx(out)
+            import winsound
+            winsound.PlaySound(out, winsound.SND_FILENAME)
+        except Exception as e:
+            log("Hlas Piper selhal:", e)
+        finally:
+            try:
+                os.remove(out)
+            except Exception:
+                pass
+
+
+def piper_say(text, role="tower", speed=1.0, radio=True, interrupt=False):
+    if not piper_state["installed"]:
+        return False
+    with _piper_lock:
+        if interrupt:
+            _piper_q.clear()
+        _piper_q.append((str(text)[:600], role, max(0.7, min(1.5, float(speed))), bool(radio)))
+    return True
+
+
+threading.Thread(target=_piper_worker, daemon=True).start()
+try:
+    piper_check()
+except Exception:
+    pass
+
+
 # ---------------- ATC (fáze 1) ----------------
 # Řízení celého letu podle SimBrief plánu. ATC mluví, pilot odpovídá tlačítky (1–4).
 # Hlasové zprávy jdou do state["atc"]["msgs"], web je přečte nahlas.

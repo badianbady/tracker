@@ -98,6 +98,7 @@ class Api:
         s["reg_now"] = core.current_reg(core.state)
         s["flight_state"] = core.flight_state()
         s["beta"] = core.BETA
+        s["piper"] = dict(core.piper_state)
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -116,6 +117,20 @@ class Api:
             core.atc.simbrief = bool(simbrief)
         core._save_settings()
         return {"ok": True}
+
+    @guarded
+    def piper_status(self):
+        core.piper_check()
+        return dict(core.piper_state)
+
+    @guarded
+    def piper_install(self):
+        core.piper_install()
+        return {"ok": True}
+
+    @guarded
+    def piper_say(self, text, role="tower", speed=1.0, radio=True, interrupt=False):
+        return {"ok": core.piper_say(text, role, speed, radio, interrupt)}
 
     @guarded
     def atc_respond(self, opt_id):
