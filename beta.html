@@ -805,7 +805,9 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Hlasy Windows": "Windows voices", "Přirozené hlasy (Piper)": "Natural voices (Piper)", "Stáhnout hlasy": "Download voices", "Rádiový efekt": "Radio effect",
+  "a pak": "and then", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
+  "podle země + místní (experimentální)": "by country + local (experimental)", "Hlasy na konkrétních letištích": "Voices at specific airports", "Zatím žádná pravidla.": "No rules yet.",
+  "všechny pozice": "all positions", "Otevřít složku": "Open folder", "@ICAO": "@ICAO", "Hlasy Windows": "Windows voices", "Přirozené hlasy (Piper)": "Natural voices (Piper)", "Stáhnout hlasy": "Download voices", "Rádiový efekt": "Radio effect",
   "Přirozené hlasy potřebují novější verzi aplikace.": "Natural voices need a newer app version.",
   "✅ Přirozené hlasy připravené: věž, ground, radar a kopilot mají každý svůj hlas.": "✅ Natural voices ready: tower, ground, radar and co-pilot each have their own voice.", "Automatický kopilot": "Automatic co-pilot", "(odpovídá sám a nastaví squawk)": "(replies by itself and sets the squawk)",
   "Dráhy a procedury podle SimBriefu": "Runways and procedures from SimBrief", "(při silném větru se zeptá)": "(asks if the wind is strong)", "Zapnout ATC": "Enable ATC", "Konec letu": "End of flight", "Zatím ticho na frekvenci.": "Frequency is quiet for now.", "Ty": "You",
@@ -2500,11 +2502,11 @@ function towerPhrase(text) {
 }
 const piperOn = () => towerPref("jai_voice_engine", "windows") === "piper" && appState?.piper?.installed && appApi?.piper_say;
 const atcRole = st => /ground|delivery/i.test(st || "") ? "ground" : /approach|departure|control/i.test(st || "") ? "radar" : "tower";
-function towerSay(text, pilot = false, role = null, interrupt = false) {
+function towerSay(text, pilot = false, role = null, interrupt = false, icao = null) {
   if (!text) return;
   if (piperOn()) {     // přirozené hlasy Piper přehrává aplikace
     const rate = Number(towerPref("jai_tower_rate", ".9")) || .9, scale = rate <= .8 ? 1.15 : rate >= 1.05 ? .92 : 1.03;
-    appApi.piper_say(String(text).replace(/\bJachym\b/g, "Yakhim"), pilot ? "pilot" : (role || "tower"), scale, towerPref("jai_radio_fx", "1") === "1", interrupt);
+    appApi.piper_say(String(text).replace(/\bJachym\b/g, "Yakhim"), pilot ? "pilot" : (role || "tower"), scale, towerPref("jai_radio_fx", "1") === "1", interrupt, icao);
     return;
   }
   if (!window.speechSynthesis) return;
@@ -2525,7 +2527,7 @@ function towerSpeak(alerts) {
     if (now - (towerSpoken.get(a.sid) || 0) < 10 * 60000) continue;      // stejnou hlášku nejdřív za 10 minut
     towerSpoken.set(a.sid, now);
     if (a.level === "danger") speechSynthesis?.cancel();
-    towerSay(a.say, false, "tower", a.level === "danger");
+    towerSay(a.say, false, "tower", a.level === "danger", a.apt || null);
   }
 }
 function renderTowerBar(t) {
@@ -2543,8 +2545,26 @@ function renderTowerBar(t) {
 function piperBoxHtml() {
   const p = appState?.piper || {};
   if (!appApi?.piper_install) return '<p class="tower-line warn" style="margin:8px 0 0">Přirozené hlasy potřebují novější verzi aplikace.</p>';
-  if (p.installed) return `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:14px"><span>✅ Přirozené hlasy připravené: věž, ground, radar a kopilot mají každý svůj hlas.</span>
-    <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="radioFx" ${towerPref("jai_radio_fx", "1") === "1" ? "checked" : ""}> Rádiový efekt</label></div>`;
+  if (p.installed) {
+    const prefs = p.prefs || {}, rules = prefs.rules || {}, custom = p.custom || [];
+    const ACC = [["uk", "britský"], ["sco", "skotský"], ["ie", "irský"], ["us", "americký"], ["ca", "kanadský"], ["in", "indický"], ["za", "jihoafrický"], ["au", "australský"], ["es", "španělský (exp.)"], ["de", "německý (exp.)"], ["fr", "francouzský (exp.)"]];
+    const voiceName = v => v.startsWith("custom:") ? "🎙️ " + v.slice(7) : "přízvuk " + (ACC.find(a => "accent:" + a[0] === v)?.[1] || v);
+    const posName = { tower: "Tower", ground: "Ground / Delivery", radar: "Approach / Departure", "*": "všechny pozice" };
+    return `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:14px"><span>✅ Přirozené hlasy připravené.</span>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="radioFx" ${towerPref("jai_radio_fx", "1") === "1" ? "checked" : ""}> Rádiový efekt</label>
+      <label style="display:flex;gap:6px;align-items:center">Přízvuky <select id="accMode" style="padding:4px 6px;font-size:14px">
+        <option value="off" ${prefs.accents === "off" ? "selected" : ""}>britský všude</option><option value="native" ${(prefs.accents || "native") === "native" ? "selected" : ""}>podle země</option>
+        <option value="local" ${prefs.accents === "local" ? "selected" : ""}>podle země + místní (experimentální)</option></select></label></div>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Hlasy na konkrétních letištích ${Object.keys(rules).length ? `(${Object.keys(rules).length})` : ""}</summary>
+      <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:14px">
+        ${Object.entries(rules).map(([k, v]) => { const [ap, pos] = k.split(":"); return `<div style="display:flex;gap:8px;align-items:center"><b>${esc(ap)}</b> ${esc(posName[pos] || pos)} → ${esc(voiceName(v))} <button class="link-btn danger" type="button" data-vrdel="${esc(k)}">Odebrat</button></div>`; }).join("") || '<span class="muted">Zatím žádná pravidla.</span>'}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input id="vrAp" maxlength="4" placeholder="ICAO" style="width:80px;text-transform:uppercase">
+          <select id="vrPos"><option value="tower">Tower</option><option value="ground">Ground / Delivery</option><option value="radar">Approach / Departure</option><option value="*">všechny pozice</option></select>
+          <select id="vrVoice">${custom.map(c => `<option value="custom:${esc(c)}">🎙️ ${esc(c)}</option>`).join("")}${ACC.map(([k, l]) => `<option value="accent:${k}">přízvuk ${l}</option>`).join("")}</select>
+          <button class="btn ghost" type="button" id="vrAdd" style="padding:4px 12px">Přidat</button></div>
+        <div class="muted" style="font-size:12px">Vlastní hlas (např. svůj natrénovaný) dej jako soubory <code>.onnx</code> a <code>.onnx.json</code> do složky s vlastními hlasy. <button class="link-btn" type="button" id="vrFolder">Otevřít složku</button></div>
+      </div></details>`;
+  }
   if (p.busy) return `<div class="tower-line info" style="margin-top:8px">Stahuji ${esc(p.step || "")}… ${p.progress || 0} %<div class="bdg" style="all:unset"></div><div style="height:6px;background:rgba(255,255,255,.3);border-radius:3px;margin-top:6px;overflow:hidden"><i style="display:block;height:100%;width:${p.progress || 0}%;background:currentColor"></i></div></div>`;
   return `<div class="tower-line info" style="margin-top:8px">Přirozené hlasy znějí jako skuteční řídící a každá pozice má vlastní hlas s britským nebo skotským přízvukem. Fungují offline, stáhnou se jednou (asi 250 MB).
     ${p.error ? `<div style="margin-top:4px">Minule se stahování nepovedlo: ${esc(p.error)}</div>` : ""}
@@ -2579,6 +2599,17 @@ document.addEventListener("change", e => {
     try { if (e.target.id === "voiceEngine") localStorage.setItem("jai_voice_engine", e.target.value); else localStorage.setItem("jai_radio_fx", e.target.checked ? "1" : "0"); } catch { }
     const b = $("towerCard"); if (b) { b.dataset.key = ""; renderTowerCard(appState?.tower); } } });
 document.addEventListener("click", e => { if (e.target?.id === "piperGet") { e.target.disabled = true; appApi?.piper_install?.().then(() => pollApp()); } });
+const voiceRefresh = () => appApi?.get_state?.().then(st => { if (st?.version) appState = st; const b = $("towerCard"); if (b) { b.dataset.key = ""; renderTowerCard(appState?.tower); } });
+document.addEventListener("change", e => { if (e.target?.id === "accMode") appApi?.voice_settings?.(e.target.value, null).then(voiceRefresh); });
+document.addEventListener("click", e => {
+  const rules = { ...(appState?.piper?.prefs?.rules || {}) };
+  if (e.target?.id === "vrAdd") {
+    const ap = ($("vrAp").value || "").trim().toUpperCase(); if (!/^[A-Z0-9]{4}$/.test(ap)) { $("vrAp").focus(); return; }
+    rules[`${ap}:${$("vrPos").value}`] = $("vrVoice").value; appApi?.voice_settings?.(null, rules).then(voiceRefresh);
+  }
+  if (e.target?.dataset?.vrdel) { delete rules[e.target.dataset.vrdel]; appApi?.voice_settings?.(null, rules).then(voiceRefresh); }
+  if (e.target?.id === "vrFolder") appApi?.open_voice_folder?.();
+});
 document.addEventListener("change", e => { if (e.target?.id === "towerVoice") { try { localStorage.setItem("jai_tower_voice", e.target.checked ? "1" : "0"); } catch { } if (!e.target.checked) speechSynthesis?.cancel(); } });
 document.addEventListener("click", e => { if (e.target?.id === "towerTest") {
   const cs = appState?.plan?.callsign || appState?.callsign || "JAI127";
@@ -2873,7 +2904,7 @@ function atcTick(a) {
   for (const m of a.msgs || []) {
     if (atcSpoken.has(m.id)) continue;
     atcSpoken.add(m.id);
-    if (!atcFirst && a.enabled && towerVoiceOn() && (m.who === "atc" || a.auto)) towerSay(m.say || m.text, m.who === "pilot", atcRole(m.station));
+    if (!atcFirst && a.enabled && towerVoiceOn() && (m.who === "atc" || a.auto)) towerSay(m.say || m.text, m.who === "pilot", atcRole(m.station), false, m.icao || null);
   }
   atcFirst = false;
   renderAtcDock(a);
