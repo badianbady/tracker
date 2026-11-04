@@ -38,7 +38,12 @@ jobs:
 
       - name: Sestavení .exe
         working-directory: app
-        run: pyinstaller --noconfirm --onefile --windowed --name JachymAirTracker --icon icon.ico --add-data "overlay.html;." --add-data "icon.ico;." --collect-all SimConnect --hidden-import build_info --hidden-import app_tk --hidden-import tkinter --hidden-import _tkinter --collect-all webview --collect-all clr_loader --collect-all pythonnet jai_app.py
+        shell: pwsh
+        run: |
+          # novější SimConnect.dll z MSFS SDK (data letišť pro ATC), pokud je v repozitáři
+          $extra = @()
+          if (Test-Path "simconnect/SimConnect.dll") { $extra = @("--add-binary", "simconnect/SimConnect.dll;simconnect"); Write-Host "Přibaluji novější SimConnect.dll" }
+          pyinstaller --noconfirm --onefile --windowed --name JachymAirTracker --icon icon.ico --add-data "overlay.html;." --add-data "icon.ico;." --collect-all SimConnect --hidden-import build_info --hidden-import app_tk --hidden-import tkinter --hidden-import _tkinter --collect-all webview --collect-all clr_loader --collect-all pythonnet @extra jai_app.py
 
       - name: Vydání na GitHubu
         uses: softprops/action-gh-release@v3
