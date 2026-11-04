@@ -805,7 +805,7 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
+  "a pak": "and then", "Ladit frekvence do COM1 standby": "Tune frequencies into COM1 standby", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
   "podle země + místní (experimentální)": "by country + local (experimental)", "Hlasy na konkrétních letištích": "Voices at specific airports", "Zatím žádná pravidla.": "No rules yet.",
   "všechny pozice": "all positions", "Otevřít složku": "Open folder", "@ICAO": "@ICAO", "Hlasy Windows": "Windows voices", "Přirozené hlasy (Piper)": "Natural voices (Piper)", "Stáhnout hlasy": "Download voices", "Rádiový efekt": "Radio effect",
   "Přirozené hlasy potřebují novější verzi aplikace.": "Natural voices need a newer app version.",
@@ -2929,9 +2929,9 @@ function renderAtcDock(a) {
   if (!a?.enabled) { d?.remove(); return; }
   if (!d) { d = document.createElement("div"); d.id = "atcDock"; d.setAttribute("aria-live", "polite"); document.body.appendChild(d); }
   const last = [...(a.msgs || [])].reverse().find(m => m.who === "atc");
-  const key = JSON.stringify([last?.id, a.options]);
+  const key = JSON.stringify([last?.id, a.options, a.next_freq]);
   if (d.dataset.key === key) return; d.dataset.key = key;
-  d.innerHTML = `<div class="atc-st">🎧 ${esc(last?.station || ATC_PHASE_TXT[a.phase] || "ATC")}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}</div>
+  d.innerHTML = `<div class="atc-st">🎧 ${esc(last?.station || ATC_PHASE_TXT[a.phase] || "ATC")}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}${a.next_freq ? ` · ${esc(a.next_freq)}` : ""}</div>
     ${last ? `<div class="atc-msg">${esc(last.text)}</div>` : ""}
     ${(a.options || []).length ? `<div class="atc-opts">${a.options.map((o, i) => `<button type="button" data-atc="${esc(o.id)}"><kbd>${i + 1}</kbd> ${esc(o.label)}</button>`).join("")}</div>` : ""}`;
   d.querySelectorAll("[data-atc]").forEach(b => b.onclick = () => atcRespond(b.dataset.atc));
@@ -2940,20 +2940,23 @@ function renderAtcCard(a) {
   const box = $("atcCard"); if (!box) return;
   if (!a) { box.style.display = "none"; return; }
   box.style.display = "";
-  const key = JSON.stringify([a.enabled, a.auto, a.simbrief, a.phase, (a.msgs || []).map(m => m.id), a.options]);
+  const key = JSON.stringify([a.enabled, a.auto, a.simbrief, a.tune, a.next_freq, a.freqs, a.phase, (a.msgs || []).map(m => m.id), a.options]);
   if (box.dataset.key === key) return; box.dataset.key = key;
   box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2 class="section-title" style="margin:0">🎧 ATC <span class="badge">beta</span></h2>
       <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="atcOn" ${a.enabled ? "checked" : ""}> Zapnout ATC</label></div>
     <div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:8px;font-size:14px">
-      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcSb" ${a.simbrief !== false ? "checked" : ""}> Dráhy a procedury podle SimBriefu <span class="muted">(při silném větru se zeptá)</span></label></div>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcSb" ${a.simbrief !== false ? "checked" : ""}> Dráhy a procedury podle SimBriefu <span class="muted">(při silném větru se zeptá)</span></label>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcTune" ${a.tune ? "checked" : ""}> Ladit frekvence do COM1 standby</label></div>
     ${!a.enabled ? '<p class="muted" style="margin:6px 0 0">Řízení celého letu podle SimBrief plánu: Delivery → Ground → Tower → Departure → Control → Approach → Tower → Ground. ATC mluví (hlasem věže) a ty odpovídáš tlačítky nebo klávesami 1–4. Před letem načti plán ze SimBriefu.</p>'
-      : `<p class="muted" style="margin:6px 0 8px">Teď: <b>${esc(ATC_PHASE_TXT[a.phase] || a.phase)}</b>${a.squawk ? ` · squawk <b>${esc(a.squawk)}</b>` : ""}${a.dep_rwy ? ` · odlet RWY <b>${esc(a.dep_rwy)}</b>` : ""}${a.arr_rwy ? ` · přílet RWY <b>${esc(a.arr_rwy)}</b>` : ""}</p>
+      : `<p class="muted" style="margin:6px 0 8px">Teď: <b>${esc(ATC_PHASE_TXT[a.phase] || a.phase)}</b>${a.squawk ? ` · squawk <b>${esc(a.squawk)}</b>` : ""}${a.dep_rwy ? ` · odlet RWY <b>${esc(a.dep_rwy)}</b>` : ""}${a.arr_rwy ? ` · přílet RWY <b>${esc(a.arr_rwy)}</b>` : ""}${a.next_freq ? ` · frekvence <b>${esc(a.next_freq)}</b>` : ""}</p>
+      ${Object.entries(a.freqs || {}).some(([, v]) => v !== "hotovo") ? `<p class="muted" style="font-size:12px;margin:-4px 0 8px">Data letišť ze simulátoru: ${Object.entries(a.freqs).map(([k, v]) => `${esc(k)} ${esc(v || "nedostupná")}`).join(" · ")}</p>` : ""}
       <div class="atc-log">${(a.msgs || []).slice(-8).map(m => `<div class="atc-line ${m.who}"><b>${m.who === "atc" ? esc(m.station || "ATC") : "Ty"}:</b> ${esc(m.text)}</div>`).join("") || '<p class="muted">Zatím ticho na frekvenci.</p>'}</div>
       ${(a.options || []).length ? `<div class="atc-opts" style="margin-top:8px">${a.options.map((o, i) => `<button type="button" class="btn ghost" data-atc="${esc(o.id)}"><kbd>${i + 1}</kbd> ${esc(o.label)}</button>`).join("")}</div>` : ""}`}`;
   box.querySelectorAll("[data-atc]").forEach(b => b.onclick = () => atcRespond(b.dataset.atc));
   if ($("atcOn")) $("atcOn").onchange = e => appApi?.atc_toggle?.(e.target.checked).then(() => pollApp());
   if ($("atcAuto")) $("atcAuto").onchange = e => appApi?.atc_settings?.(e.target.checked, null).then(() => pollApp());
   if ($("atcSb")) $("atcSb").onchange = e => appApi?.atc_settings?.(null, e.target.checked).then(() => pollApp());
+  if ($("atcTune")) $("atcTune").onchange = e => appApi?.atc_settings?.(null, null, e.target.checked).then(() => pollApp());
 }
 document.addEventListener("keydown", e => {
   if (!appState?.atc?.enabled || e.ctrlKey || e.altKey || e.metaKey || /input|textarea|select/i.test(e.target?.tagName || "")) return;
