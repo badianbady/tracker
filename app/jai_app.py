@@ -99,6 +99,7 @@ class Api:
         s["flight_state"] = core.flight_state()
         s["beta"] = core.BETA
         s["piper"] = {**core.piper_state, "prefs": core.VOICE_PREFS}
+        s["fac"] = dict(core.fac_result)
         s["obs_url"] = f"http://localhost:{core.PORT}"
         return s
 
@@ -149,6 +150,10 @@ class Api:
         except Exception:
             pass
         return {"ok": True, "path": core.CUSTOM_DIR}
+
+    @guarded
+    def fac_probe(self, icao):
+        return {"ok": core.fac_request(icao)}
 
     @guarded
     def atc_respond(self, opt_id):

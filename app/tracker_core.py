@@ -7,6 +7,8 @@ a posílá polohu a dokončené lety na web JAI Trackeru.
 
 import csv
 import re
+import ctypes
+import struct
 import subprocess
 import webbrowser
 import io
@@ -1426,6 +1428,136 @@ def tower_alerts(s, others):
     return alerts
 
 
+# ---------------- Data letišť ze simulátoru (SimConnect facility data) ----------------
+# Diagnostika pro ATC fázi 2: frekvence, SID, STAR, přiblížení a pojezdové dráhy přímo z MSFS.
+FAC_TYPES = {0: "AIRPORT", 1: "RUNWAY", 2: "START", 3: "FREQUENCY", 4: "HELIPAD", 5: "APPROACH", 6: "APPROACH_TRANSITION", 7: "APPROACH_LEG",
+             8: "FINAL_APPROACH_LEG", 9: "MISSED_APPROACH_LEG", 10: "DEPARTURE", 11: "ARRIVAL", 12: "RUNWAY_TRANSITION", 13: "ENROUTE_TRANSITION",
+             14: "TAXI_POINT", 15: "TAXI_PARKING", 16: "TAXI_PATH", 17: "TAXI_NAME", 18: "JETWAY"}
+FREQ_TYPES = {0: "NONE", 1: "ATIS", 2: "MULTICOM", 3: "UNICOM", 4: "CTAF", 5: "GROUND", 6: "TOWER", 7: "CLEARANCE", 8: "APPROACH",
+              9: "DEPARTURE", 10: "CENTER", 11: "FSS", 12: "AWOS", 13: "ASOS", 14: "CPT", 15: "GCO"}
+# pořadí a typy polí, které si o každém objektu vyžádáme (formát pro struct)
+FAC_DEF = [
+    ("AIRPORT", [("ICAO", "8s"), ("NAME", "32s"), ("LATITUDE", "d"), ("LONGITUDE", "d"), ("ALTITUDE", "d"),
+                 ("N_RUNWAYS", "i"), ("N_FREQUENCIES", "i"), ("N_DEPARTURES", "i"), ("N_ARRIVALS", "i"), ("N_APPROACHES", "i"), ("N_TAXI_NAMES", "i")]),
+    ("FREQUENCY", [("TYPE", "i"), ("FREQUENCY", "i"), ("NAME", "64s")]),
+    ("DEPARTURE", [("NAME", "8s")]),
+    ("ARRIVAL", [("NAME", "8s")]),
+    ("APPROACH", [("TYPE", "i"), ("SUFFIX", "i"), ("RUNWAY_NUMBER", "i"), ("RUNWAY_DESIGNATOR", "i")]),
+    ("TAXI_NAME", [("NAME", "32s")]),
+]
+FAC_DEF_ID, FAC_REQ_BASE = 7700, 7700
+FAC_PENDING = []          # ICAO čekající na dotaz (zpracuje smyčka simulátoru)
+fac_result = {}
+_fac_defined = set()
+
+
+def fac_request(icao):
+    icao = (icao or "").upper().strip()
+    if re.match(r"^[A-Z0-9]{3,4}$", icao):
+        FAC_PENDING.append(icao)
+        fac_result.clear()
+        fac_result.update(icao=icao, status="čekám na simulátor", t=time.time(), errors=[], items={}, raw={})
+        return True
+    return False
+
+
+def _fac_define(sm):
+    """Definice polí pro dotaz (jednou za připojení)."""
+    if id(sm) in _fac_defined:
+        return
+    f = sm.dll.SimConnect.SimConnect_AddToFacilityDefinition
+    names = []
+    for obj, fields in FAC_DEF:
+        if obj != "AIRPORT":
+            names.append(f"OPEN {obj}")
+        else:
+            names.append("OPEN AIRPORT")
+        for name, _ in fields:
+            names.append(name)
+        if obj != "AIRPORT":
+            names.append(f"CLOSE {obj}")
+    names.append("CLOSE AIRPORT")
+    fac_result["sent_fields"] = names
+    for n in names:
+        f(sm.hSimConnect, ctypes.c_uint(FAC_DEF_ID), ctypes.c_char_p(n.encode()))
+    _fac_defined.add(id(sm))
+
+
+def _fac_parse(type_id, block):
+    """Rozbalí jeden objekt podle naší definice."""
+    name = FAC_TYPES.get(type_id)
+    fields = dict(FAC_DEF).get(name)
+    if not fields:
+        return None
+    out, off = {}, 0
+    for fname, fmt in fields:
+        size = struct.calcsize("<" + fmt)
+        if off + size > len(block):
+            break
+        v = struct.unpack_from("<" + fmt, block, off)[0]
+        if isinstance(v, bytes):
+            v = v.split(b"\0", 1)[0].decode("latin-1", "replace")
+        out[fname] = v
+        off += size
+    if name == "FREQUENCY":
+        out["TYPE_NAME"] = FREQ_TYPES.get(out.get("TYPE"), out.get("TYPE"))
+    return name, out
+
+
+def fac_on_recv(raw):
+    """Zpráva ze simulátoru (už jako bajty): 28 = data, 29 = konec, 1 = chyba."""
+    try:
+        dw_id = struct.unpack_from("<I", raw, 8)[0]
+        if dw_id == 1:            # SIMCONNECT_RECV_EXCEPTION: dwException, dwSendID, dwIndex
+            exc, send_id, idx = struct.unpack_from("<III", raw, 12)
+            fac_result.setdefault("errors", []).append({"exception": exc, "send_id": send_id, "index": idx})
+            return
+        user_req, uniq, parent, typ, is_list, item_idx, list_size = struct.unpack_from("<7I", raw, 12)
+        if dw_id == 29:
+            fac_result["status"] = "hotovo"
+            return
+        block = raw[40:]
+        tname = FAC_TYPES.get(typ, str(typ))
+        raw_s = fac_result.setdefault("raw", {})
+        if tname not in raw_s:
+            raw_s[tname] = block[:96].hex()           # vzorek pro ladění
+        parsed = _fac_parse(typ, block)
+        if parsed:
+            fac_result.setdefault("items", {}).setdefault(parsed[0], []).append(parsed[1])
+        fac_result["status"] = "přijímám data"
+    except Exception as e:
+        fac_result.setdefault("errors", []).append({"parse": str(e)[:120]})
+
+
+def fac_make_simconnect(SimConnectCls):
+    """Podtřída knihovny SimConnect, která navíc zachytí data letišť."""
+    class JaiSimConnect(SimConnectCls):
+        def my_dispatch_proc(self, pData, cbData, pContext):
+            try:
+                dw_id = pData.contents.dwID
+                if dw_id in (28, 29) or (dw_id == 1 and fac_result.get("status") not in (None, "hotovo")):
+                    fac_on_recv(ctypes.string_at(pData, cbData))
+                    if dw_id != 1:
+                        return
+            except Exception:
+                pass
+            return super().my_dispatch_proc(pData, cbData, pContext)
+    return JaiSimConnect
+
+
+def fac_process(sm):
+    """Volá smyčka simulátoru: odešle čekající dotazy."""
+    while FAC_PENDING:
+        icao = FAC_PENDING.pop(0)
+        try:
+            _fac_define(sm)
+            r = sm.dll.SimConnect.SimConnect_RequestFacilityData(sm.hSimConnect, ctypes.c_uint(FAC_DEF_ID), ctypes.c_uint(FAC_REQ_BASE + 1),
+                                                                   ctypes.c_char_p(icao.encode()), ctypes.c_char_p(b""))
+            fac_result["status"] = "dotaz odeslán" + ("" if r == 0 else f" (návratový kód {r})")
+        except Exception as e:
+            fac_result.update(status="chyba", error=str(e)[:200])
+
+
 # ---------------- Hlasy Piper (přirozené hlasy, offline) ----------------
 # Stahují se až na vyžádání do složky aplikace. Piper (MIT) + hlasy z rhasspy/piper-voices.
 PIPER_DIR = os.path.join(DATA_DIR, "piper")
@@ -2549,7 +2681,8 @@ def push(on_ground, alt, agl, ias, gs, vs, hdg, g, lat, lon, aircraft):
 # ---------------- Čtení z MSFS ----------------
 def sim_loop():
     try:
-        from SimConnect import SimConnect, AircraftRequests
+        from SimConnect import SimConnect as _BaseSimConnect, AircraftRequests
+        SimConnect = fac_make_simconnect(_BaseSimConnect)
         try:
             from SimConnect import AircraftEvents
         except Exception:
@@ -2673,6 +2806,8 @@ def sim_loop():
                     state["wind_dir"], state["wind_kt"] = wind_dir, wind_kt
                 rec.update(t, on_ground, vs, g, {"aircraft": title, "lat": lat, "lon": lon, "gs": gs, "ias": ias,
                                                  "alt": alt, "agl": agl, "hdg": hdg, "wind_dir": wind_dir, "wind_kt": wind_kt})
+                if FAC_PENDING:
+                    fac_process(sm)
                 # příkazy pro simulátor (např. squawk od ATC kopilota)
                 while SIM_CMDS and ae is not None:
                     name, val = SIM_CMDS.pop(0)
