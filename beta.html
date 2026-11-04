@@ -1223,6 +1223,7 @@ function renderTracker(full) {
           <h3 id="trVerdict" style="font-size:22px">Zatím žádné přistání</h3><div id="trLand" class="muted">Přistání se tu ukáže automaticky.</div></div></div>
         <div class="card tr-wide save-card" id="saveCard"></div>
         <div class="card tr-wide" id="atcCard"></div>
+        <div class="card tr-wide" id="facCard"></div>
         <div class="card tr-wide" id="towerCard"></div>
         <div class="card tr-wide save-card" id="tripCard"></div>
         <div class="card tr-wide"><div class="tr-nums" id="trNums">
@@ -1381,6 +1382,7 @@ function renderTracker(full) {
   if ($("tripCard") && !$("tripCard").dataset.done) renderTripCard();
   renderTowerCard(s.tower);
   renderAtcCard(s.atc);
+  renderFacCard(s.fac);
   const sc = $("saveCard");
   if (sc) {
     const st = s.flight_state || "idle";
@@ -2948,6 +2950,33 @@ document.addEventListener("keydown", e => {
   const n = Number(e.key); const o = appState.atc.options?.[n - 1];
   if (o) { e.preventDefault(); atcRespond(o.id); }
 });
+
+/* ---------- diagnostika: data letiště ze simulátoru ---------- */
+function renderFacCard(f) {
+  const box = $("facCard"); if (!box) return;
+  if (f === undefined || !appApi?.fac_probe) { box.style.display = "none"; return; }
+  box.style.display = "";
+  const key = JSON.stringify([f.status, f.icao, Object.fromEntries(Object.entries(f.items || {}).map(([k, v]) => [k, v.length])), (f.errors || []).length]);
+  if (box.dataset.key === key) return; box.dataset.key = key;
+  const it = f.items || {}, ap = (it.AIRPORT || [])[0];
+  const fq = (it.FREQUENCY || []).map(x => `<li><b>${esc(x.TYPE_NAME)}</b> ${esc(x.NAME || "")} · ${(x.FREQUENCY / 1e6).toFixed(3)} <span class="muted">(${esc(String(x.FREQUENCY))})</span></li>`).join("");
+  const list = (k, f2) => (it[k] || []).map(f2).join(", ");
+  box.innerHTML = `<details ${f.icao ? "open" : ""}><summary style="cursor:pointer"><b>🔧 Diagnostika ATC: data letiště ze simulátoru</b></summary>
+    <p class="muted" style="margin:6px 0">Zeptá se spuštěného MSFS na frekvence, odlety (SID), přílety (STAR), přiblížení a pojezdové dráhy. Výsledek zkopíruj a pošli ho.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input id="facIcao" maxlength="4" value="${esc(f.icao || appState?.plan?.dep || "LKPR")}" style="width:90px;text-transform:uppercase">
+      <button class="btn" type="button" id="facGo" style="padding:6px 14px">Načíst</button>
+      ${f.status ? `<span>Stav: <b>${esc(f.status)}</b></span>` : ""}
+      ${f.icao ? '<button class="btn ghost" type="button" id="facCopy" style="padding:6px 14px">Zkopírovat výsledek</button>' : ""}</div>
+    ${ap ? `<p style="margin:10px 0 4px"><b>${esc(ap.ICAO)}</b> ${esc(ap.NAME)} · dráhy ${ap.N_RUNWAYS} · frekvence ${ap.N_FREQUENCIES} · SID ${ap.N_DEPARTURES} · STAR ${ap.N_ARRIVALS} · přiblížení ${ap.N_APPROACHES} · pojezdové dráhy ${ap.N_TAXI_NAMES}</p>` : ""}
+    ${fq ? `<p style="margin:6px 0 2px"><b>Frekvence:</b></p><ul style="margin:0;padding-left:20px">${fq}</ul>` : ""}
+    ${it.DEPARTURE ? `<p style="margin:6px 0"><b>SID:</b> ${esc(list("DEPARTURE", x => x.NAME))}</p>` : ""}
+    ${it.ARRIVAL ? `<p style="margin:6px 0"><b>STAR:</b> ${esc(list("ARRIVAL", x => x.NAME))}</p>` : ""}
+    ${it.APPROACH ? `<p style="margin:6px 0"><b>Přiblížení:</b> ${esc(list("APPROACH", x => `typ ${x.TYPE} RWY ${x.RUNWAY_NUMBER}/${x.RUNWAY_DESIGNATOR}`))}</p>` : ""}
+    ${it.TAXI_NAME ? `<p style="margin:6px 0"><b>Pojezdové dráhy:</b> ${esc(list("TAXI_NAME", x => x.NAME))}</p>` : ""}
+    ${(f.errors || []).length ? `<p class="tower-line warn" style="margin-top:6px">Simulátor hlásí ${f.errors.length} chyb(u) – i ty pomůžou, pošli výsledek.</p>` : ""}</details>`;
+  $("facGo").onclick = () => appApi.fac_probe($("facIcao").value).then(() => pollApp());
+  if ($("facCopy")) $("facCopy").onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(appState.fac, null, 1)); toast("Zkopírováno ✔"); } catch { prompt("Zkopíruj:", JSON.stringify(appState.fac)); } };
+}
 
 /* ---------- detail vlastní rotace ---------- */
 async function renderTrip(id) {
