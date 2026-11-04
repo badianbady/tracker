@@ -2614,7 +2614,7 @@ document.addEventListener("change", e => { if (e.target?.id === "towerVoice") { 
 document.addEventListener("click", e => { if (e.target?.id === "towerTest") {
   const cs = appState?.plan?.callsign || appState?.callsign || "JAI127";
   const m = String(cs).toUpperCase().match(/^([A-Z]{3})(\d.*)$/), DG = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "niner"];
-  const spoken = m ? `${m[1] === "JAI" ? "Jachym" : m[1].split("").join(" ")} ${m[2].split("").map(c => /\d/.test(c) ? DG[+c] : c).join(" ")}` : cs;
+  const spoken = m ? `${({ JAI: "Algeria", JAE: "Eurosky" })[m[1]] || m[1].split("").join(" ")} ${m[2].split("").map(c => /\d/.test(c) ? DG[+c] : c).join(" ")}` : cs;
   speechSynthesis?.cancel();
   towerSay(`${spoken}, wind two four zero degrees, eight knots, runway two four, cleared to land.`, false, "tower", true); } });
 if (window.speechSynthesis) {
@@ -2904,7 +2904,8 @@ function atcTick(a) {
   for (const m of a.msgs || []) {
     if (atcSpoken.has(m.id)) continue;
     atcSpoken.add(m.id);
-    if (!atcFirst && a.enabled && towerVoiceOn() && (m.who === "atc" || a.auto)) towerSay(m.say || m.text, m.who === "pilot", atcRole(m.station), false, m.icao || null);
+    // ATC i tvoje odpovědi (pilot má vlastní hlas)
+    if (!atcFirst && a.enabled && towerVoiceOn()) towerSay(m.say || m.text, m.who === "pilot", atcRole(m.station), false, m.icao || null);
   }
   atcFirst = false;
   renderAtcDock(a);
@@ -2918,7 +2919,7 @@ function renderAtcDock(a) {
   const last = [...(a.msgs || [])].reverse().find(m => m.who === "atc");
   const key = JSON.stringify([last?.id, a.options]);
   if (d.dataset.key === key) return; d.dataset.key = key;
-  d.innerHTML = `<div class="atc-st">🎧 ${esc(last?.station || ATC_PHASE_TXT[a.phase] || "ATC")}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}${a.auto ? " · kopilot 🤖" : ""}</div>
+  d.innerHTML = `<div class="atc-st">🎧 ${esc(last?.station || ATC_PHASE_TXT[a.phase] || "ATC")}${a.squawk ? ` · squawk ${esc(a.squawk)}` : ""}</div>
     ${last ? `<div class="atc-msg">${esc(last.text)}</div>` : ""}
     ${(a.options || []).length ? `<div class="atc-opts">${a.options.map((o, i) => `<button type="button" data-atc="${esc(o.id)}"><kbd>${i + 1}</kbd> ${esc(o.label)}</button>`).join("")}</div>` : ""}`;
   d.querySelectorAll("[data-atc]").forEach(b => b.onclick = () => atcRespond(b.dataset.atc));
@@ -2932,7 +2933,6 @@ function renderAtcCard(a) {
   box.innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2 class="section-title" style="margin:0">🎧 ATC <span class="badge">beta</span></h2>
       <label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="atcOn" ${a.enabled ? "checked" : ""}> Zapnout ATC</label></div>
     <div style="display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:8px;font-size:14px">
-      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcAuto" ${a.auto ? "checked" : ""}> Automatický kopilot <span class="muted">(odpovídá sám a nastaví squawk)</span></label>
       <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="atcSb" ${a.simbrief !== false ? "checked" : ""}> Dráhy a procedury podle SimBriefu <span class="muted">(při silném větru se zeptá)</span></label></div>
     ${!a.enabled ? '<p class="muted" style="margin:6px 0 0">Řízení celého letu podle SimBrief plánu: Delivery → Ground → Tower → Departure → Control → Approach → Tower → Ground. ATC mluví (hlasem věže) a ty odpovídáš tlačítky nebo klávesami 1–4. Před letem načti plán ze SimBriefu.</p>'
       : `<p class="muted" style="margin:6px 0 8px">Teď: <b>${esc(ATC_PHASE_TXT[a.phase] || a.phase)}</b>${a.squawk ? ` · squawk <b>${esc(a.squawk)}</b>` : ""}${a.dep_rwy ? ` · odlet RWY <b>${esc(a.dep_rwy)}</b>` : ""}${a.arr_rwy ? ` · přílet RWY <b>${esc(a.arr_rwy)}</b>` : ""}</p>
