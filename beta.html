@@ -2544,6 +2544,15 @@ function renderTowerBar(t) {
   if (top.level === "danger" && top.text !== towerLastDanger) towerBeep();
   towerLastDanger = top.level === "danger" ? top.text : "";
 }
+function accentLabel(icao, mode) {
+  icao = String(icao || "").toUpperCase(); if (!icao || mode === "off") return "(britský)";
+  const p2 = icao.slice(0, 2), p1 = icao[0];
+  const loc = { LE: "španělský", GC: "španělský", ED: "německý", ET: "německý", LO: "německý", LS: "německý", LF: "francouzský", DA: "francouzský", DT: "francouzský", GM: "francouzský" }[p2];
+  if (loc) return `(${loc})`;
+  if (/^EG[PE]/.test(icao)) return "(skotský)"; if (/^(EI|EGA)/.test(icao)) return "(irský)"; if (p1 === "K" || p1 === "P") return "(americký)"; if (p1 === "C") return "(kanadský)";
+  if (["VA", "VE", "VI", "VO"].includes(p2)) return "(indický)"; if (p2 === "FA") return "(jihoafrický)"; if (p1 === "Y" || p2 === "NZ") return "(australský)";
+  return "(britský)";
+}
 function piperBoxHtml() {
   const p = appState?.piper || {};
   if (!appApi?.piper_install) return '<p class="tower-line warn" style="margin:8px 0 0">Přirozené hlasy potřebují novější verzi aplikace.</p>';
@@ -2555,8 +2564,9 @@ function piperBoxHtml() {
     return `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px;font-size:14px"><span>✅ Přirozené hlasy připravené.</span>
       <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="radioFx" ${towerPref("jai_radio_fx", "1") === "1" ? "checked" : ""}> Rádiový efekt</label>
       <label style="display:flex;gap:6px;align-items:center">Přízvuky <select id="accMode" style="padding:4px 6px;font-size:14px">
-        <option value="off" ${prefs.accents === "off" ? "selected" : ""}>britský všude</option><option value="native" ${(prefs.accents || "native") === "native" ? "selected" : ""}>podle země</option>
-        <option value="local" ${prefs.accents === "local" ? "selected" : ""}>podle země + místní (experimentální)</option></select></label></div>
+        <option value="off" ${prefs.accents === "off" ? "selected" : ""}>britský všude</option><option value="native" ${(prefs.accents || "native") !== "off" ? "selected" : ""}>podle země</option>
+        </select></label></div>
+    <p class="muted" style="font-size:13px;margin:6px 0 0">${(() => { const d = appState?.plan?.dep, a = appState?.plan?.arr; return d || a ? `Na tomhle letu: odlet ${esc(d || "?")} ${accentLabel(d, prefs.accents)}, přílet ${esc(a || "?")} ${accentLabel(a, prefs.accents)}.` : "Přízvuk se vybere podle země letiště (Španělsko, Německo, Rakousko, Švýcarsko, Francie a Maghreb mluví s místním přízvukem, Skotsko, Irsko, USA… s rodilým)."; })()}</p>
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">Hlasy na konkrétních letištích ${Object.keys(rules).length ? `(${Object.keys(rules).length})` : ""}</summary>
       <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;font-size:14px">
         ${Object.entries(rules).map(([k, v]) => { const [ap, pos] = k.split(":"); return `<div style="display:flex;gap:8px;align-items:center"><b>${esc(ap)}</b> ${esc(posName[pos] || pos)} → ${esc(voiceName(v))} <button class="link-btn danger" type="button" data-vrdel="${esc(k)}">Odebrat</button></div>`; }).join("") || '<span class="muted">Zatím žádná pravidla.</span>'}
@@ -2618,7 +2628,7 @@ document.addEventListener("click", e => { if (e.target?.id === "towerTest") {
   const m = String(cs).toUpperCase().match(/^([A-Z]{3})(\d.*)$/), DG = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "niner"];
   const spoken = m ? `${({ JAI: "Algeria", JAE: "Eurosky" })[m[1]] || m[1].split("").join(" ")} ${m[2].split("").map(c => /\d/.test(c) ? DG[+c] : c).join(" ")}` : cs;
   speechSynthesis?.cancel();
-  towerSay(`${spoken}, wind two four zero degrees, eight knots, runway two four, cleared to land.`, false, "tower", true); } });
+  towerSay(`${spoken}, wind two four zero degrees, eight knots, runway two four, cleared to land.`, false, "tower", true, appState?.plan?.dep || null); } });
 if (window.speechSynthesis) {
   const refreshVoices = () => { const b = $("towerCard"); if (b) { b.dataset.key = ""; renderTowerCard(appState?.tower); } };
   speechSynthesis.onvoiceschanged = refreshVoices;
@@ -2973,7 +2983,9 @@ function renderFacCard(f) {
     ${it.ARRIVAL ? `<p style="margin:6px 0"><b>STAR:</b> ${esc(list("ARRIVAL", x => x.NAME))}</p>` : ""}
     ${it.APPROACH ? `<p style="margin:6px 0"><b>Přiblížení:</b> ${esc(list("APPROACH", x => `typ ${x.TYPE} RWY ${x.RUNWAY_NUMBER}/${x.RUNWAY_DESIGNATOR}`))}</p>` : ""}
     ${it.TAXI_NAME ? `<p style="margin:6px 0"><b>Pojezdové dráhy:</b> ${esc(list("TAXI_NAME", x => x.NAME))}</p>` : ""}
-    ${(f.errors || []).length ? `<p class="tower-line warn" style="margin-top:6px">Simulátor hlásí ${f.errors.length} chyb(u) – i ty pomůžou, pošli výsledek.</p>` : ""}</details>`;
+    ${f.error ? `<p class="tower-line warn" style="margin-top:6px">${esc(f.error)}</p>` : ""}
+    ${(f.errors || []).length ? `<p class="tower-line warn" style="margin-top:6px">Simulátor hlásí ${f.errors.length} chyb(u) – i ty pomůžou, pošli výsledek.</p>` : ""}
+    ${f.dll ? `<p class="muted" style="font-size:12px;margin:6px 0 0">SimConnect: ${esc(f.dll)}</p>` : ""}</details>`;
   $("facGo").onclick = () => appApi.fac_probe($("facIcao").value).then(() => pollApp());
   if ($("facCopy")) $("facCopy").onclick = async () => { try { await navigator.clipboard.writeText(JSON.stringify(appState.fac, null, 1)); toast("Zkopírováno ✔"); } catch { prompt("Zkopíruj:", JSON.stringify(appState.fac)); } };
 }
