@@ -111,7 +111,9 @@ class Api:
         return {"ok": True}
 
     @guarded
-    def atc_settings(self, auto=None, simbrief=None):
+    def atc_settings(self, auto=None, simbrief=None, tune=None):
+        if tune is not None:
+            core.atc.tune = bool(tune)
         if auto is not None:
             core.atc.auto = bool(auto)
         if simbrief is not None:

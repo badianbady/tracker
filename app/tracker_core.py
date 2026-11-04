@@ -586,6 +586,7 @@ def load_settings():
             state["reg_override"] = d.get("reg")
         TAIL_SEEN.update(d.get("tails") or {})
         atc.auto = False          # automatický kopilot zrušen – odpovídá pilot
+        atc.tune = bool(d.get("atc_tune", False))
         VOICE_PREFS.update(d.get("voices") or {})
         atc.simbrief = bool(d.get("atc_simbrief", True))
     except Exception:
@@ -596,7 +597,7 @@ def _save_settings():
     try:
         with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
             json.dump({"va": state.get("va_choice"), "reg": state.get("reg_override"), "tails": TAIL_SEEN,
-                       "atc_auto": atc.auto, "atc_simbrief": atc.simbrief, "voices": VOICE_PREFS}, f)
+                       "atc_auto": atc.auto, "atc_simbrief": atc.simbrief, "atc_tune": atc.tune, "voices": VOICE_PREFS}, f)
     except Exception:
         pass
 
@@ -1447,19 +1448,49 @@ FAC_DEF = [
 ]
 FAC_DEF_ID, FAC_REQ_BASE = 7700, 7700
 FAC_PENDING = []          # ICAO čekající na dotaz (zpracuje smyčka simulátoru)
-fac_result = {}
+fac_result = {}           # poslední diagnostika (pro kartu v aplikaci)
+FAC_CACHE = {}            # ICAO -> {"status", "items"} – data letišť pro ATC
+FAC_REQS = {}             # id dotazu -> ICAO
 _fac_defined = set()
 
 
-def fac_request(icao):
+def fac_request(icao, diag=True):
     icao = (icao or "").upper().strip()
-    if re.match(r"^[A-Z0-9]{3,4}$", icao):
-        FAC_PENDING.append(icao)
+    if not re.match(r"^[A-Z0-9]{3,4}$", icao):
+        return False
+    if diag:
         dll = fac_result.get("dll")
         fac_result.clear()
         fac_result.update(dll=dll, icao=icao, status="čekám na simulátor", t=time.time(), errors=[], items={}, raw={})
+    elif icao in FAC_CACHE:
         return True
-    return False
+    FAC_CACHE[icao] = {"status": "čekám", "items": {}}
+    FAC_PENDING.append(icao)
+    return True
+
+
+def atc_freq(icao, kind):
+    """Frekvence letiště ze simulátoru: (Hz, název) nebo None. kind: delivery/ground/tower/departure/approach."""
+    items = (FAC_CACHE.get((icao or "").upper()) or {}).get("items", {}).get("FREQUENCY") or []
+    order = {"delivery": ["CLEARANCE", "CPT", "GROUND"], "ground": ["GROUND"], "tower": ["TOWER", "CTAF"],
+             "departure": ["DEPARTURE", "APPROACH"], "approach": ["APPROACH"]}.get(kind, [])
+    for t in order:
+        for f in items:
+            if f.get("TYPE_NAME") == t and f.get("FREQUENCY"):
+                return f["FREQUENCY"], (f.get("NAME") or "").strip()
+    return None
+
+
+def say_freq(hz):
+    mhz = f"{hz / 1e6:.3f}".rstrip("0")
+    if mhz.endswith("."):
+        mhz += "0"
+    a, b = mhz.split(".")
+    return f"{say_digits(a)} decimal {say_digits(b)}"
+
+
+def fmt_freq(hz):
+    return f"{hz / 1e6:.3f}"
 
 
 def _fac_define(sm):
@@ -1514,8 +1545,19 @@ def fac_on_recv(raw):
             fac_result.setdefault("errors", []).append({"exception": exc, "send_id": send_id, "index": idx})
             return
         user_req, uniq, parent, typ, is_list, item_idx, list_size = struct.unpack_from("<7I", raw, 12)
+        icao = FAC_REQS.get(user_req)
+        diag = icao is not None and icao == fac_result.get("icao")
         if dw_id == 29:
-            fac_result["status"] = "hotovo"
+            if icao in FAC_CACHE:
+                FAC_CACHE[icao]["status"] = "hotovo"
+            if diag:
+                fac_result["status"] = "hotovo"
+            return
+        if dw_id == 28 and icao in FAC_CACHE:
+            parsed0 = _fac_parse(typ, raw[40:])
+            if parsed0:
+                FAC_CACHE[icao]["items"].setdefault(parsed0[0], []).append(parsed0[1])
+        if not diag:
             return
         block = raw[40:]
         tname = FAC_TYPES.get(typ, str(typ))
@@ -1570,13 +1612,18 @@ def fac_process(sm):
     while FAC_PENDING:
         icao = FAC_PENDING.pop(0)
         if not hasattr(sm.dll.SimConnect, "SimConnect_RequestFacilityData"):
-            fac_result.update(status="chyba", error="Chybí novější SimConnect.dll z MSFS SDK (starý neumí data letišť).")
+            if icao == fac_result.get("icao"):
+                fac_result.update(status="chyba", error="Chybí novější SimConnect.dll z MSFS SDK (starý neumí data letišť).")
+            FAC_CACHE.pop(icao, None)
             continue
         try:
             _fac_define(sm)
-            r = sm.dll.SimConnect.SimConnect_RequestFacilityData(sm.hSimConnect, ctypes.c_uint(FAC_DEF_ID), ctypes.c_uint(FAC_REQ_BASE + 1),
+            req_id = FAC_REQ_BASE + 1 + len(FAC_REQS)
+            FAC_REQS[req_id] = icao
+            r = sm.dll.SimConnect.SimConnect_RequestFacilityData(sm.hSimConnect, ctypes.c_uint(FAC_DEF_ID), ctypes.c_uint(req_id),
                                                                    ctypes.c_char_p(icao.encode()), ctypes.c_char_p(b""))
-            fac_result["status"] = "dotaz odeslán" + ("" if r == 0 else f" (návratový kód {r})")
+            if icao == fac_result.get("icao"):
+                fac_result["status"] = "dotaz odeslán" + ("" if r == 0 else f" (návratový kód {r})")
         except Exception as e:
             fac_result.update(status="chyba", error=str(e)[:200])
 
@@ -1810,6 +1857,10 @@ def _piper_worker():
         model, spk = resolve_voice(role, icao)
         if not exe or not model or not os.path.exists(model):
             continue
+        vkey = (icao, role, os.path.basename(model), spk)
+        if vkey != getattr(_piper_worker, "last", None):
+            _piper_worker.last = vkey
+            log(f"🔊 Hlas pro {icao or 'trať'} ({role}): {os.path.basename(model)[:-5]}{'' if spk is None else ' #' + str(spk)}")
         out = os.path.join(tempfile.gettempdir(), f"jai_atc_{int(time.time() * 1000)}.wav")
         args = [exe, "--model", model, "--output_file", out, "--length_scale", str(speed)]
         if spk is not None:
@@ -1961,6 +2012,7 @@ class AtcSession:
         self.enabled = False
         self.auto = False         # kopilot odpovídá sám
         self.simbrief = True      # dráhy a procedury podle SimBriefu
+        self.tune = False         # ladit frekvence do COM1 standby
         self.reset()
 
     def reset(self):
@@ -2001,6 +2053,18 @@ class AtcSession:
         if [o["id"] for o in new] != [o["id"] for o in self.options]:
             self.opts_t = time.time()
         self.options = new
+
+    def contact(self, icao, kind):
+        """„Praha Tower one one eight decimal one“ – se skutečnou frekvencí ze simulátoru, když je známá."""
+        role = {"delivery": "Delivery", "ground": "Ground", "tower": "Tower", "departure": "Departure", "approach": "Approach"}[kind]
+        st = station_name(icao, role)
+        fq = atc_freq(icao, kind)
+        if not fq:
+            return st
+        self.next_freq = fmt_freq(fq[0])
+        if self.tune:
+            SIM_CMDS.append(("COM_STBY_RADIO_SET_HZ", int(fq[0])))
+        return f"{st} {say_freq(fq[0])}"
 
     def _rwy_check(self, icao, planned, wdir, wkt, station, cs, what):
         """SimBrief dráha vs. vítr: při silném větru zezadu/zboku nabídne volbu. Vrací True, když čeká na pilota."""
@@ -2064,7 +2128,7 @@ class AtcSession:
                 self.arr_rwy = planned if opt_id == "rwy_keep" else alt
                 self._issue_approach(s)
         elif opt_id == "rb" and self.awaiting == "readback_clr":
-            self.atc(station_name(dep, "Delivery"), f"{cs}, readback correct, contact Ground when ready for pushback.")
+            self.atc(station_name(dep, "Delivery"), f"{cs}, readback correct, when ready for pushback contact {self.contact(dep, 'ground')}.")
             self.phase, self.awaiting = "ground", None
         elif opt_id == "push":
             self.atc(station_name(dep, "Ground"), f"{cs}, pushback and start up approved.")
@@ -2112,6 +2176,8 @@ class AtcSession:
         if (dep, arr) != (getattr(self, "cur_dep", None), getattr(self, "cur_arr", None)):
             prefetch_accent(dep)
             prefetch_accent(arr)
+            fac_request(dep, diag=False)
+            fac_request(arr, diag=False)
         self.cur_dep, self.cur_arr = dep, arr
         on_ground, agl, alt, gs = bool(s.get("on_ground")), s.get("agl") or 0, s.get("alt") or 0, s.get("gs") or 0
         lat, lon = s.get("lat"), s.get("lon")
@@ -2137,7 +2203,7 @@ class AtcSession:
                 self.atc(station_name(dep, "Ground"), f"{cs}, check squawk, should be {say_digits(self.squawk)}.")
             edge = runway_near_edge(lat, lon, runways_near(lat, lon)) if lat is not None else None
             if "taxi_ok" in self.flags and edge:
-                self.atc(station_name(dep, "Ground"), f"{cs}, contact Tower.", key="to_tower")
+                self.atc(station_name(dep, "Ground"), f"{cs}, contact {self.contact(dep, 'tower')}.", key="to_tower")
                 self.phase = "tower_dep"
             if not on_ground:
                 self.phase = "departure"
@@ -2153,7 +2219,7 @@ class AtcSession:
                 elif "to_clr" not in self.flags:
                     self.atc(station_name(dep, "Tower"), f"{cs}, {say_wind(s)}runway {say_runway(self.dep_rwy)}, cleared for takeoff.", key="to_clr")
             if not on_ground and agl > 1500:
-                self.atc(station_name(dep, "Tower"), f"{cs}, contact Departure, good day.", key="to_dep")
+                self.atc(station_name(dep, "Tower"), f"{cs}, contact {self.contact(dep, 'departure')}, good day.", key="to_dep")
                 self.phase = "departure"
         elif ph == "departure":
             if "checkin_dep" not in self.flags:
@@ -2182,7 +2248,7 @@ class AtcSession:
                     self.atc("Control", f"{cs}, descend {say_alt(fl)}{(', ' + star[:-2] + ' ' + say_digits(star[-2:]) + ' arrival') if star else ''}.")
                     self.opts(("wilco", "Wilco", f"Descend {fl}, {cs}."))
                 if d_arr < 40 and alt < 16000:
-                    self.atc("Control", f"{cs}, contact {station_name(arr, 'Approach')}.", key="to_app")
+                    self.atc("Control", f"{cs}, contact {self.contact(arr, 'approach')}.", key="to_app")
                     self.phase, self.options = "approach", []
         elif ph == "approach":
             if "checkin_app" not in self.flags:
@@ -2190,13 +2256,13 @@ class AtcSession:
             else:
                 fin = on_final(lat, lon, s.get("hdg") or 0, agl, rws_big(lat, lon), max_nm=14) if lat is not None else None
                 if fin:
-                    self.atc(station_name(arr, "Approach"), f"{cs}, cleared I L S approach runway {say_runway(fin[1])}, contact Tower.", key="ils")
+                    self.atc(station_name(arr, "Approach"), f"{cs}, cleared I L S approach runway {say_runway(fin[1])}, contact {self.contact(arr, 'tower')}.", key="ils")
                     self.arr_rwy = fin[1]
                     self.phase, self.options = "tower_arr", []
         elif ph == "tower_arr":
             # povolení k přistání dává automatická věž; po přistání předání na Ground
             if s.get("live_landing") and on_ground and gs < 40:
-                self.atc(station_name(arr, "Tower"), f"{cs}, vacate when able, contact Ground.", key="vacate")
+                self.atc(station_name(arr, "Tower"), f"{cs}, vacate when able, contact {self.contact(arr, 'ground')}.", key="vacate")
                 self.phase = "ground_arr"
         elif ph == "ground_arr":
             if not self.options:
@@ -2228,7 +2294,8 @@ class AtcSession:
             self.plan_key = key
 
     def snapshot(self):
-        return {"enabled": self.enabled, "auto": self.auto, "simbrief": self.simbrief, "phase": self.phase, "msgs": self.msgs[-12:], "options": self.options, "squawk": self.squawk,
+        return {"enabled": self.enabled, "auto": self.auto, "simbrief": self.simbrief, "tune": self.tune, "next_freq": getattr(self, "next_freq", None),
+                "freqs": {k: (FAC_CACHE.get(k) or {}).get("status") for k in (getattr(self, "cur_dep", None), getattr(self, "cur_arr", None)) if k}, "phase": self.phase, "msgs": self.msgs[-12:], "options": self.options, "squawk": self.squawk,
                 "dep_rwy": self.dep_rwy, "arr_rwy": self.arr_rwy, "cleared_alt": self.cleared_alt}
 
 
