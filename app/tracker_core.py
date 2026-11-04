@@ -1455,8 +1455,9 @@ def fac_request(icao):
     icao = (icao or "").upper().strip()
     if re.match(r"^[A-Z0-9]{3,4}$", icao):
         FAC_PENDING.append(icao)
+        dll = fac_result.get("dll")
         fac_result.clear()
-        fac_result.update(icao=icao, status="čekám na simulátor", t=time.time(), errors=[], items={}, raw={})
+        fac_result.update(dll=dll, icao=icao, status="čekám na simulátor", t=time.time(), errors=[], items={}, raw={})
         return True
     return False
 
@@ -1529,6 +1530,25 @@ def fac_on_recv(raw):
         fac_result.setdefault("errors", []).append({"parse": str(e)[:120]})
 
 
+def find_new_simconnect_dll():
+    """Novější SimConnect.dll (MSFS SDK) – umí data letišť. Přibalený v aplikaci, nebo z nainstalovaného SDK."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    cands = [os.path.join(base, "simconnect", "SimConnect.dll"), os.path.join(os.path.dirname(sys.executable), "SimConnect.dll")]
+    for env in ("MSFS2024_SDK", "MSFS_SDK"):
+        if os.environ.get(env):
+            cands.append(os.path.join(os.environ[env], "SimConnect SDK", "lib", "SimConnect.dll"))
+    cands += [r"C:\MSFS 2024 SDK\SimConnect SDK\lib\SimConnect.dll", r"C:\MSFS SDK\SimConnect SDK\lib\SimConnect.dll"]
+    for p in cands:
+        try:
+            if os.path.exists(p):
+                d = ctypes.WinDLL(p)
+                getattr(d, "SimConnect_RequestFacilityData")          # má potřebnou funkci?
+                return p
+        except Exception:
+            continue
+    return None
+
+
 def fac_make_simconnect(SimConnectCls):
     """Podtřída knihovny SimConnect, která navíc zachytí data letišť."""
     class JaiSimConnect(SimConnectCls):
@@ -1549,6 +1569,9 @@ def fac_process(sm):
     """Volá smyčka simulátoru: odešle čekající dotazy."""
     while FAC_PENDING:
         icao = FAC_PENDING.pop(0)
+        if not hasattr(sm.dll.SimConnect, "SimConnect_RequestFacilityData"):
+            fac_result.update(status="chyba", error="Chybí novější SimConnect.dll z MSFS SDK (starý neumí data letišť).")
+            continue
         try:
             _fac_define(sm)
             r = sm.dll.SimConnect.SimConnect_RequestFacilityData(sm.hSimConnect, ctypes.c_uint(FAC_DEF_ID), ctypes.c_uint(FAC_REQ_BASE + 1),
@@ -1598,7 +1621,7 @@ def accent_for(icao, mode):
     icao = (icao or "").upper()
     if mode == "off" or not icao:
         return "uk"
-    if mode == "local" and icao[:2] in LOCAL_ACCENT:
+    if mode in ("local", "native") and icao[:2] in LOCAL_ACCENT:
         return LOCAL_ACCENT[icao[:2]]
     if icao.startswith(("EGP", "EGE")):
         return "sco"
@@ -1828,6 +1851,16 @@ def resolve_voice(role, icao):
             _fetch_voice(vid)
             vid, spk = ACCENTS["uk"].get(role) or ACCENTS["uk"]["tower"]
     return os.path.join(PIPER_DIR, VOICE_FILES[vid][0] + ".onnx"), _speaker_id(vid, spk)
+
+
+def prefetch_accent(icao):
+    """Stáhne hlas přízvuku dané země dopředu (např. po načtení plánu)."""
+    if not piper_state.get("installed") or not icao:
+        return
+    acc = accent_for(icao, VOICE_PREFS.get("accents", "native"))
+    for vid, spk in ACCENTS.get(acc, {}).values():
+        if not _voice_ok(vid):
+            _fetch_voice(vid)
 
 
 def piper_say(text, role="tower", speed=1.0, radio=True, interrupt=False, icao=None):
@@ -2076,6 +2109,9 @@ class AtcSession:
                 self.atc("ATC", "Load your SimBrief flight plan to start A T C.", key="noplan")
             return
         cs = self._cs(s)
+        if (dep, arr) != (getattr(self, "cur_dep", None), getattr(self, "cur_arr", None)):
+            prefetch_accent(dep)
+            prefetch_accent(arr)
         self.cur_dep, self.cur_arr = dep, arr
         on_ground, agl, alt, gs = bool(s.get("on_ground")), s.get("agl") or 0, s.get("alt") or 0, s.get("gs") or 0
         lat, lon = s.get("lat"), s.get("lon")
@@ -2703,7 +2739,9 @@ def sim_loop():
             if not waiting_logged:
                 log("Čekám na MSFS…")
                 waiting_logged = True
-            sm = SimConnect()
+            new_dll = find_new_simconnect_dll()
+            sm = SimConnect(library_path=new_dll) if new_dll else SimConnect()
+            fac_result["dll"] = new_dll or "starší (z knihovny)"
             aq = AircraftRequests(sm, _time=0)
             ae = AircraftEvents(sm) if AircraftEvents else None
             log("Připojeno k MSFS ✔")
