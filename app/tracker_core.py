@@ -583,7 +583,7 @@ def load_settings():
             state["va_choice"] = d.get("va")
             state["reg_override"] = d.get("reg")
         TAIL_SEEN.update(d.get("tails") or {})
-        atc.auto = bool(d.get("atc_auto", False))
+        atc.auto = False          # automatický kopilot zrušen – odpovídá pilot
         VOICE_PREFS.update(d.get("voices") or {})
         atc.simbrief = bool(d.get("atc_simbrief", True))
     except Exception:
@@ -1261,7 +1261,7 @@ NATO = {"A": "Alpha", "B": "Bravo", "C": "Charlie", "D": "Delta", "E": "Echo", "
         "J": "Juliett", "K": "Kilo", "L": "Lima", "M": "Mike", "N": "November", "O": "Oscar", "P": "Papa", "Q": "Quebec", "R": "Romeo",
         "S": "Sierra", "T": "Tango", "U": "Uniform", "V": "Victor", "W": "Whiskey", "X": "X-ray", "Y": "Yankee", "Z": "Zulu"}
 DIGITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "niner"]
-TELEPHONY = {"JAI": "Jachym", "TVS": "Skytravel", "SWG": "Sunwing", "RYR": "Ryanair", "WZZ": "Wizz Air", "DLH": "Lufthansa", "EZY": "Easy",
+TELEPHONY = {"JAI": "Algeria", "JAE": "Eurosky", "TVS": "Skytravel", "SWG": "Sunwing", "RYR": "Ryanair", "WZZ": "Wizz Air", "DLH": "Lufthansa", "EZY": "Easy",
              "CSA": "C-S-A", "AFR": "Air France", "BAW": "Speedbird", "KLM": "K-L-M", "UAE": "Emirates", "THY": "Turkish", "DAH": "Air Algerie"}
 
 
