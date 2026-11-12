@@ -1429,6 +1429,106 @@ def tower_alerts(s, others):
     return alerts
 
 
+# ---------------- Discord Rich Presence („Hraje Jachym Air Tracker“) ----------------
+# Vlastní malý klient (bez dalších knihoven): pojmenovaná roura Discordu, handshake a SET_ACTIVITY.
+DISCORD_APP_ID = ""          # Application ID z discord.com/developers (aplikace „Jachym Air Tracker“)
+discord_state = {"enabled": True, "connected": False, "error": None}
+PHASE_EN = {"Na zemi": "Parked", "Pojíždění": "Taxi", "Vzlet": "Takeoff", "Stoupání": "Climb", "Cestovní let": "Cruise",
+            "Klesání": "Descent", "Přiblížení": "Approach", "Přistání": "Landing"}
+
+
+class DiscordIPC:
+    def __init__(self, app_id):
+        self.app_id, self.pipe = app_id, None
+
+    def _send(self, op, payload):
+        data = json.dumps(payload).encode("utf-8")
+        self.pipe.write(struct.pack("<II", op, len(data)) + data)
+        self.pipe.flush()
+        hdr = self.pipe.read(8)
+        if len(hdr) < 8:
+            raise OSError("Discord neodpověděl")
+        _, ln = struct.unpack("<II", hdr)
+        return json.loads(self.pipe.read(ln).decode("utf-8") or "{}")
+
+    def connect(self):
+        for i in range(10):
+            try:
+                self.pipe = open(rf"\\?\pipe\discord-ipc-{i}", "r+b", buffering=0)
+                break
+            except OSError:
+                continue
+        if not self.pipe:
+            raise OSError("Discord neběží")
+        self._send(0, {"v": 1, "client_id": self.app_id})
+
+    def set_activity(self, activity):
+        return self._send(1, {"cmd": "SET_ACTIVITY", "args": {"pid": os.getpid(), "activity": activity}, "nonce": str(time.time())})
+
+    def close(self):
+        try:
+            self.pipe and self.pipe.close()
+        except Exception:
+            pass
+        self.pipe = None
+
+
+def presence_activity(s):
+    plan = s.get("plan") or {}
+    cs = plan.get("callsign") or s.get("callsign") or ""
+    dep, arr = plan.get("dep") or s.get("dep") or "", plan.get("arr") or ""
+    phase = PHASE_EN.get(s.get("phase"), s.get("phase") or "")
+    alt = s.get("alt") or 0
+    state = phase
+    if phase in ("Cruise", "Climb", "Descent") and alt > 10000:
+        state = f"{phase} · FL{round(alt / 100):03d}"
+    elif phase and alt > 0 and phase not in ("Parked", "Taxi"):
+        state = f"{phase} · {round(alt / 100) * 100:,} ft".replace(",", " ")
+    details = " · ".join(x for x in [cs, f"{dep} → {arr}" if dep and arr else dep] if x) or "Na zemi"
+    act = {"details": details[:128], "state": (state or "Connected")[:128],
+           "assets": {"large_image": "logo", "large_text": "Jachym Air Tracker", "small_text": (s.get("aircraft") or "")[:128]},
+           "buttons": [{"label": "Sledovat na mapě", "url": "https://tracker.jachymair.com/" + (f"#/let/live/{cloud.user_id}" if getattr(cloud, "user_id", None) else "")}]}
+    to = (rec_ref.get("rec").takeoff or {}) if rec_ref.get("rec") else {}
+    if to.get("wall") and not to.get("landed"):
+        act["timestamps"] = {"start": int(to["wall"])}
+    return act
+
+
+rec_ref = {}
+
+
+def discord_loop():
+    if not DISCORD_APP_ID:
+        return
+    ipc, last = None, None
+    while True:
+        time.sleep(15)
+        try:
+            with lock:
+                s = dict(state)
+            if not discord_state["enabled"] or not s.get("connected"):
+                if ipc:
+                    ipc.set_activity(None)
+                    ipc.close()
+                    ipc, last = None, None
+                    discord_state["connected"] = False
+                continue
+            if ipc is None:
+                ipc = DiscordIPC(DISCORD_APP_ID)
+                ipc.connect()
+                discord_state.update(connected=True, error=None)
+            act = presence_activity(s)
+            key = json.dumps(act, sort_keys=True)
+            if key != last:
+                ipc.set_activity(act)
+                last = key
+        except Exception as e:
+            discord_state.update(connected=False, error=str(e)[:120])
+            if ipc:
+                ipc.close()
+            ipc, last = None, None
+
+
 # ---------------- Data letišť ze simulátoru (SimConnect facility data) ----------------
 # Diagnostika pro ATC fázi 2: frekvence, SID, STAR, přiblížení a pojezdové dráhy přímo z MSFS.
 FAC_TYPES = {0: "AIRPORT", 1: "RUNWAY", 2: "START", 3: "FREQUENCY", 4: "HELIPAD", 5: "APPROACH", 6: "APPROACH_TRANSITION", 7: "APPROACH_LEG",
@@ -2827,6 +2927,7 @@ def sim_loop():
             if rec is None:
                 global RECORDER
                 rec = FlightRecorder(touchdown_reader=read_td)
+                rec_ref["rec"] = rec
                 RECORDER = rec
             else:
                 rec.touchdown_reader = read_td
@@ -3153,6 +3254,7 @@ def start_background(demo=False):
     threading.Thread(target=upload_loop, daemon=True).start()
     threading.Thread(target=tower_loop, daemon=True).start()
     threading.Thread(target=atc_loop, daemon=True).start()
+    threading.Thread(target=discord_loop, daemon=True).start()
     threading.Thread(target=check_update, daemon=True).start()
 
     def bids_loop():
