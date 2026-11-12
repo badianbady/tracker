@@ -64,12 +64,22 @@
   .hl-card.boo { background: #2A1838; color: #FDE7D3; } .hl-card.boo .hl-k { color: #F9A15A; } .hl-card.boo .hl-ic { background: #E26A12; }
 
   /* ---------- přehrání letu a rozbor přiblížení ---------- */
-  .replay-bar { position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1000; display: flex; gap: 10px; align-items: center;
-    background: var(--card, #fff); color: var(--text, #13241A); border-radius: 14px; padding: 8px 12px; box-shadow: 0 8px 26px rgba(0,0,0,.28); width: min(620px, 92vw); }
-  .replay-bar button { border: 0; background: var(--green); color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 15px; cursor: pointer; flex: none; }
-  .replay-bar #rpClose { background: transparent; color: inherit; font-size: 18px; }
-  .replay-bar input[type=range] { flex: 1; min-width: 80px; accent-color: var(--green); }
-  .rp-hud { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .replay-bar { position: absolute; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 1000; width: min(760px, 94vw);
+    background: rgba(12, 22, 16, .92); color: #F2F7F4; border-radius: 16px; padding: 12px 16px 10px; box-shadow: 0 12px 34px rgba(0,0,0,.35); backdrop-filter: blur(6px);
+    display: flex; flex-direction: column; gap: 8px; }
+  .rp-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .rp-cs { font: 800 22px var(--display, sans-serif); letter-spacing: .02em; } .rp-route { font: 700 17px var(--display, sans-serif); } .rp-ac { font-size: 13px; color: #A9BDB1 !important; }
+  .rp-phase { margin-left: auto; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: rgba(139,227,160,.16); color: #8BE3A0; }
+  .rp-x { background: transparent; border: 0; color: #CFE0D5; font-size: 18px; cursor: pointer; padding: 0 2px; }
+  .rp-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .rp-stats div { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,.05); border-radius: 10px; padding: 6px 4px; }
+  .rp-stats b { font: 800 22px var(--display, sans-serif); font-variant-numeric: tabular-nums; line-height: 1.1; } .rp-stats span { font-size: 11px; color: #A9BDB1; }
+  .rp-ctrl { display: flex; gap: 10px; align-items: center; }
+  .rp-play { border: 0; background: var(--green); color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 16px; cursor: pointer; flex: none; }
+  .rp-track { position: relative; flex: 1; } .rp-track input { width: 100%; accent-color: var(--green); }
+  .rp-mk { position: absolute; top: -14px; transform: translateX(-50%); font-style: normal; font-size: 12px; pointer-events: none; }
+  .replay-bar select { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 4px 6px; }
+  @media (max-width: 560px) { .rp-stats b { font-size: 17px; } .rp-cs { font-size: 18px; } }
   .appr-verdict { font-weight: 700; padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; } .appr-verdict span { font-weight: 400; font-size: 13px; }
   .appr-verdict.ok { background: #DCF5E3; color: #0F6A27; } .appr-verdict.bad { background: #FDE2E2; color: #9B1C1C; }
   .appr-chart { width: 100%; height: auto; display: block; color: inherit; }
@@ -805,7 +815,10 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Ladit frekvence do COM1 standby": "Tune frequencies into COM1 standby", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
+  "a pak": "and then", "🔗 Sdílet": "🔗 Share", "Odkaz zkopírován ✔ Vlož ho na Discord.": "Link copied ✔ Paste it on Discord.", "Čas letu": "Flight time", "Profil letu": "Flight profile", "rychlost GS": "ground speed", "čas letu": "flight time", "vzdálenost": "distance", "Oblačnost (model)": "Clouds (model)", "SIGMET (turbulence, námraza, bouřky)": "SIGMET (turbulence, icing, storms)", "Turbulence": "Turbulence", "Námraza": "Icing",
+  "Bouřky": "Thunderstorms", "Tropická cyklóna": "Tropical cyclone", "Sopečný popel": "Volcanic ash", "Horské vlny": "Mountain waves", "Snížená dohlednost": "Low visibility", "Zakryté hory": "Mountain obscuration",
+  "Prachová bouře": "Dust storm", "Písečná bouře": "Sandstorm", "platí do": "valid until", "Skrýt přistání na mapě": "Hide landing on the map",
+  "(let a známka zůstanou v historii a žebříčku)": "(the flight and score stay in history and the leaderboard)", "Přistání je na mapě skryté.": "Landing hidden from the map.", "Přistání je zase vidět.": "Landing is visible again.", "Ladit frekvence do COM1 standby": "Tune frequencies into COM1 standby", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
   "podle země + místní (experimentální)": "by country + local (experimental)", "Hlasy na konkrétních letištích": "Voices at specific airports", "Zatím žádná pravidla.": "No rules yet.",
   "všechny pozice": "all positions", "Otevřít složku": "Open folder", "@ICAO": "@ICAO", "Hlasy Windows": "Windows voices", "Přirozené hlasy (Piper)": "Natural voices (Piper)", "Stáhnout hlasy": "Download voices", "Rádiový efekt": "Radio effect",
   "Přirozené hlasy potřebují novější verzi aplikace.": "Natural voices need a newer app version.",
@@ -907,7 +920,7 @@ Object.assign(EN, {
 EN_PAT.push(
   [/^⚡ (.+):$/, (m, a) => `⚡ ${tr(a)}:`],
   [/^Teď:$/, "Now:"], [/^Ponechat RWY (\S+) \(SimBrief\)$/, "Keep RWY $1 (SimBrief)"], [/^Dráha (\S+) \(proti větru\)$/, "Runway $1 (into wind)"], [/^· odlet RWY$/, "· departure RWY"], [/^· přílet RWY$/, "· arrival RWY"],
-  [/^(\d+) m (vpravo|vlevo)$/, (m, a, b) => `${a} m ${b === "vpravo" ? "right" : "left"}`], [/^· rychlost na finále (\d+) kt$/, "· final approach speed $1 kt"],
+  [/^výška \(max\. (.+) ft\)$/, "altitude (max $1 ft)"], [/^(\d+) m (vpravo|vlevo)$/, (m, a, b) => `${a} m ${b === "vpravo" ? "right" : "left"}`], [/^· rychlost na finále (\d+) kt$/, "· final approach speed $1 kt"],
   [/^Přistál (\S+)$/, "Landed $1"], [/^Ve vzduchu · přílet (\S+)$/, "Airborne · arriving $1"], [/^Zpožděno · odhad (\S+)$/, "Delayed · est. $1"],
   [/^vzlet (\S+)$/, "departed $1"], [/^odhad (\S+)$/, "est. $1"], [/^skutečně (\S+)$/, "actual $1"],
   [/^Čekej před dráhou (\S+): (\S+) je na dráze\.$/, "Hold short of runway $1: $2 is on the runway."],
@@ -1383,6 +1396,7 @@ function renderTracker(full) {
   renderTowerCard(s.tower);
   renderAtcCard(s.atc);
   renderFacCard(s.fac);
+  if (s.state_error && !$("stateErr")) $("towerCard")?.insertAdjacentHTML("beforebegin", `<div class="card tr-wide tower-line warn" id="stateErr">Aplikace hlásí chybu při posílání stavu (ATC a věž proto nejsou vidět): <code>${esc(s.state_error)}</code>. Pošli to prosím autorovi.</div>`);
   const sc = $("saveCard");
   if (sc) {
     const st = s.flight_state || "idle";
@@ -1564,7 +1578,7 @@ function initMap() {
   L.control.layers({ "Mapa": osm, "Satelit": sat }, { "Letiště": airportLayer, "Moje poslední přistání": tdLayer }, { position: "topright" }).addTo(map);
   map.on("moveend", () => { drawAirports(); scheduleMetar(); });
   settingsControl().addTo(map);
-  updateRadar();
+  updateRadar(); updateClouds(); updateSigmet();
   map.on("popupopen", e => e.popup.getElement()?.querySelectorAll(".rt-box").forEach(b => {
     b.onclick = () => { map.closePopup(); location.hash = "#/linka/" + encodeURIComponent(b.dataset.route); };
   }));
@@ -1633,7 +1647,9 @@ function settingsControl() {
         <option value="kompaktni" ${settings.apStyle === "kompaktni" ? "selected" : ""}>Kompaktně (kód a barva podmínek)</option>
         <option value="body" ${settings.apStyle === "body" ? "selected" : ""}>Jen body</option></select>
       <label class="chk"><input type="checkbox" id="msWx" ${settings.weather ? "checked" : ""}> Počasí u letišť</label>
-      <label class="chk"><input type="checkbox" id="msRadar" ${settings.radar ? "checked" : ""}> Radar srážek</label></div>`;
+      <label class="chk"><input type="checkbox" id="msRadar" ${settings.radar ? "checked" : ""}> Radar srážek</label>
+      <label class="chk"><input type="checkbox" id="msClouds" ${settings.clouds ? "checked" : ""}> Oblačnost (model)</label>
+      <label class="chk"><input type="checkbox" id="msSigmet" ${settings.sigmet ? "checked" : ""}> SIGMET (turbulence, námraza, bouřky)</label></div>`;
     L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d);
     d.querySelector("button").onclick = () => d.classList.toggle("open");
     d.querySelector("#msTrail").oninput = e => { settings.trail = +e.target.value; d.querySelector("#msTrailV").textContent = settings.trail; saveSettings(); renderLive(); redrawFocus(); };
@@ -1641,6 +1657,8 @@ function settingsControl() {
     d.querySelector("#msWx").onchange = e => { settings.weather = e.target.checked; saveSettings(); drawAirports(); };
     d.querySelector("#msAp").onchange = e => { settings.apStyle = e.target.value; saveSettings(); drawAirports(); };
     d.querySelector("#msRadar").onchange = e => { settings.radar = e.target.checked; saveSettings(); updateRadar(); };
+    d.querySelector("#msClouds").onchange = e => { settings.clouds = e.target.checked; saveSettings(); updateClouds(); };
+    d.querySelector("#msSigmet").onchange = e => { settings.sigmet = e.target.checked; saveSettings(); updateSigmet(); };
     return d;
   };
   return c;
@@ -1664,6 +1682,51 @@ async function updateRadar() {
     }).addTo(map);
   } catch { /* radar je jen doplněk */ }
   radarTimer = setInterval(updateRadar, 10 * 60 * 1000);
+}
+
+/* ---------- oblačnost (LibreWXR, model ECMWF IFS, CC BY 4.0) ---------- */
+let cloudLayer = null, cloudTimer = null;
+async function updateClouds() {
+  if (!map) return;
+  if (cloudLayer) { map.removeLayer(cloudLayer); cloudLayer = null; }
+  clearInterval(cloudTimer);
+  if (!settings.clouds) return;
+  try {
+    const d = await (await fetch("https://api.librewxr.net/public/weather-maps.json")).json();
+    const frame = (d.satellite?.infrared || []).slice(-1)[0];
+    if (!frame) return;
+    cloudLayer = L.tileLayer(`${d.host || "https://api.librewxr.net"}${frame.path}/256/{z}/{x}/{y}/0/0_0.png`, {
+      opacity: 0.55, maxNativeZoom: 7, maxZoom: 19, zIndex: 340,
+      attribution: 'Oblačnost &copy; <a href="https://librewxr.pages.dev" target="_blank" rel="noopener">LibreWXR</a> (ECMWF IFS, CC BY 4.0)'
+    }).addTo(map);
+  } catch { /* doplněk */ }
+  cloudTimer = setInterval(updateClouds, 30 * 60 * 1000);
+}
+
+/* ---------- SIGMET (aviationweather.gov přes funkci trackeru) ---------- */
+let sigmetLayer = null, sigmetTimer = null;
+const SIG_STYLE = { TURB: ["#F59E0B", "Turbulence"], ICE: ["#38BDF8", "Námraza"], TS: ["#EF4444", "Bouřky"], CONVECTIVE: ["#EF4444", "Bouřky"], TC: ["#EF4444", "Tropická cyklóna"],
+  VA: ["#A855F7", "Sopečný popel"], MTW: ["#A16207", "Horské vlny"], IFR: ["#64748B", "Snížená dohlednost"], MTN: ["#A16207", "Zakryté hory"], DS: ["#B45309", "Prachová bouře"], SS: ["#B45309", "Písečná bouře"] };
+async function updateSigmet() {
+  if (!map) return;
+  if (sigmetLayer) { map.removeLayer(sigmetLayer); sigmetLayer = null; }
+  clearInterval(sigmetTimer);
+  if (!settings.sigmet) return;
+  try {
+    const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/sigmet`, { headers: { apikey: CFG.SUPABASE_KEY } });
+    const list = await r.json();
+    if (!Array.isArray(list)) return;
+    sigmetLayer = L.layerGroup().addTo(map);
+    const fl = v => v == null ? "?" : v >= 1000 ? "FL" + String(Math.round(v / 100)).padStart(3, "0") : v === 0 ? "SFC" : "FL" + String(v).padStart(3, "0");
+    for (const sg of list) {
+      const key = Object.keys(SIG_STYLE).find(k => String(sg.hazard).toUpperCase().includes(k)) || "TURB";
+      const [col, name] = SIG_STYLE[key];
+      const tip = `<b>${esc(tr(name))}</b> ${esc(sg.qualifier || "")}<br>${fl(sg.base)} – ${fl(sg.top)}${sg.fir ? `<br>${esc(sg.fir)}` : ""}${sg.to ? `<br>${tr("platí do")} ${hm(sg.to * (sg.to < 1e12 ? 1000 : 1))}` : ""}`;
+      L.polygon(sg.coords, { color: col, weight: 1.5, fillColor: col, fillOpacity: .14, dashArray: "5 4" }).bindTooltip(tip, { sticky: true })
+        .bindPopup(`${tip}<pre class="wx-raw" style="white-space:pre-wrap;font-size:11px;margin-top:6px">${esc(sg.raw)}</pre>`, { maxWidth: 380 }).addTo(sigmetLayer);
+    }
+  } catch { /* doplněk */ }
+  sigmetTimer = setInterval(updateSigmet, 10 * 60 * 1000);
 }
 
 /* ---------- body trasy ---------- */
@@ -1816,9 +1879,13 @@ function landingToast(f) {
   $("toasts").prepend(t);
   setTimeout(() => t.remove(), 15000);
 }
+let recentNoHide = false;
 async function refreshRecent() {
-  const { data } = await sb.from("flights").select("id, user_id, callsign, arr_icao, score, fpm, g, landed_at, profiles!flights_user_id_fkey(username)")
-    .order("landed_at", { ascending: false }).limit(6);
+  const sel = "id, user_id, callsign, arr_icao, score, fpm, g, landed_at, profiles!flights_user_id_fkey(username)";
+  let q = sb.from("flights").select(sel).order("landed_at", { ascending: false }).limit(6);
+  if (!recentNoHide) q = q.eq("hide_landing", false);
+  let { data, error } = await q;
+  if (error && !recentNoHide) { recentNoHide = true; ({ data } = await sb.from("flights").select(sel).order("landed_at", { ascending: false }).limit(6)); }
   if (data?.length) {
     if (lastFlightId !== null) data.filter(f => f.id > lastFlightId).reverse().forEach(landingToast);
     lastFlightId = Math.max(lastFlightId ?? 0, ...data.map(f => f.id));
@@ -2152,7 +2219,8 @@ function redrawFocus(fit) {
   }
   const pts = Array.isArray(f.path) ? f.path : [];
   if (pts.length > 1) drawAltTrail(L.layerGroup().addTo(focusLayer), pts, settings.trail + 1, trailRenderer);
-  if (f.td_lat != null) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true, f.fpm), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
+  const hideTd = f.hide_landing && !(me && me.user.id === f.user_id);        // pilot přistání skryl
+  if (f.td_lat != null && !hideTd) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true, f.fpm), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
   if (pts.length) L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(focusLayer);
   if (fit) {
     const all = pts.map(p => [p[0], p[1]]).concat(fixes.map(x => [x[0], x[1]]));
@@ -2224,10 +2292,11 @@ function renderFlightPanel() {
       : `${d.points != null ? `<div class="fp-sec"><h4>Body za let: ${nf.format(d.points)}</h4>
           <div class="muted" style="font-size:14px">${Object.entries(d.points_detail || {}).map(([k, v]) => `${{ let: "let z rotace", dochvilnost: "dochvilnost", pristani: "přistání", spokojenost: "spokojenost cestujících", jina_varianta_typu: "jiný typ z rodiny", volny_let: "volný let" }[k] || k}: <b>${typeof v === "number" && v > 0 ? "+" : ""}${esc(String(v))}</b>`).join(" · ")}</div>
           ${d.rotation_id ? `<div style="font-size:14px;margin-top:4px">Let z rotace · ${d.delay_min != null ? (d.delay_min <= 0 ? "včas" : `zpoždění ${d.delay_min} min`) : ""}${d.pax_sat != null ? ` · spokojenost cestujících ${d.pax_sat} %` : ""} · <a href="#/briefing/${d.rotation_id}/${d.leg_idx || 0}">briefing</a></div>` : ""}</div>` : ""}
-        ${(d.path || []).length > 5 ? `<div class="fp-sec"><button class="btn" id="fpReplay" style="width:100%">▶ Přehrát let</button></div>` : ""}
+        <div class="fp-sec" style="display:flex;gap:8px">${(d.path || []).length > 5 ? `<button class="btn" id="fpReplay" style="flex:1">▶ Přehrát let</button>` : ""}<button class="btn ghost" id="fpShare" style="flex:1">🔗 Sdílet</button></div>
         ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
+    ${!live ? flightProfileHtml(d) : ""}
     ${!live ? flightWxHtml(d) : ""}
     ${!live ? approachHtml(d) : ""}
     ${d.route ? `<div class="fp-sec"><h4>Trasa</h4><div class="plan-route" style="margin:0">${esc(d.route)}</div></div>` : ""}
@@ -2235,9 +2304,13 @@ function renderFlightPanel() {
     ${!live && d.crew_status ? `<div class="fp-sec muted" style="font-size:13px">Crew center: ${esc(d.crew_status)}</div>` : ""}
     <div class="fp-sec"><h4>Fotky z letu</h4><div id="fpPhotos"><p class="muted" style="margin:0">Načítám…</p></div></div>
     ${!live ? `<div class="fp-sec"><h4>Reakce</h4><div id="fpReact"></div></div>` : ""}
+    ${!live && me && me.user.id === d.user_id && d.fpm != null ? `<div class="fp-sec"><label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="fpHideTd" ${d.hide_landing ? "checked" : ""}> Skrýt přistání na mapě <span class="muted" style="font-size:12px">(let a známka zůstanou v historii a žebříčku)</span></label></div>` : ""}
     ${!live && me && (me.user.id === d.user_id || me.profile?.is_admin) ? `<div class="fp-sec"><button class="link-btn danger" id="fpDelete">Smazat tento let</button></div>` : ""}`;
   $("fpBack").onclick = closeFocus;
   if ($("fpReplay")) $("fpReplay").onclick = () => startReplay(focus.data);
+  if ($("fpShare")) $("fpShare").onclick = () => shareFlight(live ? { live: d.user_id } : { let: d.id });
+  if ($("fpHideTd")) $("fpHideTd").onchange = async e => { const { error } = await sb.from("flights").update({ hide_landing: e.target.checked }).eq("id", d.id);
+    if (error) { alert("Nepodařilo se uložit: " + error.message); e.target.checked = !e.target.checked; return; } d.hide_landing = e.target.checked; toast(e.target.checked ? "Přistání je na mapě skryté." : "Přistání je zase vidět."); refreshRecent(); };
   friendButton($("fpFriend"), d.user_id, d.profiles?.username);
   if (!live) renderReactions($("fpReact"), d.id);
   renderFlightPhotos($("fpPhotos"), d, live);
@@ -2824,9 +2897,19 @@ function startReplay(f) {
   const icon = deg => L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17], html: `<div style="transform:rotate(${deg}deg);width:34px;height:34px">${planeIcon(0, f.va === "JAI", true).options.html}</div>` });
   const mk = L.marker([pts[0][0], pts[0][1]], { icon: icon(0), zIndexOffset: 3000, interactive: false }).addTo(layer);
   const bar = document.createElement("div"); bar.className = "replay-bar";
-  bar.innerHTML = `<button id="rpPlay" aria-label="Přehrát">⏸</button><input type="range" id="rpPos" min="0" max="1000" value="0" aria-label="Pozice">
-    <select id="rpSpeed" aria-label="Rychlost">${[10, 30, 60, 120, 300].map(x => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x}×</option>`).join("")}</select>
-    <span id="rpHud" class="rp-hud"></span><button id="rpClose" aria-label="Zavřít">✕</button>`;
+  const tko = Math.max(0, pts.findIndex(p => (p[2] || 0) > 0)), lnd = pts.length - 1 - [...pts].reverse().findIndex(p => (p[2] || 0) > 0);
+  const mark = i => (times[Math.max(0, Math.min(times.length - 1, i))] / T * 100).toFixed(2);
+  bar.innerHTML = `<div class="rp-head"><span class="rp-cs">${esc(f.callsign || f.flight_no || "")}</span>
+      <span class="rp-route">${esc(f.dep_icao || "?")} <span class="muted">→</span> ${esc(f.arr_icao || "?")}</span>
+      <span class="rp-ac muted">${esc([f.ac_icao, f.reg].filter(Boolean).join(" · ") || (f.aircraft || ""))}</span>
+      <span class="rp-phase" id="rpPhase"></span><button id="rpClose" class="rp-x" aria-label="Zavřít">✕</button></div>
+    <div class="rp-stats"><div><b id="rpAlt">–</b><span>${esc(tr("Výška ft"))}</span></div><div><b id="rpGs">–</b><span>GS kt</span></div><div><b id="rpVs">–</b><span>V/S fpm</span></div>
+      <div><b id="rpHdg">–</b><span>${esc(tr("Kurz"))}</span></div><div><b id="rpTime">0:00</b><span>${esc(tr("Čas letu"))}</span></div></div>
+    <div class="rp-ctrl"><button id="rpPlay" class="rp-play" aria-label="Přehrát">⏸</button>
+      <div class="rp-track"><input type="range" id="rpPos" min="0" max="1000" value="0" aria-label="Pozice">
+        <i class="rp-mk" style="left:${mark(tko)}%" title="${esc(tr("Vzlet"))}">🛫</i><i class="rp-mk" style="left:${mark(lnd)}%" title="${esc(tr("Přistání"))}">🛬</i></div>
+      <select id="rpSpeed" aria-label="Rychlost">${[10, 30, 60, 120, 300].map(x => `<option value="${x}" ${x === 60 ? "selected" : ""}>${x}×</option>`).join("")}</select></div>
+    <span id="rpHud" hidden></span>`;
   $("view-map").appendChild(bar);
   replay = { raf: 0, layer, bar, t: 0, playing: true, last: performance.now() };
   const hdgBetween = (a, b) => { const y = Math.sin((b[1] - a[1]) * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180), x = Math.cos(a[0] * Math.PI / 180) * Math.sin(b[0] * Math.PI / 180) - Math.sin(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.cos((b[1] - a[1]) * Math.PI / 180); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
@@ -2841,8 +2924,12 @@ function startReplay(f) {
     mk.setLatLng([lat, lon]); mk.setIcon(icon(lastHdg));
     done.setLatLngs(pts.slice(0, idx + 1).map(p => [p[0], p[1]]).concat([[lat, lon]]));
     const gs = timed && a[4] != null ? Math.round((a[4] || 0) + ((b[4] ?? a[4]) - (a[4] || 0)) * k) : null;
+    const dtp = (times[idx + 1] - times[idx]) || 0, vs = dtp > 0 && (a[2] || 0) > 0 && (b[2] || 0) > 0 ? Math.round(((b[2] || 0) - (a[2] || 0)) / dtp * 60 / 10) * 10 : 0;
     const tt = Math.round(replay.t), hh = Math.floor(tt / 3600), mm = Math.floor(tt % 3600 / 60), ss = tt % 60;
-    $("rpHud").textContent = `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")} · ${alt > 0 ? nf.format(alt) + " ft" : tr("Na zemi")}${gs != null ? ` · ${gs} kt` : ""}`;
+    $("rpAlt").textContent = alt > 0 ? nf.format(alt) : "–"; $("rpGs").textContent = gs != null ? gs : "–";
+    $("rpVs").textContent = alt > 0 ? (vs > 0 ? "+" : "") + nf.format(vs) : "–"; $("rpHdg").textContent = String(Math.round(lastHdg)).padStart(3, "0") + "°";
+    $("rpTime").textContent = `${hh}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+    $("rpPhase").textContent = tr(alt <= 0 ? ((gs ?? 0) > 3 ? "Pojíždění" : "Na zemi") : vs > 300 ? "Stoupání" : vs < -300 ? (alt < 4000 + ((pts[pts.length - 1][2]) || 0) ? "Přiblížení" : "Klesání") : "Cestovní let");
     $("rpPos").value = Math.round(replay.t / T * 1000);
     if (replay.follow !== false && !map.getBounds().pad(-0.2).contains([lat, lon])) map.panTo([lat, lon], { animate: false });
   };
@@ -2858,6 +2945,38 @@ function startReplay(f) {
   map.on("dragstart", () => { if (replay) replay.follow = false; });
   map.setView([pts[0][0], pts[0][1]], Math.max(map.getZoom(), 9));
   replay.raf = requestAnimationFrame(loop);
+}
+
+/* ---------- sdílení letu (odkaz s náhledem pro Discord) ---------- */
+async function shareFlight(q) {
+  const base = CFG.SHARE_URL || "";
+  const url = base ? `${base}?${q.let ? "let=" + q.let : "live=" + q.live}` : `${location.origin}${location.pathname}#/let/${q.let ? q.let : "live/" + q.live}`;
+  try { if (navigator.share && /Mobi/i.test(navigator.userAgent)) { await navigator.share({ title: "JAI Tracker", url }); return; } } catch { }
+  try { await navigator.clipboard.writeText(url); toast("Odkaz zkopírován ✔ Vlož ho na Discord."); } catch { prompt("Zkopíruj odkaz:", url); }
+}
+
+/* ---------- profil letu (výška a rychlost celého letu) ---------- */
+function flightProfileHtml(f) {
+  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p.length >= 3);
+  if (pts.length < 6) return "";
+  const timed = pts.filter(p => p.length >= 4).length > pts.length * .8;
+  let xs;
+  if (timed) xs = pts.map(p => p[3] || 0);
+  else { xs = [0]; for (let i = 1; i < pts.length; i++) xs.push(xs[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], (pts[i][1] - pts[i - 1][1]) * Math.cos(pts[i][0] * Math.PI / 180))); }
+  const W = 320, H = 130, P = { l: 30, r: 28, t: 8, b: 18 }, maxX = xs[xs.length - 1] || 1;
+  const maxA = Math.max(5000, ...pts.map(p => p[2] || 0)) * 1.08, maxS = Math.max(200, ...pts.map(p => p[4] || 0)) * 1.1;
+  const x = v => P.l + v / maxX * (W - P.l - P.r), y = v => P.t + (1 - v / maxA) * (H - P.t - P.b), ys = v => P.t + (1 - v / maxS) * (H - P.t - P.b);
+  const altPath = pts.map((p, i) => `${i ? "L" : "M"}${x(xs[i]).toFixed(1)},${y(p[2] || 0).toFixed(1)}`).join("");
+  const area = `${altPath} L${x(maxX).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
+  const spd = timed ? pts.map((p, i) => `${i ? "L" : "M"}${x(xs[i]).toFixed(1)},${ys(p[4] || 0).toFixed(1)}`).join("") : "";
+  const top = Math.round(Math.max(...pts.map(p => p[2] || 0)) / 100) * 100;
+  const grid = [0, .25, .5, .75, 1].map(fr => { const v = Math.round(maxA / 1.08 * fr / 1000) * 1000; return `<line x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" opacity=".1"/><text x="${P.l - 4}" y="${y(v) + 3}" text-anchor="end" font-size="9" fill="currentColor" opacity=".6">${v ? v / 1000 + "k" : "0"}</text>`; }).join("");
+  const tlab = timed ? [0, .5, 1].map(fr => `<text x="${x(maxX * fr)}" y="${H - 5}" text-anchor="middle" font-size="9" fill="currentColor" opacity=".6">${Math.floor(maxX * fr / 3600)}:${String(Math.floor(maxX * fr % 3600 / 60)).padStart(2, "0")}</text>`).join("") : "";
+  return `<div class="fp-sec"><h4>Profil letu</h4>
+    <svg viewBox="0 0 ${W} ${H}" class="appr-chart" role="img" aria-label="Profil výšky a rychlosti">${grid}${tlab}
+      <path d="${area}" fill="var(--green)" opacity=".18"/><path d="${altPath}" stroke="var(--green)" stroke-width="2" fill="none"/>
+      ${spd ? `<path d="${spd}" stroke="#2563EB" stroke-width="1.4" fill="none" opacity=".8"/>` : ""}</svg>
+    <div class="appr-legend"><span><i style="background:var(--green)"></i>výška (max. ${nf.format(top)} ft)</span>${spd ? '<span><i style="background:#2563EB"></i>rychlost GS</span>' : ""}<span class="muted">${timed ? "čas letu" : "vzdálenost"}</span></div></div>`;
 }
 
 /* ---------- počasí v době letu ---------- */
