@@ -1431,7 +1431,7 @@ def tower_alerts(s, others):
 
 # ---------------- Discord Rich Presence („Hraje Jachym Air Tracker“) ----------------
 # Vlastní malý klient (bez dalších knihoven): pojmenovaná roura Discordu, handshake a SET_ACTIVITY.
-DISCORD_APP_ID = ""          # Application ID z discord.com/developers (aplikace „Jachym Air Tracker“)
+DISCORD_APP_ID = "1570732052268064809"          # Application ID z discord.com/developers (aplikace „Jachym Air Tracker“)
 discord_state = {"enabled": True, "connected": False, "error": None}
 PHASE_EN = {"Na zemi": "Parked", "Pojíždění": "Taxi", "Vzlet": "Takeoff", "Stoupání": "Climb", "Cestovní let": "Cruise",
             "Klesání": "Descent", "Přiblížení": "Approach", "Přistání": "Landing"}
