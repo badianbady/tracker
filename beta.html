@@ -92,6 +92,8 @@
   .cat-chip { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; color: #fff; }
   .cat-chip.cat-VFR { background: #16A34A; } .cat-chip.cat-MVFR { background: #2563EB; } .cat-chip.cat-IFR { background: #DC2626; } .cat-chip.cat-LIFR { background: #C026D3; }
 
+  .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 14px; } .kv2 dt { color: var(--muted); } .kv2 dd { margin: 0; font-weight: 600; }
+
   /* ---------- plánované lety a odznaky ---------- */
   .plan-grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .plan-grid label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
@@ -504,6 +506,7 @@
     <a href="#/rozpis" data-r="rozpis" id="navRoster" style="display:none">Rozpis</a>
     <a href="#/obchod" data-r="obchod" id="navShop" style="display:none">Obchod</a>
     <a href="#/plany" data-r="plany">Plány</a>
+    <a href="#/brief" data-r="brief">Briefing</a>
     <a href="#/fotky" data-r="fotky">Fotky</a>
     <a href="#/pratele" data-r="pratele" id="navFriends">Přátelé</a>
     <a href="#/sprava" data-r="sprava" id="navAdmin" style="display:none">Správa</a>
@@ -539,6 +542,7 @@
   <section class="view" id="view-rozpis"><div class="page" id="rozpis"></div></section>
   <section class="view" id="view-rotace"><div class="page" id="rotace"></div></section>
   <section class="view" id="view-plany"><div class="page" id="plany"></div></section>
+  <section class="view" id="view-brief"><div class="page" id="sbbrief"></div></section>
   <section class="view" id="view-obchod"><div class="page" id="obchod"></div></section>
   <section class="view" id="view-briefing"><div class="page" id="briefing"></div></section>
   <section class="view" id="view-fotky"><div class="page" id="fotky"></div></section>
@@ -549,6 +553,11 @@
 </main>
 
 <script src="config.js"></script>
+<script>
+  // pojistka: když se config.js nenačte (např. překlep), web běží dál s výchozím nastavením
+  window.JAI_CONFIG = Object.assign({ SUPABASE_URL: "https://wfmrynrtzrfaqvlwtabz.supabase.co", SUPABASE_KEY: "sb_publishable_onhmEyLR0N0dPCOjNTyVig_ZR4VU2hh",
+    APP_NAME: "JAI Tracker", CONTACT_EMAIL: "support.jachymair@gmail.com", GITHUB_REPO: "badianbady/tracker", TRACKER_ZIP: "JachymAir_Tracker.zip" }, window.JAI_CONFIG || {});
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
@@ -815,7 +824,11 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "🔗 Sdílet": "🔗 Share", "Odkaz zkopírován ✔ Vlož ho na Discord.": "Link copied ✔ Paste it on Discord.", "Čas letu": "Flight time", "Profil letu": "Flight profile", "rychlost GS": "ground speed", "čas letu": "flight time", "vzdálenost": "distance", "Oblačnost (model)": "Clouds (model)", "SIGMET (turbulence, námraza, bouřky)": "SIGMET (turbulence, icing, storms)", "Turbulence": "Turbulence", "Námraza": "Icing",
+  "a pak": "and then", "Briefing ze SimBriefu": "SimBrief briefing", "Načíst briefing": "Load briefing", "Uživatelské jméno nebo Pilot ID v SimBriefu": "SimBrief username or Pilot ID",
+  "Načti svůj poslední plán ze SimBriefu: počasí, vítr a teplota ve výšce, odhad turbulence, varování SIGMET po trase, palivo a váhy. Funguje pro jakýkoli let.": "Load your latest SimBrief plan: weather, winds and temperature aloft, turbulence estimate, SIGMETs along the route, fuel and weights. Works for any flight.",
+  "Plán se nepodařilo načíst:": "Couldn't load the plan:", "Výška a vítr": "Altitude and wind", "Cestovní hladina": "Cruise level", "Průměrný vítr": "Average wind", "čelní": "headwind", "zadní": "tailwind",
+  "Odchylka od ISA": "ISA deviation", "Tropopauza": "Tropopause", "Palivo": "Fuel", "Na stání (ramp)": "Ramp", "Spotřeba na trať": "Trip burn", "Rezerva + záloha": "Reserve + alternate",
+  "Při přistání": "At landing", "Váhy": "Weights", "po trase": "along the route", "střih větru": "wind shear", "Teď": "Now", "🔗 Sdílet": "🔗 Share", "Odkaz zkopírován ✔ Vlož ho na Discord.": "Link copied ✔ Paste it on Discord.", "Čas letu": "Flight time", "Profil letu": "Flight profile", "rychlost GS": "ground speed", "čas letu": "flight time", "vzdálenost": "distance", "Oblačnost (model)": "Clouds (model)", "SIGMET (turbulence, námraza, bouřky)": "SIGMET (turbulence, icing, storms)", "Turbulence": "Turbulence", "Námraza": "Icing",
   "Bouřky": "Thunderstorms", "Tropická cyklóna": "Tropical cyclone", "Sopečný popel": "Volcanic ash", "Horské vlny": "Mountain waves", "Snížená dohlednost": "Low visibility", "Zakryté hory": "Mountain obscuration",
   "Prachová bouře": "Dust storm", "Písečná bouře": "Sandstorm", "platí do": "valid until", "Skrýt přistání na mapě": "Hide landing on the map",
   "(let a známka zůstanou v historii a žebříčku)": "(the flight and score stay in history and the leaderboard)", "Přistání je na mapě skryté.": "Landing hidden from the map.", "Přistání je zase vidět.": "Landing is visible again.", "Ladit frekvence do COM1 standby": "Tune frequencies into COM1 standby", "✅ Přirozené hlasy připravené.": "✅ Natural voices ready.", "Přízvuky": "Accents", "britský všude": "British everywhere", "podle země": "by country",
@@ -1419,7 +1432,7 @@ function renderTracker(full) {
 }
 
 /* ---------- směrování ---------- */
-const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod", "rotace", "plany"];
+const views = ["map", "zebricek", "piloti", "pilot", "ucet", "tracker", "novinky", "sprava", "noveheslo", "pratele", "chat", "soukromi", "pravidla", "fotky", "rozpis", "briefing", "obchod", "rotace", "plany", "brief"];
 async function router() {
   const parts = location.hash.replace(/^#\/?/, "").split("/");
   const r = parts[0] || "map";
@@ -1450,6 +1463,7 @@ async function router() {
   if (view === "obchod") renderShop();
   if (view === "rotace") renderTrip(+parts[1]);
   if (view === "plany") renderPlans();
+  if (view === "brief") renderSbBrief();
 }
 window.addEventListener("hashchange", router);
 
@@ -2945,6 +2959,113 @@ function startReplay(f) {
   map.on("dragstart", () => { if (replay) replay.follow = false; });
   map.setView([pts[0][0], pts[0][1]], Math.max(map.getZoom(), 9));
   replay.raf = requestAnimationFrame(loop);
+}
+
+/* ---------- briefing ze SimBriefu (pro jakýkoli let) ---------- */
+let sbMap = null;
+const sbNum = v => Number(v || 0);
+async function renderSbBrief() {
+  const el = $("sbbrief");
+  const user = (localStorage.getItem("jai_sb_user") || me?.profile?.simbrief_user || "").trim();
+  el.innerHTML = `<h1 class="page-title">Briefing ze SimBriefu</h1>
+    <p class="lead">Načti svůj poslední plán ze SimBriefu: počasí, vítr a teplota ve výšce, odhad turbulence, varování SIGMET po trase, palivo a váhy. Funguje pro jakýkoli let.</p>
+    <form class="card" id="sbbForm" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <label style="display:flex;flex-direction:column;gap:4px;font-weight:600">Uživatelské jméno nebo Pilot ID v SimBriefu<input id="sbbUser" value="${esc(user)}" required maxlength="40" placeholder="např. jachym12"></label>
+      <button class="btn">Načíst briefing</button><span id="sbbMsg" class="muted"></span></form>
+    <div id="sbbOut"></div>`;
+  $("sbbForm").onsubmit = e => { e.preventDefault(); const u = $("sbbUser").value.trim(); localStorage.setItem("jai_sb_user", u); loadSbBrief(u); };
+  if (user) loadSbBrief(user);
+}
+async function loadSbBrief(user) {
+  $("sbbMsg").textContent = tr("Načítám…");
+  let ofp;
+  try {
+    const q = /^\d+$/.test(user) ? `userid=${user}` : `username=${encodeURIComponent(user)}`;
+    try { const r = await fetch(`https://www.simbrief.com/api/xml.fetcher.php?${q}&json=1`); ofp = await r.json(); }
+    catch { const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/simbrief?${q}`, { headers: { apikey: CFG.SUPABASE_KEY } }); ofp = await r.json(); }   // záloha přes funkci trackeru
+    if (ofp?.fetch?.status && !/success/i.test(ofp.fetch.status)) throw new Error(ofp.fetch.status);
+  } catch (e) { $("sbbMsg").textContent = tr("Plán se nepodařilo načíst:") + " " + (e.message || e); return; }
+  $("sbbMsg").textContent = "";
+  const g = ofp.general || {}, o = ofp.origin || {}, d = ofp.destination || {}, a = ofp.alternate || {}, t = ofp.times || {}, fu = ofp.fuel || {}, w = ofp.weights || {}, ac = ofp.aircraft || {};
+  const units = (ofp.params?.units || "kgs").toLowerCase().startsWith("lb") ? "lb" : "kg";
+  const fixes = (Array.isArray(ofp.navlog?.fix) ? ofp.navlog.fix : ofp.navlog?.fix ? [ofp.navlog.fix] : []).filter(f => f.pos_lat && f.pos_long);
+  const cs = `${g.icao_airline || ""}${g.flight_number || ""}`;
+  const dt = s => s ? new Date(sbNum(s) * 1000) : null;
+  const dur = s => { const m = Math.round(sbNum(s) / 60); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`; };
+  // vítr a teplota v cestovní hladině
+  const cruise = fixes.filter(f => f.stage === "CRZ");
+  const cr = cruise.length ? cruise : fixes;
+  const maxWind = cr.reduce((m, f) => sbNum(f.wind_spd) > sbNum(m?.wind_spd) ? f : m, null);
+  const avgIsa = cr.length ? Math.round(cr.reduce((s, f) => s + sbNum(f.oat_isa_dev), 0) / cr.length) : null;
+  // turbulence: odhad podle střihu větru (shear) v plánu
+  const turbLvl = f => sbNum(f.shear) >= 8 ? 2 : sbNum(f.shear) >= 4 ? 1 : 0;
+  const turbFixes = fixes.filter(f => turbLvl(f) > 0);
+  // SIGMET po trase
+  let sigs = [];
+  try { const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/sigmet`, { headers: { apikey: CFG.SUPABASE_KEY } }); const list = await r.json();
+    const inPoly = (lat, lon, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [yi, xi] = poly[i], [yj, xj] = poly[j];
+      if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) c = !c; } return c; };
+    sigs = (Array.isArray(list) ? list : []).filter(sg => fixes.some(f => inPoly(sbNum(f.pos_lat), sbNum(f.pos_long), sg.coords)
+      && (sg.base == null || sg.top == null || (sbNum(f.altitude_feet) >= sg.base * (sg.base < 1000 ? 100 : 1) - 2000 && sbNum(f.altitude_feet) <= sg.top * (sg.top < 1000 ? 100 : 1) + 2000))));
+  } catch { }
+  // aktuální počasí (METAR) přes funkci trackeru
+  let wx = {};
+  try { const ids = [o.icao_code, d.icao_code, a.icao_code].filter(Boolean).join(",");
+    const r = await fetch(`${CFG.SUPABASE_URL}/functions/v1/metar?ids=${ids}`, { headers: { apikey: CFG.SUPABASE_KEY } }); const list = await r.json();
+    for (const m of Array.isArray(list) ? list : []) if (!wx[m.icaoId]) wx[m.icaoId] = m; } catch { }
+  const wind = sbNum(g.avg_wind_comp), en = LANG === "en";
+  const catTxt = c => ({ VFR: en ? "good (VFR)" : "dobré (VFR)", MVFR: en ? "marginal (MVFR)" : "zhoršené (MVFR)", IFR: en ? "poor (IFR)" : "špatné (IFR)", LIFR: en ? "very poor (LIFR)" : "velmi špatné (LIFR)" })[c] || "–";
+  // shrnutí pro pilota
+  const sum = [];
+  sum.push(en ? `Flight time about ${dur(t.est_time_enroute)} h at FL${String(Math.round(sbNum(g.initial_altitude) / 100)).padStart(3, "0")}, ${Math.abs(wind)} kt average ${wind < 0 ? "headwind" : "tailwind"}.`
+    : `Čeká tě asi ${dur(t.est_time_enroute)} h letu ve FL${String(Math.round(sbNum(g.initial_altitude) / 100)).padStart(3, "0")} s průměrným ${wind < 0 ? "čelním" : "zadním"} větrem ${Math.abs(wind)} kt.`);
+  for (const [lab, ap] of [[en ? "Departure" : "Na odletu", o], [en ? "Arrival" : "V cíli", d]]) { const m = wx[ap.icao_code]; if (m) sum.push(`${lab} ${ap.icao_code}: ${catTxt(m.fltCat)}${m.wspd ? (en ? `, wind ${m.wspd} kt` : `, vítr ${m.wspd} kt`) : ""}${m.wgst ? (en ? ` gusting ${m.wgst}` : ` v nárazech ${m.wgst}`) : ""}.`); }
+  if (maxWind) sum.push(en ? `Strongest wind ${maxWind.wind_spd} kt near ${maxWind.ident}.` : `Nejsilnější vítr ${maxWind.wind_spd} kt u bodu ${maxWind.ident}.`);
+  sum.push(turbFixes.length ? (en ? `Possible ${turbFixes.some(f => turbLvl(f) === 2) ? "moderate to strong" : "light to moderate"} turbulence near ${[...new Set(turbFixes.map(f => f.ident))].slice(0, 4).join(", ")}.`
+    : `Možné ${turbFixes.some(f => turbLvl(f) === 2) ? "mírné až silné" : "slabé až mírné"} turbulence u bodů ${[...new Set(turbFixes.map(f => f.ident))].slice(0, 4).join(", ")}.`) : (en ? "Smooth ride expected en route." : "Po trase by mělo být klidně."));
+  if (sigs.length) sum.push(en ? `${sigs.length} SIGMET(s) along the route – see below.` : `Po trase ${sigs.length} varování SIGMET – viz níže.`);
+  const wxCard = (lab, ap) => { if (!ap?.icao_code) return ""; const m = wx[ap.icao_code];
+    return `<div class="card" style="margin:0"><h3 style="margin:0 0 4px">${esc(lab)}: ${esc(ap.icao_code)} <span class="muted" style="font-weight:400;font-size:14px">${esc(ap.name || "")}</span></h3>
+      ${ap.plan_rwy ? `<div class="muted" style="font-size:13px">RWY ${esc(ap.plan_rwy)}</div>` : ""}
+      ${m ? `<p style="margin:6px 0 4px">${m.fltCat ? `<span class="cat-chip cat-${esc(m.fltCat)}">${esc(m.fltCat)}</span> ` : ""}${esc(tr("Teď"))}: ${m.wspd != null ? `${esc(String(m.wdir ?? ""))}° ${m.wspd} kt` : ""} · ${m.temp != null ? Math.round(m.temp) + " °C" : ""}</p><code class="wx-raw" style="display:block;font-size:11px;white-space:normal">${esc(m.rawOb || "")}</code>` : ""}
+      ${ap.taf ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px">TAF</summary><code class="wx-raw" style="display:block;font-size:11px;white-space:normal">${esc(ap.taf)}</code></details>` : ""}</div>`; };
+  $("sbbOut").innerHTML = `
+    <div class="card" style="margin-top:16px"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline">
+      <div><div class="muted" style="font-size:13px;font-weight:700">${esc(ac.icaocode || "")} ${esc(ac.reg || "")} · ${esc(ac.name || "")}</div>
+        <div style="font:800 30px var(--display)">${esc(cs || "—")} · ${esc(o.icao_code || "?")} → ${esc(d.icao_code || "?")}</div>
+        <div class="muted">${dt(t.sched_out) ? `${esc(tr("Odlet"))} ${hm(dt(t.sched_out))}` : ""}${dt(t.sched_in) ? ` · ${esc(tr("Přílet"))} ${hm(dt(t.sched_in))}` : ""} · ${esc(tr("Blok"))} ${dur(t.est_block)} · ${nf.format(sbNum(g.route_distance))} nm</div></div>
+      ${me ? `<a class="btn ghost" href="#/plany" id="sbbPlan" style="align-self:center">${esc(tr("Naplánovat let"))}</a>` : ""}</div>
+      <ul style="margin:12px 0 0;padding-left:20px;line-height:1.6">${sum.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>
+    <div id="sbMapBox" class="card" style="margin-top:14px;padding:0;overflow:hidden;height:360px"></div>
+    <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:14px">${wxCard(tr("Odlet"), o)}${wxCard(tr("Přílet"), d)}${wxCard(tr("Záložní letiště"), a)}</div>
+    <div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:14px">
+      <div class="card" style="margin:0"><h3 style="margin:0 0 6px">${esc(tr("Výška a vítr"))}</h3><dl class="kv2">
+        <dt>${esc(tr("Cestovní hladina"))}</dt><dd>FL${String(Math.round(sbNum(g.initial_altitude) / 100)).padStart(3, "0")}${g.stepclimb_string ? ` <span class="muted">(${esc(g.stepclimb_string)})</span>` : ""}</dd>
+        <dt>${esc(tr("Průměrný vítr"))}</dt><dd>${esc(g.avg_wind_dir || "")}° / ${esc(g.avg_wind_spd || "")} kt (${wind < 0 ? esc(tr("čelní")) : esc(tr("zadní"))} ${Math.abs(wind)} kt)</dd>
+        <dt>${esc(tr("Odchylka od ISA"))}</dt><dd>${avgIsa != null ? (avgIsa > 0 ? "+" : "") + avgIsa + " °C" : "–"}</dd>
+        <dt>${esc(tr("Tropopauza"))}</dt><dd>${g.avg_tropopause ? nf.format(sbNum(g.avg_tropopause)) + " ft" : "–"}</dd></dl></div>
+      <div class="card" style="margin:0"><h3 style="margin:0 0 6px">${esc(tr("Palivo"))} (${units})</h3><dl class="kv2">
+        <dt>${esc(tr("Na stání (ramp)"))}</dt><dd>${nf.format(sbNum(fu.plan_ramp))}</dd><dt>${esc(tr("Spotřeba na trať"))}</dt><dd>${nf.format(sbNum(fu.enroute_burn))}</dd>
+        <dt>${esc(tr("Rezerva + záloha"))}</dt><dd>${nf.format(sbNum(fu.reserve) + sbNum(fu.alternate_burn))}</dd><dt>${esc(tr("Při přistání"))}</dt><dd>${nf.format(sbNum(fu.plan_landing))}</dd></dl></div>
+      <div class="card" style="margin:0"><h3 style="margin:0 0 6px">${esc(tr("Váhy"))} (${units})</h3><dl class="kv2">
+        <dt>${esc(tr("Cestující"))}</dt><dd>${esc(w.pax_count || "–")}</dd><dt>ZFW</dt><dd>${nf.format(sbNum(w.est_zfw))}</dd><dt>TOW</dt><dd>${nf.format(sbNum(w.est_tow))}</dd><dt>LDW</dt><dd>${nf.format(sbNum(w.est_ldw))}</dd></dl></div></div>
+    ${sigs.length ? `<div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">⚠️ SIGMET ${esc(tr("po trase"))}</h3>${sigs.map(sg => `<details style="margin:4px 0"><summary style="cursor:pointer"><b>${esc(sg.hazard)}</b> ${esc(sg.qualifier || "")} · ${esc(sg.fir || "")}</summary><code class="wx-raw" style="display:block;font-size:11px;white-space:pre-wrap">${esc(sg.raw)}</code></details>`).join("")}</div>` : ""}
+    <div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">${esc(tr("Trasa"))}</h3><code style="white-space:normal;font-size:13px">${esc(g.route || "")}</code></div>`;
+  // mapa trasy: barva podle odhadu turbulence
+  if (sbMap) { sbMap.remove(); sbMap = null; }
+  if (fixes.length && window.L) {
+    sbMap = L.map("sbMapBox", { zoomControl: true, attributionControl: true });
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 12, attribution: "&copy; OpenStreetMap, &copy; CARTO" }).addTo(sbMap);
+    const ll = fixes.map(f => [sbNum(f.pos_lat), sbNum(f.pos_long)]);
+    for (let i = 1; i < fixes.length; i++) { const lv = Math.max(turbLvl(fixes[i - 1]), turbLvl(fixes[i]));
+      L.polyline([ll[i - 1], ll[i]], { color: lv === 2 ? "#DC2626" : lv === 1 ? "#F59E0B" : "#1E9B36", weight: 4 }).addTo(sbMap); }
+    fixes.forEach((f, i) => { if (f.type === "wpt" || i % 3 === 0 || turbLvl(f)) L.circleMarker(ll[i], { radius: 3, color: "#13241A", weight: 1, fillOpacity: 1 })
+      .bindTooltip(`<b>${esc(f.ident)}</b> FL${String(Math.round(sbNum(f.altitude_feet) / 100)).padStart(3, "0")}<br>${esc(f.wind_dir)}°/${esc(f.wind_spd)} kt · ${esc(f.oat)} °C${turbLvl(f) ? `<br>${esc(tr("střih větru"))} ${esc(f.shear)}` : ""}`).addTo(sbMap); });
+    for (const sg of sigs) L.polygon(sg.coords, { color: "#F59E0B", weight: 1, fillOpacity: .12, dashArray: "4 4" }).addTo(sbMap);
+    sbMap.fitBounds(L.latLngBounds(ll).pad(.15));
+    setTimeout(() => { sbMap?.invalidateSize(); sbMap?.fitBounds(L.latLngBounds(ll).pad(.15)); }, 200);
+    L.control({ position: "bottomleft" }).onAdd = function () { return L.DomUtil.create("div"); };
+  }
 }
 
 /* ---------- sdílení letu (odkaz s náhledem pro Discord) ---------- */
