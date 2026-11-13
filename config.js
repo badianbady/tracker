@@ -7,4 +7,4 @@ window.JAI_CONFIG = {
   CONTACT_EMAIL: "support.jachymair@gmail.com", 
   GITHUB_REPO: "badianbady/tracker", // e-mail pro dotazy k osobním údajům, např. "info@jachymair.com"
   TRACKER_ZIP: "JachymAir_Tracker.zip"
-};
+SHARE_URL: "https://crew.jachymair.com/sdilet.php",
