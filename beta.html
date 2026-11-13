@@ -3055,7 +3055,7 @@ async function loadSbBrief(user) {
   if (sbMap) { sbMap.remove(); sbMap = null; }
   if (fixes.length && window.L) {
     sbMap = L.map("sbMapBox", { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 12, attribution: "&copy; OpenStreetMap, &copy; CARTO" }).addTo(sbMap);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 12, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' }).addTo(sbMap);
     const ll = fixes.map(f => [sbNum(f.pos_lat), sbNum(f.pos_long)]);
     for (let i = 1; i < fixes.length; i++) { const lv = Math.max(turbLvl(fixes[i - 1]), turbLvl(fixes[i]));
       L.polyline([ll[i - 1], ll[i]], { color: lv === 2 ? "#DC2626" : lv === 1 ? "#F59E0B" : "#1E9B36", weight: 4 }).addTo(sbMap); }
