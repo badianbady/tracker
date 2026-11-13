@@ -94,6 +94,11 @@
 
   .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 14px; } .kv2 dt { color: var(--muted); } .kv2 dd { margin: 0; font-weight: 600; }
 
+  .vid-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(5,12,8,.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .vid-box { background: var(--card, #fff); color: var(--text, #13241A); border-radius: 16px; padding: 18px 20px; width: min(760px, 96vw); max-height: 94vh; overflow: auto; }
+  .vid-box label { display: flex; gap: 6px; align-items: center; font-weight: 600; font-size: 14px; }
+  .vid-can { width: 100%; max-height: 52vh; object-fit: contain; background: #0B1A12; border-radius: 10px; display: block; }
+
   /* ---------- plánované lety a odznaky ---------- */
   .plan-grid { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
   .plan-grid label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
@@ -824,7 +829,11 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "Briefing ze SimBriefu": "SimBrief briefing", "Načíst briefing": "Load briefing", "Uživatelské jméno nebo Pilot ID v SimBriefu": "SimBrief username or Pilot ID",
+  "a pak": "and then", "🎬 Video": "🎬 Video", "Video letu": "Flight video", "Formát": "Format", "Délka": "Length", "Podklad": "Background", "satelit": "satellite", "mapa": "map",
+  "na šířku 16:9 (YouTube, Discord)": "landscape 16:9 (YouTube, Discord)", "na výšku 9:16 (Shorts, TikTok, Instagram)": "portrait 9:16 (Shorts, TikTok, Instagram)", "Vytvořit video": "Create video",
+  "Video se nahrává v reálném čase, nech prosím okno otevřené, dokud nebude hotovo.": "The video records in real time, keep the window open until it's done.",
+  "Tenhle prohlížeč neumí nahrávat video. Zkus Chrome nebo Edge.": "This browser can't record video. Try Chrome or Edge.", "Připravuji mapu…": "Preparing the map…", "Nahrávám…": "Recording…",
+  "Hotovo ✔ Video se stahuje": "Done ✔ The video is downloading", "Tenhle let nemá dost bodů trasy na video.": "This flight doesn't have enough track points for a video.", "Briefing ze SimBriefu": "SimBrief briefing", "Načíst briefing": "Load briefing", "Uživatelské jméno nebo Pilot ID v SimBriefu": "SimBrief username or Pilot ID",
   "Načti svůj poslední plán ze SimBriefu: počasí, vítr a teplota ve výšce, odhad turbulence, varování SIGMET po trase, palivo a váhy. Funguje pro jakýkoli let.": "Load your latest SimBrief plan: weather, winds and temperature aloft, turbulence estimate, SIGMETs along the route, fuel and weights. Works for any flight.",
   "Plán se nepodařilo načíst:": "Couldn't load the plan:", "Výška a vítr": "Altitude and wind", "Cestovní hladina": "Cruise level", "Průměrný vítr": "Average wind", "čelní": "headwind", "zadní": "tailwind",
   "Odchylka od ISA": "ISA deviation", "Tropopauza": "Tropopause", "Palivo": "Fuel", "Na stání (ramp)": "Ramp", "Spotřeba na trať": "Trip burn", "Rezerva + záloha": "Reserve + alternate",
@@ -2306,7 +2315,7 @@ function renderFlightPanel() {
       : `${d.points != null ? `<div class="fp-sec"><h4>Body za let: ${nf.format(d.points)}</h4>
           <div class="muted" style="font-size:14px">${Object.entries(d.points_detail || {}).map(([k, v]) => `${{ let: "let z rotace", dochvilnost: "dochvilnost", pristani: "přistání", spokojenost: "spokojenost cestujících", jina_varianta_typu: "jiný typ z rodiny", volny_let: "volný let" }[k] || k}: <b>${typeof v === "number" && v > 0 ? "+" : ""}${esc(String(v))}</b>`).join(" · ")}</div>
           ${d.rotation_id ? `<div style="font-size:14px;margin-top:4px">Let z rotace · ${d.delay_min != null ? (d.delay_min <= 0 ? "včas" : `zpoždění ${d.delay_min} min`) : ""}${d.pax_sat != null ? ` · spokojenost cestujících ${d.pax_sat} %` : ""} · <a href="#/briefing/${d.rotation_id}/${d.leg_idx || 0}">briefing</a></div>` : ""}</div>` : ""}
-        <div class="fp-sec" style="display:flex;gap:8px">${(d.path || []).length > 5 ? `<button class="btn" id="fpReplay" style="flex:1">▶ Přehrát let</button>` : ""}<button class="btn ghost" id="fpShare" style="flex:1">🔗 Sdílet</button></div>
+        <div class="fp-sec" style="display:flex;gap:8px">${(d.path || []).length > 5 ? `<button class="btn" id="fpReplay" style="flex:1">▶ Přehrát let</button>` : ""}<button class="btn ghost" id="fpShare" style="flex:1">🔗 Sdílet</button>${!live && (d.path || []).length > 5 ? '<button class="btn ghost" id="fpVideo" style="flex:1">🎬 Video</button>' : ""}</div>
         ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
@@ -2322,6 +2331,7 @@ function renderFlightPanel() {
     ${!live && me && (me.user.id === d.user_id || me.profile?.is_admin) ? `<div class="fp-sec"><button class="link-btn danger" id="fpDelete">Smazat tento let</button></div>` : ""}`;
   $("fpBack").onclick = closeFocus;
   if ($("fpReplay")) $("fpReplay").onclick = () => startReplay(focus.data);
+  if ($("fpVideo")) $("fpVideo").onclick = () => videoDialog(focus.data);
   if ($("fpShare")) $("fpShare").onclick = () => shareFlight(live ? { live: d.user_id } : { let: d.id });
   if ($("fpHideTd")) $("fpHideTd").onchange = async e => { const { error } = await sb.from("flights").update({ hide_landing: e.target.checked }).eq("id", d.id);
     if (error) { alert("Nepodařilo se uložit: " + error.message); e.target.checked = !e.target.checked; return; } d.hide_landing = e.target.checked; toast(e.target.checked ? "Přistání je na mapě skryté." : "Přistání je zase vidět."); refreshRecent(); };
@@ -3067,6 +3077,149 @@ async function loadSbBrief(user) {
     L.control({ position: "bottomleft" }).onAdd = function () { return L.DomUtil.create("div"); };
   }
 }
+
+/* ---------- export videa letu (2D, prohlížeč nahraje animaci do souboru) ---------- */
+function videoDialog(f) {
+  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]);
+  if (pts.length < 6) { alert(tr("Tenhle let nemá dost bodů trasy na video.")); return; }
+  const can = typeof MediaRecorder !== "undefined" && HTMLCanvasElement.prototype.captureStream;
+  let dlg = $("vidDlg"); if (dlg) dlg.remove();
+  dlg = document.createElement("div"); dlg.id = "vidDlg"; dlg.className = "vid-overlay";
+  dlg.innerHTML = `<div class="vid-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 class="section-title" style="margin:0">🎬 ${esc(tr("Video letu"))}</h2><button class="link-btn" id="vidX">✕</button></div>
+    ${can ? `<div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0">
+      <label>${esc(tr("Formát"))} <select id="vidFmt"><option value="h">${esc(tr("na šířku 16:9 (YouTube, Discord)"))}</option><option value="v">${esc(tr("na výšku 9:16 (Shorts, TikTok, Instagram)"))}</option></select></label>
+      <label>${esc(tr("Délka"))} <select id="vidLen"><option value="15">15 s</option><option value="25" selected>25 s</option><option value="45">45 s</option></select></label>
+      <label>${esc(tr("Podklad"))} <select id="vidMap"><option value="sat">${esc(tr("satelit"))}</option><option value="map">${esc(tr("mapa"))}</option></select></label></div>
+      <canvas id="vidCan" class="vid-can"></canvas>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button class="btn" id="vidGo">${esc(tr("Vytvořit video"))}</button><span id="vidSt" class="muted"></span></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">${esc(tr("Video se nahrává v reálném čase, nech prosím okno otevřené, dokud nebude hotovo."))}</p>`
+      : `<p>${esc(tr("Tenhle prohlížeč neumí nahrávat video. Zkus Chrome nebo Edge."))}</p>`}</div>`;
+  document.body.appendChild(dlg);
+  $("vidX").onclick = () => { dlg.remove(); };
+  if (!can) return;
+  const preview = async () => { const r = await buildVideoRenderer(f, pts, $("vidFmt").value, $("vidMap").value, Number($("vidLen").value)); r.draw(0.35 * r.total); };
+  ["vidFmt", "vidMap", "vidLen"].forEach(id => $(id).onchange = preview);
+  preview();
+  $("vidGo").onclick = async () => {
+    $("vidGo").disabled = true; $("vidSt").textContent = tr("Připravuji mapu…");
+    const r = await buildVideoRenderer(f, pts, $("vidFmt").value, $("vidMap").value, Number($("vidLen").value));
+    const types = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+    const mime = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/webm";
+    const stream = r.canvas.captureStream(30), rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 }), chunks = [];
+    rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => {
+      const ext = mime.includes("mp4") ? "mp4" : "webm", blob = new Blob(chunks, { type: mime.split(";")[0] });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${(f.callsign || "let").replace(/\W/g, "")}_${f.dep_icao || ""}-${f.arr_icao || ""}.${ext}`; a.click();
+      $("vidSt").textContent = `${tr("Hotovo ✔ Video se stahuje")} (${ext.toUpperCase()}, ${(blob.size / 1e6).toFixed(1)} MB)`; $("vidGo").disabled = false;
+    };
+    rec.start(500);
+    const t0 = performance.now();
+    const step = now => {
+      const t = (now - t0) / 1000;
+      r.draw(Math.min(t, r.total));
+      $("vidSt").textContent = `${tr("Nahrávám…")} ${Math.min(100, Math.round(t / r.total * 100))} %`;
+      if (t < r.total + .3) requestAnimationFrame(step); else rec.stop();
+    };
+    requestAnimationFrame(step);
+  };
+}
+
+async function buildVideoRenderer(f, pts, fmt, base, flySec) {
+  const W = fmt === "v" ? 1080 : 1920, H = fmt === "v" ? 1920 : 1080;
+  const canvas = $("vidCan"); canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  // Web Mercator
+  const px = (lat, lon, z) => { const s = 256 * 2 ** z, x = (lon + 180) / 360 * s, sl = Math.sin(lat * Math.PI / 180);
+    return [x, (0.5 - Math.log((1 + sl) / (1 - sl)) / (4 * Math.PI)) * s]; };
+  const lats = pts.map(p => p[0]), lons = pts.map(p => p[1]);
+  const box = { n: Math.max(...lats), s: Math.min(...lats), e: Math.max(...lons), w: Math.min(...lons) };
+  const padX = W * .14, padTop = H * (fmt === "v" ? .22 : .2), padBot = H * (fmt === "v" ? .26 : .24);
+  // plynulé přiblížení: trasa vyplní dostupnou plochu (dlaždice celé úrovně se zvětší)
+  const a0 = px(box.n, box.w, 0), b0 = px(box.s, box.e, 0);
+  const zf = Math.min(11, Math.log2(Math.min((W - 2 * padX) / Math.max(1e-6, b0[0] - a0[0]), (H - padTop - padBot) / Math.max(1e-6, b0[1] - a0[1]))));
+  const z = Math.max(2, Math.floor(zf)), sc = 2 ** (zf - z), TS = 256 * sc;
+  const pxs = (lat, lon) => { const q = px(lat, lon, z); return [q[0] * sc, q[1] * sc]; };
+  const a = pxs(box.n, box.w), b = pxs(box.s, box.e);
+  const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2, ox = cx - W / 2, oy = cy - (padTop + (H - padTop - padBot) / 2);
+  const P = (lat, lon) => { const q = pxs(lat, lon); return [q[0] - ox, q[1] - oy]; };
+  // podklad z dlaždic (jednou)
+  const bg = document.createElement("canvas"); bg.width = W; bg.height = H; const bx = bg.getContext("2d");
+  bx.fillStyle = "#0B1A12"; bx.fillRect(0, 0, W, H);
+  const url = (x, y) => base === "sat" ? `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}` : `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+  const tx0 = Math.floor(ox / TS), ty0 = Math.floor(oy / TS), tx1 = Math.floor((ox + W) / TS), ty1 = Math.floor((oy + H) / TS), n = 2 ** z;
+  const jobs = [];
+  for (let tx = tx0; tx <= tx1; tx++) for (let ty = ty0; ty <= ty1; ty++) {
+    if (ty < 0 || ty >= n) continue;
+    jobs.push(new Promise(res => { const im = new Image(); im.crossOrigin = "anonymous";
+      im.onload = () => { bx.drawImage(im, tx * TS - ox, ty * TS - oy, TS + .5, TS + .5); res(); }; im.onerror = () => res(); im.src = url(((tx % n) + n) % n, ty); setTimeout(res, 8000); }));
+  }
+  await Promise.all(jobs);
+  const grad = bx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .3, W / 2, H / 2, Math.max(W, H) * .75);
+  grad.addColorStop(0, "rgba(5,12,8,.25)"); grad.addColorStop(1, "rgba(5,12,8,.75)"); bx.fillStyle = grad; bx.fillRect(0, 0, W, H);
+  // časy bodů jako u přehrávání
+  const timed = pts.filter(p => p.length >= 4).length > pts.length * .8;
+  let times;
+  if (timed) { times = pts.map(p => p[3] || 0); for (let i = 1; i < times.length; i++) if (times[i] < times[i - 1]) times[i] = times[i - 1]; }
+  else { const d = [0]; for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], (pts[i][1] - pts[i - 1][1]) * Math.cos(pts[i][0] * Math.PI / 180)));
+    const tot = (f.duration_min || 60) * 60; times = d.map(x => x / (d[d.length - 1] || 1) * tot); }
+  const T = times[times.length - 1] || 1, XY = pts.map(p => P(p[0], p[1]));
+  const intro = 1.6, outro = f.fpm != null ? 3.6 : 1.5, total = intro + flySec + outro;
+  const S = Math.min(W, H) / 1080, font = (w, s) => `${w} ${Math.round(s * S)}px "Saira Semi Condensed","Arial Narrow",sans-serif`;
+  const card = (x, y, w, h, r = 18 * S) => { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); };
+  const scoreCol = sc => sc >= 9 ? "#1E9B36" : sc >= 7 ? "#65A30D" : sc >= 5 ? "#D97706" : "#DC2626";
+  function draw(t) {
+    const ft = Math.max(0, Math.min(1, (t - intro) / flySec)) * T;
+    let i = 0; while (i < times.length - 2 && times[i + 1] < ft) i++;
+    const k = Math.max(0, Math.min(1, (ft - times[i]) / ((times[i + 1] - times[i]) || 1)));
+    const pa = pts[i], pb = pts[Math.min(i + 1, pts.length - 1)];
+    const cur = [XY[i][0] + (XY[i + 1 < XY.length ? i + 1 : i][0] - XY[i][0]) * k, XY[i][1] + (XY[i + 1 < XY.length ? i + 1 : i][1] - XY[i][1]) * k];
+    const alt = Math.round((pa[2] || 0) + ((pb[2] || 0) - (pa[2] || 0)) * k), gs = pa[4] != null ? Math.round((pa[4] || 0) + ((pb[4] ?? pa[4]) - (pa[4] || 0)) * k) : null;
+    const dt = (times[i + 1] - times[i]) || 0, vs = dt > 0 && pa[2] > 0 && pb[2] > 0 ? Math.round(((pb[2] || 0) - (pa[2] || 0)) / dt * 60 / 10) * 10 : 0;
+    ctx.drawImage(bg, 0, 0);
+    // celá trasa slabě, uletěná část barevně podle výšky
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = "rgba(255,255,255,.28)"; ctx.lineWidth = 4 * S; ctx.setLineDash([10 * S, 10 * S]); ctx.beginPath(); XY.forEach((q, j) => j ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.stroke(); ctx.setLineDash([]);
+    ctx.lineWidth = 7 * S;
+    for (let j = 1; j <= i + 1 && j < XY.length; j++) { const end = j === i + 1 ? cur : XY[j]; ctx.strokeStyle = altColor(pts[j - 1][2] || 0); ctx.beginPath(); ctx.moveTo(XY[j - 1][0], XY[j - 1][1]); ctx.lineTo(end[0], end[1]); ctx.stroke(); }
+    // letiště
+    for (const [q, lab] of [[XY[0], f.dep_icao], [XY[XY.length - 1], f.arr_icao]]) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(q[0], q[1], 9 * S, 0, 7); ctx.fill();
+      ctx.fillStyle = "#1E9B36"; ctx.beginPath(); ctx.arc(q[0], q[1], 5 * S, 0, 7); ctx.fill(); if (lab) { ctx.font = font(700, 30); ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,.8)"; ctx.shadowBlur = 8; ctx.fillText(lab, q[0] + 14 * S, q[1] - 12 * S); ctx.shadowBlur = 0; } }
+    // letadlo
+    const nb = XY[Math.min(i + 1, XY.length - 1)], hd = Math.atan2(nb[0] - XY[i][0], -(nb[1] - XY[i][1]));
+    ctx.save(); ctx.translate(cur[0], cur[1]); ctx.rotate(hd); ctx.shadowColor = "rgba(0,0,0,.7)"; ctx.shadowBlur = 12 * S; ctx.fillStyle = "#fff";
+    const s = 26 * S; ctx.beginPath(); ctx.moveTo(0, -s); ctx.lineTo(s * .18, -s * .2); ctx.lineTo(s * .95, s * .25); ctx.lineTo(s * .95, s * .42); ctx.lineTo(s * .18, s * .18); ctx.lineTo(s * .14, s * .7); ctx.lineTo(s * .38, s * .9);
+    ctx.lineTo(s * .38, s); ctx.lineTo(0, s * .88); ctx.lineTo(-s * .38, s); ctx.lineTo(-s * .38, s * .9); ctx.lineTo(-s * .14, s * .7); ctx.lineTo(-s * .18, s * .18); ctx.lineTo(-s * .95, s * .42); ctx.lineTo(-s * .95, s * .25); ctx.lineTo(-s * .18, -s * .2); ctx.closePath(); ctx.fill(); ctx.restore();
+    // hlavička
+    const m = 48 * S; ctx.fillStyle = "rgba(10,20,14,.78)"; card(m, m, W - 2 * m, 150 * S);
+    ctx.fillStyle = "#fff"; ctx.font = font(800, 64); ctx.fillText(f.callsign || f.flight_no || "", m + 34 * S, m + 78 * S);
+    ctx.font = font(700, 40); ctx.fillStyle = "#8BE3A0"; ctx.fillText(`${f.dep_icao || "?"} → ${f.arr_icao || "?"}`, m + 34 * S, m + 126 * S);
+    ctx.textAlign = "right"; ctx.font = font(700, 30); ctx.fillStyle = "#CFE0D5"; ctx.fillText([f.ac_icao || f.aircraft, f.reg].filter(Boolean).join(" · "), W - m - 34 * S, m + 70 * S);
+    ctx.font = font(600, 26); ctx.fillStyle = "#8BE3A0"; ctx.fillText("JAI Tracker", W - m - 34 * S, m + 118 * S); ctx.textAlign = "left";
+    // údaje dole
+    const boxes = [[alt > 0 ? nf.format(alt) : "–", tr("Výška ft")], [gs != null ? String(gs) : "–", "GS kt"], [alt > 0 ? (vs > 0 ? "+" : "") + nf.format(vs) : "–", "V/S fpm"],
+      [(() => { const tt = Math.round(ft); return `${Math.floor(tt / 3600)}:${String(Math.floor(tt % 3600 / 60)).padStart(2, "0")}`; })(), tr("Čas letu")]];
+    const cols = fmt === "v" ? 2 : 4, bw = (W - 2 * m - (cols - 1) * 16 * S) / cols, bh = 120 * S, rows = Math.ceil(boxes.length / cols);
+    const by0 = H - m - rows * bh - (rows - 1) * 16 * S - 40 * S;
+    boxes.forEach(([v, l], j) => { const bxp = m + (j % cols) * (bw + 16 * S), byp = by0 + Math.floor(j / cols) * (bh + 16 * S);
+      ctx.fillStyle = "rgba(10,20,14,.78)"; card(bxp, byp, bw, bh); ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.font = font(800, 54); ctx.fillText(v, bxp + bw / 2, byp + 66 * S);
+      ctx.font = font(600, 24); ctx.fillStyle = "#A9BDB1"; ctx.fillText(l, bxp + bw / 2, byp + 100 * S); ctx.textAlign = "left"; });
+    ctx.fillStyle = "rgba(255,255,255,.18)"; card(m, H - m - 14 * S, W - 2 * m, 10 * S, 5 * S); ctx.fillStyle = "#1E9B36"; card(m, H - m - 14 * S, (W - 2 * m) * (ft / T), 10 * S, 5 * S);
+    // úvod a závěr
+    if (t < intro) { ctx.fillStyle = `rgba(8,16,11,${1 - t / intro})`; ctx.fillRect(0, 0, W, H); }
+    if (t > intro + flySec && f.fpm != null) {
+      const a2 = Math.min(1, (t - intro - flySec) / .6); ctx.globalAlpha = a2; ctx.fillStyle = "rgba(8,16,11,.6)"; ctx.fillRect(0, 0, W, H);
+      const cw = Math.min(W - 2 * m, 860 * S), chh = 330 * S, cxp = (W - cw) / 2, cyp = (H - chh) / 2;
+      ctx.fillStyle = "rgba(12,24,16,.95)"; card(cxp, cyp, cw, chh, 26 * S);
+      ctx.fillStyle = scoreCol(f.score); card(cxp + 40 * S, cyp + 60 * S, 210 * S, 210 * S, 26 * S);
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.font = font(800, 104); ctx.fillText(String(Number(f.score).toLocaleString(LOCALE, { maximumFractionDigits: 1 })), cxp + 145 * S, cyp + 200 * S);
+      ctx.textAlign = "left"; ctx.font = font(800, 52); ctx.fillText(tr(landingVerdict(f.score)), cxp + 290 * S, cyp + 130 * S);
+      ctx.font = font(600, 36); ctx.fillStyle = "#CFE0D5"; ctx.fillText(`${nf.format(f.fpm)} fpm · ${String(f.g ?? "").replace(".", LANG === "en" ? "." : ",")} G`, cxp + 290 * S, cyp + 190 * S);
+      ctx.fillText(`${f.arr_icao || ""}${f.rwy ? " · RWY " + f.rwy : ""}`, cxp + 290 * S, cyp + 240 * S); ctx.globalAlpha = 1;
+    }
+  }
+  return { canvas, draw, total };
+}
+const landingVerdict = sc => sc >= 9.5 ? "Máslo!" : sc >= 8 ? "Výborné přistání" : sc >= 6 ? "Dobré přistání" : sc >= 4 ? "Tvrdší přistání" : "Tvrdé přistání";
 
 /* ---------- sdílení letu (odkaz s náhledem pro Discord) ---------- */
 async function shareFlight(q) {
