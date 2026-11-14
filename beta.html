@@ -94,6 +94,11 @@
 
   .kv2 { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0; font-size: 14px; } .kv2 dt { color: var(--muted); } .kv2 dd { margin: 0; font-weight: 600; }
 
+  .r3d { position: fixed; inset: 0; z-index: 2500; background: #0B1A12; }
+  .r3d-map, #r3dMap { position: absolute !important; inset: 0; width: 100%; height: 100%; }
+  .r3d-load { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #CFE0D5; font: 700 20px var(--display, sans-serif); }
+  .r3d .r3d-bar { position: absolute; z-index: 5; }
+  .r3d select { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; padding: 4px 6px; }
   .vid-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(5,12,8,.7); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .vid-box { background: var(--card, #fff); color: var(--text, #13241A); border-radius: 16px; padding: 18px 20px; width: min(760px, 96vw); max-height: 94vh; overflow: auto; }
   .vid-box label { display: flex; gap: 6px; align-items: center; font-weight: 600; font-size: 14px; }
@@ -829,7 +834,8 @@ Object.assign(EN, {
   // fotky letadel, obchod
   "Fotku se nepodařilo nahrát:": "The photo couldn't be uploaded:", "Nahrát": "Upload", "Změnit": "Change",
   "a přihlas se stejným e-mailem a heslem jako tady. Když Windows ukáže modré okno „Systém Windows ochránil váš počítač“, klikni na": "and sign in with the same email and password as here. If Windows shows a blue “Windows protected your PC” window, click",
-  "a pak": "and then", "🎬 Video": "🎬 Video", "Video letu": "Flight video", "Formát": "Format", "Délka": "Length", "Podklad": "Background", "satelit": "satellite", "mapa": "map",
+  "a pak": "and then", "Reliéf": "Terrain", "🌍 3D": "🌍 3D", "Načítám 3D krajinu…": "Loading 3D terrain…", "3D knihovnu se nepodařilo načíst.": "Couldn't load the 3D library.", "Kamera za letadlem": "Chase camera",
+  "Z boku": "Side view", "Shora": "Top view", "Volná kamera": "Free camera", "Nahrát": "Record", "Zastavit nahrávání": "Stop recording", "🎬 Video": "🎬 Video", "Video letu": "Flight video", "Formát": "Format", "Délka": "Length", "Podklad": "Background", "satelit": "satellite", "mapa": "map",
   "na šířku 16:9 (YouTube, Discord)": "landscape 16:9 (YouTube, Discord)", "na výšku 9:16 (Shorts, TikTok, Instagram)": "portrait 9:16 (Shorts, TikTok, Instagram)", "Vytvořit video": "Create video",
   "Video se nahrává v reálném čase, nech prosím okno otevřené, dokud nebude hotovo.": "The video records in real time, keep the window open until it's done.",
   "Tenhle prohlížeč neumí nahrávat video. Zkus Chrome nebo Edge.": "This browser can't record video. Try Chrome or Edge.", "Připravuji mapu…": "Preparing the map…", "Nahrávám…": "Recording…",
@@ -2319,7 +2325,7 @@ function renderFlightPanel() {
       : `${d.points != null ? `<div class="fp-sec"><h4>Body za let: ${nf.format(d.points)}</h4>
           <div class="muted" style="font-size:14px">${Object.entries(d.points_detail || {}).map(([k, v]) => `${{ let: "let z rotace", dochvilnost: "dochvilnost", pristani: "přistání", spokojenost: "spokojenost cestujících", jina_varianta_typu: "jiný typ z rodiny", volny_let: "volný let" }[k] || k}: <b>${typeof v === "number" && v > 0 ? "+" : ""}${esc(String(v))}</b>`).join(" · ")}</div>
           ${d.rotation_id ? `<div style="font-size:14px;margin-top:4px">Let z rotace · ${d.delay_min != null ? (d.delay_min <= 0 ? "včas" : `zpoždění ${d.delay_min} min`) : ""}${d.pax_sat != null ? ` · spokojenost cestujících ${d.pax_sat} %` : ""} · <a href="#/briefing/${d.rotation_id}/${d.leg_idx || 0}">briefing</a></div>` : ""}</div>` : ""}
-        <div class="fp-sec" style="display:flex;gap:8px">${(d.path || []).length > 5 ? `<button class="btn" id="fpReplay" style="flex:1">▶ Přehrát let</button>` : ""}<button class="btn ghost" id="fpShare" style="flex:1">🔗 Sdílet</button>${!live && (d.path || []).length > 5 ? '<button class="btn ghost" id="fpVideo" style="flex:1">🎬 Video</button>' : ""}</div>
+        <div class="fp-sec" style="display:flex;gap:8px">${(d.path || []).length > 5 ? `<button class="btn" id="fpReplay" style="flex:1">▶ Přehrát let</button>` : ""}<button class="btn ghost" id="fpShare" style="flex:1">🔗 Sdílet</button>${!live && (d.path || []).length > 5 ? '<button class="btn ghost" id="fpVideo" style="flex:1">🎬 Video</button><button class="btn ghost" id="fp3d" style="flex:1">🌍 3D</button>' : ""}</div>
         ${d.fpm != null ? `<div class="fp-sec">${landingCardHtml(d)}</div>` : `<div class="fp-sec"><span class="incomplete">Nedokončený let</span> <span class="muted" style="font-size:13px">uložen bez přistání</span></div>`}
          <div class="fp-sec"><div class="fp-stats"><div><b>${fmtDur(d.duration_min)}</b><span>Doba letu</span></div><div><b>${nf.format(Math.round(d.distance_nm || 0))}</b><span>nm</span></div>
          <div><b>${d.fuel_used_kg != null ? nf.format(d.fuel_used_kg) : "–"}</b><span>Palivo kg</span></div><div><b>${esc(d.altn || "–")}</b><span>Alternativa</span></div></div></div>`}
@@ -2336,6 +2342,7 @@ function renderFlightPanel() {
   $("fpBack").onclick = closeFocus;
   if ($("fpReplay")) $("fpReplay").onclick = () => startReplay(focus.data);
   if ($("fpVideo")) $("fpVideo").onclick = () => videoDialog(focus.data);
+  if ($("fp3d")) $("fp3d").onclick = () => start3d(focus.data);
   if ($("fpShare")) $("fpShare").onclick = () => shareFlight(live ? { live: d.user_id } : { let: d.id });
   if ($("fpHideTd")) $("fpHideTd").onchange = async e => { const { error } = await sb.from("flights").update({ hide_landing: e.target.checked }).eq("id", d.id);
     if (error) { alert("Nepodařilo se uložit: " + error.message); e.target.checked = !e.target.checked; return; } d.hide_landing = e.target.checked; toast(e.target.checked ? "Přistání je na mapě skryté." : "Přistání je zase vidět."); refreshRecent(); };
@@ -3080,6 +3087,149 @@ async function loadSbBrief(user) {
     setTimeout(() => { sbMap?.invalidateSize(); sbMap?.fitBounds(L.latLngBounds(ll).pad(.15)); }, 200);
     L.control({ position: "bottomleft" }).onAdd = function () { return L.DomUtil.create("div"); };
   }
+}
+
+/* ---------- 3D přehrání letu (MapLibre GL + reliéf terénu) ---------- */
+let r3d = null;
+function loadMapLibre() {
+  if (window.maplibregl) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css"; document.head.appendChild(css);
+    const js = document.createElement("script"); js.src = "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"; js.onload = res; js.onerror = rej; document.head.appendChild(js);
+  });
+}
+function close3d() { if (!r3d) return; cancelAnimationFrame(r3d.raf); try { r3d.rec?.state === "recording" && r3d.rec.stop(); } catch { } r3d.map?.remove(); r3d.el?.remove(); r3d = null; }
+async function start3d(f) {
+  close3d(); stopReplay?.();
+  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]);
+  if (pts.length < 6) return;
+  const el = document.createElement("div"); el.className = "r3d";
+  el.innerHTML = `<div id="r3dMap" class="r3d-map"></div><div class="r3d-load" id="r3dLoad">${esc(tr("Načítám 3D krajinu…"))}</div>
+    <div class="replay-bar r3d-bar">
+      <div class="rp-head"><span class="rp-cs">${esc(f.callsign || f.flight_no || "")}</span><span class="rp-route">${esc(f.dep_icao || "?")} <span class="muted">→</span> ${esc(f.arr_icao || "?")}</span>
+        <span class="rp-ac muted">${esc([f.ac_icao, f.reg].filter(Boolean).join(" · "))}</span><span class="rp-phase" id="r3Phase"></span><button class="rp-x" id="r3X" aria-label="Zavřít">✕</button></div>
+      <div class="rp-stats"><div><b id="r3Alt">–</b><span>${esc(tr("Výška ft"))}</span></div><div><b id="r3Gs">–</b><span>GS kt</span></div><div><b id="r3Vs">–</b><span>V/S fpm</span></div>
+        <div><b id="r3Hdg">–</b><span>${esc(tr("Kurz"))}</span></div><div><b id="r3Time">0:00</b><span>${esc(tr("Čas letu"))}</span></div></div>
+      <div class="rp-ctrl"><button class="rp-play" id="r3Play">⏸</button><div class="rp-track"><input type="range" id="r3Pos" min="0" max="1000" value="0"></div>
+        <select id="r3Speed">${[10, 30, 60, 120, 300].map(x => `<option value="${x}" ${x === 30 ? "selected" : ""}>${x}×</option>`).join("")}</select>
+        <select id="r3Cam"><option value="chase">${esc(tr("Kamera za letadlem"))}</option><option value="side">${esc(tr("Z boku"))}</option><option value="top">${esc(tr("Shora"))}</option><option value="free">${esc(tr("Volná kamera"))}</option></select>
+        <label style="display:flex;gap:4px;align-items:center;font-size:13px;color:#CFE0D5"><input type="checkbox" id="r3Ter" ${localStorage.getItem("jai_3d_terrain") === "0" ? "" : "checked"}> ${esc(tr("Reliéf"))}</label>
+        <button class="btn" id="r3Rec" style="padding:6px 12px">🎬 ${esc(tr("Nahrát"))}</button></div></div>`;
+  document.body.appendChild(el);
+  r3d = { el, t: 0, playing: true, last: performance.now() };
+  $("r3X").onclick = close3d;
+  try { await loadMapLibre(); } catch { $("r3dLoad").textContent = tr("3D knihovnu se nepodařilo načíst."); return; }
+  if (!r3d) return;
+  // časy bodů
+  const timed = pts.filter(p => p.length >= 4).length > pts.length * .8;
+  let times;
+  if (timed) { times = pts.map(p => p[3] || 0); for (let i = 1; i < times.length; i++) if (times[i] < times[i - 1]) times[i] = times[i - 1]; }
+  else { const d = [0]; for (let i = 1; i < pts.length; i++) d.push(d[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], (pts[i][1] - pts[i - 1][1]) * Math.cos(pts[i][0] * Math.PI / 180)));
+    const tot = (f.duration_min || 60) * 60; times = d.map(x => x / (d[d.length - 1] || 1) * tot); }
+  const T = times[times.length - 1] || 1, FT = .3048;
+  // výška nad terénem: odečíst nadmořskou výšku letišť (lineárně mezi odletem a příletem)
+  const e0 = pts[0][2] || 0, e1 = pts[pts.length - 1][2] || 0;
+  const VSCALE = 0.35;      // výška zobrazená v 3D (zmenšená, aby byla trasa i letadlo dobře vidět i v cestovní hladině)
+  const relM = i => Math.max(0, ((pts[i][2] || 0) - (e0 + (e1 - e0) * (times[i] / T)))) * FT * VSCALE;
+  // geometrie pásu trasy ve vzduchu
+  const off = (lat, lon, brg, dist) => { const R = 6371000, d = dist / R, b = brg * Math.PI / 180, la = lat * Math.PI / 180, lo = lon * Math.PI / 180;
+    const la2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b)); const lo2 = lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(la2));
+    return [lo2 * 180 / Math.PI, la2 * 180 / Math.PI]; };
+  const brgOf = (a, b) => { const y = Math.sin((b[1] - a[1]) * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180), x = Math.cos(a[0] * Math.PI / 180) * Math.sin(b[0] * Math.PI / 180) - Math.sin(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.cos((b[1] - a[1]) * Math.PI / 180); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
+  const ribbon = [], curtain = [], track = [];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], br = brgOf(a, b), h = (relM(i - 1) + relM(i)) / 2, col = altColor(((a[2] || 0) + (b[2] || 0)) / 2), w = 90;
+    const poly = [off(a[0], a[1], br - 90, w), off(b[0], b[1], br - 90, w), off(b[0], b[1], br + 90, w), off(a[0], a[1], br + 90, w)]; poly.push(poly[0]);
+    ribbon.push({ type: "Feature", properties: { i, base: Math.max(0, h - 30), top: h + 30, col: `rgb(${col.match(/\d+/g).slice(0, 3).join(",")})` }, geometry: { type: "Polygon", coordinates: [poly] } });
+    track.push({ type: "Feature", properties: { i, col: ribbon[ribbon.length - 1].properties.col }, geometry: { type: "LineString", coordinates: [[a[1], a[0]], [b[1], b[0]]] } });
+    curtain.push({ type: "Feature", properties: { i, top: Math.max(1, h - 30) }, geometry: { type: "Polygon", coordinates: [[off(a[0], a[1], br - 90, 8), off(b[0], b[1], br - 90, 8), off(b[0], b[1], br + 90, 8), off(a[0], a[1], br + 90, 8), off(a[0], a[1], br - 90, 8)]] } });
+  }
+  // silueta letadla (x = napříč, y = podél; nos je y = -1)
+  const PLANE_SHAPE = [[0, -1], [.09, -.82], [.1, -.25], [.95, .2], [.95, .34], [.1, .12], [.08, .66], [.36, .86], [.36, .97], [0, .9], [-.36, .97], [-.36, .86], [-.08, .66], [-.1, .12], [-.95, .34], [-.95, .2], [-.1, -.25], [-.09, -.82], [0, -1]];
+  const planeFeat = (lat, lon, hdg, hM, size = 700) => {
+    const ring = PLANE_SHAPE.map(([x, y]) => { const p1 = off(lat, lon, hdg, -y * size * .55); return off(p1[1], p1[0], hdg + 90, x * size * .5); });
+    return { type: "FeatureCollection", features: [{ type: "Feature", properties: { base: Math.max(0, hM - size * .03), top: hM + size * .03 }, geometry: { type: "Polygon", coordinates: [ring] } }] }; };
+  const map = new maplibregl.Map({ container: "r3dMap", preserveDrawingBuffer: true, attributionControl: true, maxPitch: 85, pitch: 60, center: [pts[0][1], pts[0][0]], zoom: 12,
+    style: { version: 8, sources: {
+      sat: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 18, attribution: "Imagery &copy; Esri" },
+      dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: "Terrain: Mapzen / AWS Terrain Tiles" } },
+      layers: [{ id: "bg", type: "background", paint: { "background-color": "#7FA7C9" } }, { id: "sat", type: "raster", source: "sat" }],
+      ...(localStorage.getItem("jai_3d_terrain") === "0" ? {} : { terrain: { source: "dem", exaggeration: 1.2 } }) } });
+  r3d.map = map;
+  let started3d = false;
+  const begin3d = () => {
+    if (!r3d || started3d || !(map.style && map.style._loaded)) return;
+    started3d = true;
+    $("r3dLoad")?.remove();
+    map.addSource("trk", { type: "geojson", data: { type: "FeatureCollection", features: track } });
+    map.addLayer({ id: "trk-all", type: "line", source: "trk", paint: { "line-color": "#ffffff", "line-opacity": .35, "line-width": 2, "line-dasharray": [2, 2] } });
+    map.addLayer({ id: "trk-done", type: "line", source: "trk", filter: ["<", ["get", "i"], 0], paint: { "line-color": ["get", "col"], "line-width": 3.5 } });
+    map.addSource("rib", { type: "geojson", data: { type: "FeatureCollection", features: ribbon } });
+    map.addSource("cur", { type: "geojson", data: { type: "FeatureCollection", features: curtain } });
+    map.addSource("plane", { type: "geojson", data: planeFeat(pts[0][0], pts[0][1], 0, 0) });
+    map.addLayer({ id: "rib-all", type: "fill-extrusion", source: "rib", paint: { "fill-extrusion-color": "#ffffff", "fill-extrusion-opacity": .28, "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
+    map.addLayer({ id: "cur-done", type: "fill-extrusion", source: "cur", filter: ["<", ["get", "i"], 0], paint: { "fill-extrusion-color": "#1E9B36", "fill-extrusion-opacity": .25, "fill-extrusion-height": ["get", "top"] } });
+    map.addLayer({ id: "rib-done", type: "fill-extrusion", source: "rib", filter: ["<", ["get", "i"], 0], paint: { "fill-extrusion-color": ["get", "col"], "fill-extrusion-opacity": .95, "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
+    map.addLayer({ id: "plane", type: "fill-extrusion", source: "plane", paint: { "fill-extrusion-color": "#ffffff", "fill-extrusion-opacity": 1, "fill-extrusion-base": ["get", "base"], "fill-extrusion-height": ["get", "top"] } });
+    let idx = 0, hdg = brgOf(pts[0], pts[1]), lastIdx = -1;
+    const frame = () => {
+      while (idx < times.length - 2 && times[idx + 1] < r3d.t) idx++;
+      while (idx > 0 && times[idx] > r3d.t) idx--;
+      const a = pts[idx], b = pts[Math.min(idx + 1, pts.length - 1)], k = Math.max(0, Math.min(1, (r3d.t - times[idx]) / ((times[idx + 1] - times[idx]) || 1)));
+      const lat = a[0] + (b[0] - a[0]) * k, lon = a[1] + (b[1] - a[1]) * k, altFt = Math.round((a[2] || 0) + ((b[2] || 0) - (a[2] || 0)) * k);
+      const hM = relM(idx) + (relM(Math.min(idx + 1, pts.length - 1)) - relM(idx)) * k;
+      const nb = brgOf(a, b); if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) > 1e-4) { let dlt = ((nb - hdg + 540) % 360) - 180; hdg = (hdg + dlt * .12 + 360) % 360; }
+      // velikost záběru podle výšky: čím výš, tím širší pohled
+      const res = Math.max(hM, 350) / 150, zoom = Math.max(7.5, Math.min(15, Math.log2(156543 * Math.cos(lat * Math.PI / 180) / res)));
+      map.getSource("plane").setData(planeFeat(lat, lon, hdg, hM, Math.max(220, res * 60)));
+      if (idx !== lastIdx) { ["rib-done", "cur-done", "trk-done"].forEach(id => map.setFilter(id, ["<=", ["get", "i"], idx])); lastIdx = idx; }
+      // kamera
+      const cam = $("r3Cam").value;
+      // kamera míří mírně před letadlo, aby letadlo (ve výšce) bylo uprostřed záběru
+      if (cam === "chase") { map.jumpTo({ center: off(lat, lon, hdg, Math.max(hM, 150) * .6), zoom, pitch: 50, bearing: hdg }); }
+      else if (cam === "side") { const br = (hdg + 90) % 360; map.jumpTo({ center: off(lat, lon, br, Math.max(hM, 150) * .6), zoom: zoom - .2, pitch: 52, bearing: br }); }
+      else if (cam === "top") map.jumpTo({ center: [lon, lat], zoom: zoom - 1.2, pitch: 0, bearing: hdg });
+      const gs = a[4] != null ? Math.round((a[4] || 0) + ((b[4] ?? a[4]) - (a[4] || 0)) * k) : null, dt = (times[idx + 1] - times[idx]) || 0;
+      const vs = dt > 0 && (a[2] || 0) > 0 && (b[2] || 0) > 0 ? Math.round(((b[2] || 0) - (a[2] || 0)) / dt * 60 / 10) * 10 : 0, tt = Math.round(r3d.t);
+      $("r3Alt").textContent = altFt > 0 ? nf.format(altFt) : "–"; $("r3Gs").textContent = gs ?? "–"; $("r3Vs").textContent = altFt > 0 ? (vs > 0 ? "+" : "") + nf.format(vs) : "–";
+      $("r3Hdg").textContent = String(Math.round(hdg)).padStart(3, "0") + "°"; $("r3Time").textContent = `${Math.floor(tt / 3600)}:${String(Math.floor(tt % 3600 / 60)).padStart(2, "0")}:${String(tt % 60).padStart(2, "0")}`;
+      $("r3Phase").textContent = tr(hM < 15 ? ((gs ?? 0) > 3 ? "Pojíždění" : "Na zemi") : vs > 300 ? "Stoupání" : vs < -300 ? (hM < 1300 ? "Přiblížení" : "Klesání") : "Cestovní let");
+      $("r3Pos").value = Math.round(r3d.t / T * 1000);
+      r3d.hud = { cs: f.callsign || "", route: `${f.dep_icao || "?"} → ${f.arr_icao || "?"}`, alt: $("r3Alt").textContent, gs: $("r3Gs").textContent, vs: $("r3Vs").textContent };
+    };
+    const loop = now => {
+      if (!r3d) return;
+      const dt = (now - r3d.last) / 1000; r3d.last = now;
+      if (r3d.playing) { r3d.t = Math.min(T, r3d.t + dt * Number($("r3Speed").value)); if (r3d.t >= T) { r3d.playing = false; $("r3Play").textContent = "▶"; if (r3d.rec?.state === "recording") r3d.rec.stop(); } }
+      frame(); if (r3d.comp) drawComp(); r3d.raf = requestAnimationFrame(loop);
+    };
+    $("r3Ter").onchange = e => { localStorage.setItem("jai_3d_terrain", e.target.checked ? "1" : "0"); map.setTerrain(e.target.checked ? { source: "dem", exaggeration: 1.2 } : null); };
+    $("r3Play").onclick = () => { if (r3d.t >= T) r3d.t = 0; r3d.playing = !r3d.playing; $("r3Play").textContent = r3d.playing ? "⏸" : "▶"; };
+    $("r3Pos").oninput = e => { r3d.t = Number(e.target.value) / 1000 * T; idx = 0; };
+    // nahrávání 3D videa: mapa + popisky do jednoho obrázku
+    const drawComp = () => { const c = r3d.comp, x = c.getContext("2d"), mc = map.getCanvas(); x.drawImage(mc, 0, 0, c.width, c.height);
+      const S = c.height / 1080; x.fillStyle = "rgba(10,20,14,.8)"; x.beginPath(); x.roundRect(40 * S, 40 * S, 620 * S, 140 * S, 18 * S); x.fill();
+      x.fillStyle = "#fff"; x.font = `800 ${60 * S}px "Saira Semi Condensed",sans-serif`; x.fillText(r3d.hud?.cs || "", 70 * S, 110 * S);
+      x.fillStyle = "#8BE3A0"; x.font = `700 ${36 * S}px "Saira Semi Condensed",sans-serif`; x.fillText(r3d.hud?.route || "", 70 * S, 158 * S);
+      const items = [[r3d.hud?.alt, tr("Výška ft")], [r3d.hud?.gs, "GS kt"], [r3d.hud?.vs, "V/S fpm"]];
+      items.forEach(([v, l], j) => { const bx = 40 * S + j * 230 * S, by = c.height - 170 * S; x.fillStyle = "rgba(10,20,14,.8)"; x.beginPath(); x.roundRect(bx, by, 210 * S, 120 * S, 16 * S); x.fill();
+        x.textAlign = "center"; x.fillStyle = "#fff"; x.font = `800 ${50 * S}px "Saira Semi Condensed",sans-serif`; x.fillText(v || "–", bx + 105 * S, by + 66 * S);
+        x.fillStyle = "#A9BDB1"; x.font = `600 ${22 * S}px sans-serif`; x.fillText(l, bx + 105 * S, by + 100 * S); x.textAlign = "left"; });
+      x.textAlign = "right"; x.fillStyle = "#8BE3A0"; x.font = `700 ${30 * S}px "Saira Semi Condensed",sans-serif`; x.fillText("JAI Tracker", c.width - 40 * S, 80 * S); x.textAlign = "left"; };
+    $("r3Rec").onclick = () => {
+      if (r3d.rec?.state === "recording") { r3d.rec.stop(); return; }
+      const mc = map.getCanvas(), c = document.createElement("canvas"); c.width = mc.width; c.height = mc.height; r3d.comp = c;
+      const types = ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm"], mime = types.find(t => MediaRecorder.isTypeSupported(t)) || "video/webm";
+      const rec = new MediaRecorder(c.captureStream(30), { mimeType: mime, videoBitsPerSecond: 10_000_000 }), chunks = [];
+      rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+      rec.onstop = () => { r3d && (r3d.comp = null); $("r3Rec").textContent = "🎬 " + tr("Nahrát"); const blob = new Blob(chunks, { type: mime.split(";")[0] }), a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = `${(f.callsign || "let").replace(/\W/g, "")}_3D.${mime.includes("mp4") ? "mp4" : "webm"}`; a.click(); };
+      rec.start(500); r3d.rec = rec; $("r3Rec").textContent = "■ " + tr("Zastavit nahrávání");
+      if (r3d.t >= T) r3d.t = 0; r3d.playing = true; $("r3Play").textContent = "⏸";
+    };
+    r3d.raf = requestAnimationFrame(loop);
+  };
+  map.on("style.load", begin3d); map.on("load", begin3d); map.on("idle", begin3d);
 }
 
 /* ---------- export videa letu (2D, prohlížeč nahraje animaci do souboru) ---------- */
