@@ -1532,9 +1532,20 @@ function altColor(alt) {
 // nakreslí trasu obarvenou podle výšky (jako Flightradar24)
 const okPt = p => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]) && !(Math.abs(p[0]) < 1 && Math.abs(p[1]) < 1) && Math.abs(p[0]) <= 90 && Math.abs(p[1]) <= 180;   // okolí bodu 0,0 = simulátor se načítá
 const kmBetween = (a, b) => { const r = Math.PI / 180, x = (b[1] - a[1]) * r * Math.cos((a[0] + b[0]) / 2 * r), y = (b[0] - a[0]) * r; return Math.hypot(x, y) * 6371; };
+// datová hranice (180. poledník): délky navázat plynule, aby trasa nepřeskočila přes celou mapu
+function unwrapLL(pts, anchorEnd = false) {
+  let prev = null;
+  const out = (pts || []).map(p => { let lon = p[1]; if (prev != null) { while (lon - prev > 180) lon -= 360; while (lon - prev < -180) lon += 360; } prev = lon; return [p[0], lon, ...p.slice(2)]; });
+  if (anchorEnd && out.length) {     // konec trasy (aktuální poloha letadla) ponechat ve „skutečné“ délce, posunout začátek
+    const last = out[out.length - 1][1]; let shift = 0; while (last + shift > 180) shift -= 360; while (last + shift < -180) shift += 360;
+    if (shift) out.forEach(p => { p[1] += shift; });
+  }
+  return out;
+}
+const unwrapNear = (lon, ref) => { while (lon - ref > 180) lon -= 360; while (lon - ref < -180) lon += 360; return lon; };
 function drawAltTrail(group, pts, weight, renderer) {
   group.clearLayers();
-  pts = (pts || []).filter(okPt);
+  pts = unwrapLL((pts || []).filter(okPt), true);
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i];
     if (kmBetween(a, b) > 250) continue;        // skok (přesun v simulátoru) – nekreslit
@@ -1981,7 +1992,7 @@ function renderLive() {
     let pl = planLines.get(r.user_id);
     if (fixes.length > 1) {
       const st = { color: isJai ? "#1E9B36" : "#66788A", weight: Math.max(2, w * 0.45), opacity: sel ? .95 : .65, dashArray: "6 7", interactive: false };
-      const ll = fixes.map(f => [f[0], f[1]]);
+      const ll = unwrapLL(fixes).map(f => [f[0], f[1]]);
       if (!pl) { pl = L.polyline(ll, st).addTo(map); planLines.set(r.user_id, pl); } else { pl.setLatLngs(ll); pl.setStyle(st); }
       const sig = fixes.length + "|" + r.plan.dep + r.plan.arr + "|" + settings.waypoints;
       let wp = wpLayers.get(r.user_id);
@@ -2247,16 +2258,17 @@ function redrawFocus(fit) {
   focusLayer.clearLayers();
   const fixes = Array.isArray(f.plan_fixes) ? f.plan_fixes : [];
   if (fixes.length > 1) {
-    L.polyline(fixes.map(x => [x[0], x[1]]), { color: "#66788A", weight: Math.max(2, settings.trail * 0.45), opacity: .7, dashArray: "6 7", interactive: false }).addTo(focusLayer);
+    L.polyline(unwrapLL(fixes).map(x => [x[0], x[1]]), { color: "#66788A", weight: Math.max(2, settings.trail * 0.45), opacity: .7, dashArray: "6 7", interactive: false }).addTo(focusLayer);
     drawWaypoints(L.layerGroup().addTo(focusLayer), fixes);
   }
   const pts = Array.isArray(f.path) ? f.path : [];
   if (pts.length > 1) drawAltTrail(L.layerGroup().addTo(focusLayer), pts, settings.trail + 1, trailRenderer);
   const hideTd = f.hide_landing && !(me && me.user.id === f.user_id);        // pilot přistání skryl
-  if (f.td_lat != null && !hideTd) L.marker([f.td_lat, f.td_lon], { icon: tdIcon(f.score, true, f.fpm), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
-  if (pts.length) L.circleMarker([pts[0][0], pts[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(focusLayer);
+  const uw = unwrapLL(pts.filter(okPt), true), tdLon = f.td_lon != null && uw.length ? unwrapNear(f.td_lon, uw[uw.length - 1][1]) : f.td_lon;
+  if (f.td_lat != null && !hideTd) L.marker([f.td_lat, tdLon], { icon: tdIcon(f.score, true, f.fpm), zIndexOffset: 2000 }).bindPopup(landingCardHtml(f), { maxWidth: 360 }).addTo(focusLayer);
+  if (uw.length) L.circleMarker([uw[0][0], uw[0][1]], { radius: 6, color: "#116B26", fillColor: "#fff", fillOpacity: 1, weight: 3 }).bindTooltip("Vzlet " + (f.dep_icao || "")).addTo(focusLayer);
   if (fit) {
-    const all = pts.map(p => [p[0], p[1]]).concat(fixes.map(x => [x[0], x[1]]));
+    const all = uw.map(p => [p[0], p[1]]).concat(unwrapLL(fixes).map(x => [x[0], x[1]]));
     if (all.length > 1) map.fitBounds(L.latLngBounds(all).pad(0.15), { paddingTopLeft: [380, 0] });
     else if (f.td_lat != null) map.setView([f.td_lat, f.td_lon], 13);
   }
@@ -2916,7 +2928,7 @@ function stopReplay() {
 }
 function startReplay(f) {
   stopReplay();
-  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]);
+  const pts = unwrapLL((Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]));
   if (pts.length < 3) return;
   // čas bodu: nové lety mají sekundy od začátku, u starších se dopočítá podle vzdálenosti
   const timed = pts.filter(p => p.length >= 4).length > pts.length * .8;
@@ -3101,7 +3113,7 @@ function loadMapLibre() {
 function close3d() { if (!r3d) return; cancelAnimationFrame(r3d.raf); try { r3d.rec?.state === "recording" && r3d.rec.stop(); } catch { } r3d.map?.remove(); r3d.el?.remove(); r3d = null; }
 async function start3d(f) {
   close3d(); stopReplay?.();
-  const pts = (Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]);
+  const pts = unwrapLL((Array.isArray(f.path) ? f.path : []).filter(p => p && p[0] && p[1]));
   if (pts.length < 6) return;
   const el = document.createElement("div"); el.className = "r3d";
   el.innerHTML = `<div id="r3dMap" class="r3d-map"></div><div class="r3d-load" id="r3dLoad">${esc(tr("Načítám 3D krajinu…"))}</div>
@@ -3113,7 +3125,7 @@ async function start3d(f) {
       <div class="rp-ctrl"><button class="rp-play" id="r3Play">⏸</button><div class="rp-track"><input type="range" id="r3Pos" min="0" max="1000" value="0"></div>
         <select id="r3Speed">${[10, 30, 60, 120, 300].map(x => `<option value="${x}" ${x === 30 ? "selected" : ""}>${x}×</option>`).join("")}</select>
         <select id="r3Cam"><option value="chase">${esc(tr("Kamera za letadlem"))}</option><option value="side">${esc(tr("Z boku"))}</option><option value="top">${esc(tr("Shora"))}</option><option value="free">${esc(tr("Volná kamera"))}</option></select>
-        <label style="display:flex;gap:4px;align-items:center;font-size:13px;color:#CFE0D5"><input type="checkbox" id="r3Ter" ${localStorage.getItem("jai_3d_terrain") === "0" ? "" : "checked"}> ${esc(tr("Reliéf"))}</label>
+        <label style="display:flex;gap:4px;align-items:center;font-size:13px;color:#CFE0D5"><input type="checkbox" id="r3Ter" ${localStorage.getItem("jai_3d_terrain") === "1" ? "checked" : ""}> ${esc(tr("Reliéf"))}</label>
         <button class="btn" id="r3Rec" style="padding:6px 12px">🎬 ${esc(tr("Nahrát"))}</button></div></div>`;
   document.body.appendChild(el);
   r3d = { el, t: 0, playing: true, last: performance.now() };
@@ -3137,8 +3149,13 @@ async function start3d(f) {
     return [lo2 * 180 / Math.PI, la2 * 180 / Math.PI]; };
   const brgOf = (a, b) => { const y = Math.sin((b[1] - a[1]) * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180), x = Math.cos(a[0] * Math.PI / 180) * Math.sin(b[0] * Math.PI / 180) - Math.sin(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.cos((b[1] - a[1]) * Math.PI / 180); return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360; };
   const ribbon = [], curtain = [], track = [];
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], b = pts[i], br = brgOf(a, b), h = (relM(i - 1) + relM(i)) / 2, col = altColor(((a[2] || 0) + (b[2] || 0)) / 2), w = 90;
+  // zjednodušená geometrie: nejvýš ~260 úseků (dlouhé lety mají tisíce bodů)
+  const step = Math.max(1, Math.ceil(pts.length / 260)), keyIdx = [];
+  for (let i = 0; i < pts.length; i += step) keyIdx.push(i);
+  if (keyIdx[keyIdx.length - 1] !== pts.length - 1) keyIdx.push(pts.length - 1);
+  for (let kk = 1; kk < keyIdx.length; kk++) {
+    const ia = keyIdx[kk - 1], i = keyIdx[kk];
+    const a = pts[ia], b = pts[i], br = brgOf(a, b), h = (relM(ia) + relM(i)) / 2, col = altColor(((a[2] || 0) + (b[2] || 0)) / 2), w = 110;
     const poly = [off(a[0], a[1], br - 90, w), off(b[0], b[1], br - 90, w), off(b[0], b[1], br + 90, w), off(a[0], a[1], br + 90, w)]; poly.push(poly[0]);
     ribbon.push({ type: "Feature", properties: { i, base: Math.max(0, h - 30), top: h + 30, col: `rgb(${col.match(/\d+/g).slice(0, 3).join(",")})` }, geometry: { type: "Polygon", coordinates: [poly] } });
     track.push({ type: "Feature", properties: { i, col: ribbon[ribbon.length - 1].properties.col }, geometry: { type: "LineString", coordinates: [[a[1], a[0]], [b[1], b[0]]] } });
@@ -3149,12 +3166,13 @@ async function start3d(f) {
   const planeFeat = (lat, lon, hdg, hM, size = 700) => {
     const ring = PLANE_SHAPE.map(([x, y]) => { const p1 = off(lat, lon, hdg, -y * size * .55); return off(p1[1], p1[0], hdg + 90, x * size * .5); });
     return { type: "FeatureCollection", features: [{ type: "Feature", properties: { base: Math.max(0, hM - size * .03), top: hM + size * .03 }, geometry: { type: "Polygon", coordinates: [ring] } }] }; };
-  const map = new maplibregl.Map({ container: "r3dMap", preserveDrawingBuffer: true, attributionControl: true, maxPitch: 85, pitch: 60, center: [pts[0][1], pts[0][0]], zoom: 12,
+  const map = new maplibregl.Map({ container: "r3dMap", preserveDrawingBuffer: true, attributionControl: true, maxPitch: 75, pitch: 50, center: [pts[0][1], pts[0][0]], zoom: 11,
+    pixelRatio: Math.min(window.devicePixelRatio || 1, 1), fadeDuration: 0, maxTileCacheSize: 400,
     style: { version: 8, sources: {
-      sat: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 18, attribution: "Imagery &copy; Esri" },
+      sat: { type: "raster", tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], tileSize: 256, maxzoom: 13, attribution: "Imagery &copy; Esri" },
       dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 14, encoding: "terrarium", attribution: "Terrain: Mapzen / AWS Terrain Tiles" } },
-      layers: [{ id: "bg", type: "background", paint: { "background-color": "#7FA7C9" } }, { id: "sat", type: "raster", source: "sat" }],
-      ...(localStorage.getItem("jai_3d_terrain") === "0" ? {} : { terrain: { source: "dem", exaggeration: 1.2 } }) } });
+      layers: [{ id: "bg", type: "background", paint: { "background-color": "#1d3b52" } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-fade-duration": 0 } }],
+      ...(localStorage.getItem("jai_3d_terrain") === "1" ? { terrain: { source: "dem", exaggeration: 1.2 } } : {}) } });
   r3d.map = map;
   let started3d = false;
   const begin3d = () => {
@@ -3180,9 +3198,12 @@ async function start3d(f) {
       const hM = relM(idx) + (relM(Math.min(idx + 1, pts.length - 1)) - relM(idx)) * k;
       const nb = brgOf(a, b); if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) > 1e-4) { let dlt = ((nb - hdg + 540) % 360) - 180; hdg = (hdg + dlt * .12 + 360) % 360; }
       // velikost záběru podle výšky: čím výš, tím širší pohled
-      const res = Math.max(hM, 350) / 150, zoom = Math.max(7.5, Math.min(15, Math.log2(156543 * Math.cos(lat * Math.PI / 180) / res)));
+      const res = Math.max(hM, 350) / 150, zTarget = Math.max(7.5, Math.min(12.5, Math.log2(156543 * Math.cos(lat * Math.PI / 180) / res)));
+      r3d.camZ = r3d.camZ == null ? zTarget : r3d.camZ + (zTarget - r3d.camZ) * .04;      // plynulá změna přiblížení = méně načítání dlaždic
+      const zoom = r3d.camZ;
       map.getSource("plane").setData(planeFeat(lat, lon, hdg, hM, Math.max(220, res * 60)));
-      if (idx !== lastIdx) { ["rib-done", "cur-done", "trk-done"].forEach(id => map.setFilter(id, ["<=", ["get", "i"], idx])); lastIdx = idx; }
+      const doneKey = Math.floor(idx / step);
+      if (doneKey !== lastIdx) { ["rib-done", "cur-done", "trk-done"].forEach(id => map.setFilter(id, ["<=", ["get", "i"], idx])); lastIdx = doneKey; }
       // kamera
       const cam = $("r3Cam").value;
       // kamera míří mírně před letadlo, aby letadlo (ve výšce) bylo uprostřed záběru
@@ -3279,6 +3300,7 @@ function videoDialog(f) {
 }
 
 async function buildVideoRenderer(f, pts, fmt, base, flySec) {
+  pts = unwrapLL(pts);
   const W = fmt === "v" ? 1080 : 1920, H = fmt === "v" ? 1920 : 1080;
   const canvas = $("vidCan"); canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext("2d");
